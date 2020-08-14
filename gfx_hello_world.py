@@ -7,12 +7,12 @@
 #
 ######################################################################
 
-import transformations
 import numpy as np
 
 import glfw
 from CleanGL import gl
 import graphics as gfx
+import transformations as tf
 
 ######################################################################
 
@@ -121,8 +121,8 @@ class HelloWorldApp(gfx.GlfwApp):
 
         if self.view is None:
 
-            Rx = transformations.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
-            Ry = transformations.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
+            Rx = tf.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
+            Ry = tf.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
 
             R_mouse = np.dot(Rx, Ry).astype(np.float32)
         
