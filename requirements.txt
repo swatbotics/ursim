@@ -4,4 +4,5 @@ PyOpenGL ~= 3.1.5
 Pillow ~= 7.2.0
 Box2D ~= 2.3.10
 transformations ~= 2020.1.1
-
+svgelements ~= 1.2.0
+matplotlib ~= 3.3.1

@@ -12,7 +12,6 @@ import numpy as np
 import glfw
 from CleanGL import gl
 import graphics as gfx
-import transformations as tf
 
 ######################################################################
 
@@ -82,7 +81,7 @@ class HelloWorldApp(gfx.GlfwApp):
 
         foo = (self.mouse_pos / self.framebuffer_size)
 
-        self.yrot = gfx.mix(-2*np.pi, 2*np.pi, foo[0]) - np.pi*3/4
+        self.yrot = gfx.mix(-2*np.pi, 2*np.pi, foo[0])
         self.xrot = gfx.mix(np.pi/2, -np.pi/4, np.clip(foo[1], 0, 1))
 
         self.need_render = True
@@ -121,12 +120,12 @@ class HelloWorldApp(gfx.GlfwApp):
 
         if self.view is None:
 
-            Rx = tf.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
-            Ry = tf.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
+            Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
+            Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
 
-            R_mouse = np.dot(Rx, Ry).astype(np.float32)
+            R_mouse = np.dot(Rx, Ry)
         
-            self.view = gfx.look_at(eye=gfx.vec3(0, -3, 0),
+            self.view = gfx.look_at(eye=gfx.vec3(2, 2, 0),
                                     center=gfx.vec3(0, 0, 0),
                                     up=gfx.vec3(0, 0, 1),
                                     Rextra=R_mouse)

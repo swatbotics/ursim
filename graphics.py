@@ -13,6 +13,7 @@ from CleanGL import gl
 from PIL import Image
 from ctypes import c_void_p
 import numpy
+import transformations as tf
 
 ######################################################################
 
@@ -177,7 +178,7 @@ def perspective_matrix(fovy, aspect, near, far):
 
 ######################################################################
 
-def rotation_from_axes(idx0, axis0, idx1, axis1_suggestion):
+def rotation_from_axes(idx0, axis0, idx1, axis1_suggestion, dim=4):
 
     assert idx0 in range(3)
     assert idx1 in range(3)
@@ -187,36 +188,54 @@ def rotation_from_axes(idx0, axis0, idx1, axis1_suggestion):
     assert axis0.dtype == numpy.float32 and axis0.shape == (3,)
     assert axis1_suggestion.dtype == numpy.float32 and axis1_suggestion.shape == (3,)
 
-    R = numpy.empty((3, 3), dtype=numpy.float32)
+    R = numpy.identity(dim, dtype=numpy.float32)
 
     s = 1 if (idx1 == (idx0 + 1) % 3) else -1
     u = normalize(axis0)
     w = s*normalize(numpy.cross(u, axis1_suggestion))
     v = s*numpy.cross(w, u)
 
-    R[idx0] = u
-    R[idx1] = v
-    R[idx2] = w
+    R[idx0,:3] = u
+    R[idx1,:3] = v
+    R[idx2,:3] = w
 
     return R
 
 ######################################################################
 
+def rotation_matrix(angle, axis, point=None):
+    return tf.rotation_matrix(angle, axis, point).astype(numpy.float32)
+
+def translation_matrix(direction):
+    return tf.translation_matrix(direction).astype(numpy.float32)
+
+def rigid_2d_matrix(position, angle, z=0.0):
+
+    x, y = position
+    c = numpy.cos(angle)
+    s = numpy.sin(angle)
+
+    return numpy.array([[c, -s, 0, x],
+                        [s, c, 0,  y],
+                        [0, 0, 1,  z],
+                        [0, 0, 0,  1]], dtype=numpy.float32)
+
+######################################################################
+
 def look_at(eye, center, up, Rextra=None):
 
-    R = rotation_from_axes(2, eye-center, 1, up)
+    diff = eye-center
+    zdist = numpy.linalg.norm(diff)
 
-    if Rextra is None:
-        RR = R
-    else:
-        RR = numpy.dot(Rextra[:3, :3], R)
+    RT = rotation_from_axes(2, diff, 1, up, dim=4)
 
-    M = numpy.eye(4, dtype=numpy.float32)
+    if Rextra is not None:
+        RT = numpy.dot(Rextra, RT)        
 
-    M[:3, :3] = RR
-    M[:3, 3] = -numpy.dot(R, eye)
+    T1 = translation_matrix(vec3(0, 0, -zdist))
+    T0 = translation_matrix(-center)
 
-    return M
+    return numpy.dot(T1, numpy.dot(RT, T0))
 
 ######################################################################
 
@@ -303,8 +322,13 @@ class IndexedPrimitives:
         uniform bool useTexture;
         uniform sampler2D materialTexture;
         uniform vec3 materialColor;
+
+        uniform float specularExponent;
+        uniform float specularStrength;
+
         uniform vec3 viewPos;
         uniform vec3 lightDir;
+
 
         in vec3 fragPos;
         in vec3 fragNormal;
@@ -328,8 +352,8 @@ class IndexedPrimitives:
 
             vec3 viewDir = normalize(viewPos - fragPos);
             vec3 halfDir = normalize(viewDir + lightDir);
-            float specAmount = pow(max(dot(normal, halfDir), 0.0), 40.0);
-            color = mix(color, vec3(1.0), 0.75*specAmount);
+            float specAmount = pow(max(dot(normal, halfDir), 0.0), specularExponent);
+            color = mix(color, vec3(1.0), specularStrength*specAmount);
 
             fragColor = vec4(color, 1.0);
 
@@ -619,8 +643,6 @@ class IndexedPrimitives:
 
         if indices is None:
             self.element_buffer = None
-            assert mode == gl.TRIANGLES
-            assert len(positions_normals_texcoords) % 3 == 0
             self.element_count = len(positions_normals_texcoords)
             self.element_type = None
         else:
@@ -657,13 +679,17 @@ class IndexedPrimitives:
 
         self.color = color
         self.texture = texture
+
+        self.specular_exponent = 40.0
+        self.specular_strength = 0.75
         
     def render(self):
 
         gl.UseProgram(self.program)
 
         set_uniform(self.uniforms['materialColor'], self.color)
-
+        set_uniform(self.uniforms['specularExponent'], self.specular_exponent)
+        set_uniform(self.uniforms['specularStrength'], self.specular_strength)
         set_uniform(self.uniforms['model'], self.model_pose)
 
         if self.texture is None:
