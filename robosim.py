@@ -60,13 +60,16 @@ def vec_from_color(color):
 
 class SimObject:
 
-    def render_setup(self):
+    def init_render(self):
         pass
 
     def render(self):
         pass
 
     def setup_sim(self, world):
+        pass
+
+    def sim_update(self):
         pass
 
 ######################################################################
@@ -83,26 +86,21 @@ class Pylon(SimObject):
         self.position = position
         self.color = color
 
-    def render_setup(self):
+    def init_render(self):
+
+        if self.gfx_object is None:
+            self.gfx_object = gfx.IndexedPrimitives.cylinder(
+                PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
+                self.color, None, None)
+        
+    def render(self):
 
         self.model_pose = gfx.translation_matrix(
             gfx.vec3(self.position[0], self.position[1], 0.5*PYLON_HEIGHT))
 
-        if self.gfx_object is None:
-            
-            self.gfx_object = gfx.IndexedPrimitives.cylinder(
-                PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
-                self.color, None, self.model_pose)
-
-        else:
-
-            self.gfx_object.color = self.color
-            self.gfx_object.model_pose = self.model_pose
+        self.gfx_object.color = self.color
+        self.gfx_object.model_pose = self.model_pose
         
-    def render(self):
-
-        self.render_setup()
-
         self.gfx_object.render()
 
 ######################################################################
@@ -117,28 +115,23 @@ class Ball(SimObject):
 
         self.position = position
 
-    def render_setup(self):
-
-        self.model_pose = gfx.translation_matrix(
-            gfx.vec3(self.position[0], self.position[1], BALL_RADIUS))
+    def init_render(self):
 
         if self.gfx_object is None:
             
             self.gfx_object = gfx.IndexedPrimitives.sphere(
                 BALL_RADIUS, 32, 24, 
-                BALL_COLOR, None, self.model_pose)
+                BALL_COLOR, None, None)
 
             self.gfx_object.specular_exponent = 100.
             self.gfx_object.specular_strength = 0.01
-
-        else:
-
-            self.gfx_object.model_pose = self.model_pose
         
     def render(self):
 
-        self.render_setup()
-
+        self.model_pose = gfx.translation_matrix(
+            gfx.vec3(self.position[0], self.position[1], BALL_RADIUS))
+        
+        self.gfx_object.model_pose = self.model_pose
         self.gfx_object.render()
 
 
@@ -158,7 +151,7 @@ class Box(SimObject):
 
         self.gfx_object = None
         
-    def render_setup(self):
+    def init_render(self):
 
         self.model_pose = gfx.rigid_2d_matrix(self.position,
                                               self.angle,
@@ -178,7 +171,7 @@ class Box(SimObject):
 
     def render(self):
 
-        self.render_setup()
+        self.init_render()
         self.gfx_object.render()
 
         
@@ -201,7 +194,7 @@ class Room(SimObject):
         self.floor_gfx_obj = None
         self.room_gfx_obj = None
 
-    def render_setup(self):
+    def init_render(self):
 
         if self.floor_gfx_obj is None:
         
@@ -261,7 +254,7 @@ class Room(SimObject):
 
     def render(self):
 
-        self.render_setup()
+        self.init_render()
 
         self.floor_gfx_obj.render()
         self.room_gfx_obj.render()
@@ -276,7 +269,7 @@ class TapeStrip(SimObject):
 
         self.gfx_object = None
 
-    def render_setup(self):
+    def init_render(self):
 
 
         if self.gfx_object is None:
@@ -350,7 +343,7 @@ class TapeStrip(SimObject):
 
     def render(self):
 
-        self.render_setup()
+        self.init_render()
         self.gfx_object.render()
         
 
@@ -372,7 +365,7 @@ def match_color(color, carray):
     
 ######################################################################
 
-class Transformer:
+class SvgTransformer:
 
     def __init__(self, width, height, scl):
 
@@ -418,35 +411,32 @@ class Transformer:
 
 ######################################################################
 
-class Environment:
+class RoboSim:
 
     def __init__(self):
+
+        self.world = B2D.b2World(gravity=(0, 0), doSleep=True)
 
         self.dims = numpy.array([-1, -1], dtype=numpy.float32)
 
         self.objects = []
 
-    def render(self):
+        
+        print('created the world!')
 
-        for obj in self.objects:
-            obj.render()
-            
-    @classmethod
-    def load_svg(cls, svgfile):
-
-        env = Environment()
+    def load_svg(self, svgfile):
 
         svg = se.SVG.parse(svgfile, color='none')
         print('parsed', svgfile)
 
         scl = 1e-2
         
-        xform = Transformer(svg.viewbox.viewbox_width,
-                            svg.viewbox.viewbox_height, scl)
+        xform = SvgTransformer(svg.viewbox.viewbox_width,
+                               svg.viewbox.viewbox_height, scl)
+        
+        self.dims = xform.dims
 
-        env.dims = xform.dims
-
-        env.objects.append(Room(env.dims))
+        self.objects.append(Room(self.dims))
 
         for item in svg:
 
@@ -484,7 +474,7 @@ class Environment:
                 delta = pfwd-pctr
                 theta = numpy.arctan2(delta[1], delta[0])
 
-                env.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
+                self.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
                 
             elif isinstance(item, se.Circle):
                 
@@ -493,9 +483,9 @@ class Environment:
                 position = xform.transform(item.cx, item.cy)
 
                 if cidx == 0:
-                    env.objects.append(Ball(position))
+                    self.objects.append(Ball(position))
                 else:
-                    env.objects.append(Pylon(position, color))
+                    self.objects.append(Pylon(position, color))
                                         
             elif isinstance(item, se.SimpleLine):
 
@@ -507,7 +497,7 @@ class Environment:
                 if cidx == 0:
                     
                     points = numpy.array([p0, p1])
-                    env.objects.append(TapeStrip(points))
+                    self.objects.append(TapeStrip(points))
                     
                 else:
 
@@ -519,52 +509,43 @@ class Environment:
                     dims = gfx.vec3(numpy.linalg.norm(delta),
                                     WALL_THICKNESS, WALL_HEIGHT)
 
-                    env.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
+                    self.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
                 
             elif isinstance(item, se.Polyline):
                 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
                 
-                env.objects.append(TapeStrip(points))
+                self.objects.append(TapeStrip(points))
                 
             else:
                 
                 print('*** warning: ignoring SVG item:', item, '***')
                 continue
-
-        return env
-
-######################################################################
-
-class RoboSim:
-
-    def __init__(self, env):
-
-        self.env = env
-        self.world = B2D.b2World(gravity=(0, 0), doSleep=True)
-
         
 
-        print('created the world!')
+    def render(self):
 
+        for obj in self.objects:
+            obj.render()
         
         
-
 ######################################################################
 
 class RoboSimApp(gfx.GlfwApp):
 
-    def __init__(self, env, sim):
+    def __init__(self, sim):
 
         super().__init__()
 
         self.create_window('Robot simulator', 1200, 1080)
 
+        for obj in sim.objects:
+            obj.init_render()
+
         gl.Enable(gl.CULL_FACE)
         gl.Enable(gl.FRAMEBUFFER_SRGB)
 
-        self.env = env
         self.sim = sim
 
         self.perspective = None
@@ -628,9 +609,6 @@ class RoboSimApp(gfx.GlfwApp):
 
     def render(self):
 
-        if gfx.IndexedPrimitives.program is None:
-            gfx.IndexedPrimitives.static_init()
-
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
@@ -657,7 +635,7 @@ class RoboSimApp(gfx.GlfwApp):
 
             R_mouse = numpy.dot(Rx, Ry)
 
-            w, h = self.env.dims
+            w, h = self.sim.dims
             m = numpy.linalg.norm([w, h])
         
             self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
@@ -673,7 +651,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         gl.Enable(gl.DEPTH_TEST)
 
-        self.env.render()
+        self.sim.render()
 
 
         
@@ -684,13 +662,13 @@ class RoboSimApp(gfx.GlfwApp):
             
 def _test_load_environment():
 
-    env = Environment.load_svg('environments/first_environment.svg')
 
-    sim = RoboSim(env)
+    sim = RoboSim()
+    sim.load_svg('environments/first_environment.svg')
 
     #return
 
-    app = RoboSimApp(env, sim)
+    app = RoboSimApp(sim)
 
     app.run()
 
