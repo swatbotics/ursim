@@ -36,6 +36,9 @@ TAPE_POLYGON_OFFSET = 0.001
 WALL_THICKNESS = 0.01
 WALL_HEIGHT = 0.5
 
+ROOM_HEIGHT = 1.5
+
+ROOM_COLOR = gfx.vec3(1, 0.97, 0.93)
 
 def vec_from_color(color):
     return gfx.vec3(color.red, color.green, color.blue) / 255.
@@ -284,6 +287,7 @@ class Environment:
 
         self.floor_texture = None
         self.floor_gfx_obj = None
+        self.room_gfx_obj = None
         
         self.pylons = []
         self.tape_strips = []
@@ -317,12 +321,43 @@ class Environment:
                 self.floor_texture)
 
             self.floor_gfx_obj.specular_strength = 0.25
+
+            w, h = self.dims
+            z = ROOM_HEIGHT
+            
+            verts = numpy.array([
+                [ 0, 0, 0 ],
+                [ w, 0, 0 ],
+                [ 0, h, 0 ],
+                [ w, h, 0 ],
+                [ 0, 0, z ],
+                [ w, 0, z ],
+                [ 0, h, z ],
+                [ w, h, z ],
+            ], dtype=numpy.float32)
+
+            indices = numpy.array([
+                [ 0, 5, 1 ], 
+                [ 0, 4, 5 ],
+                [ 1, 7, 3 ], 
+                [ 1, 5, 7 ],
+                [ 3, 6, 2 ],
+                [ 3, 7, 6 ],
+                [ 2, 4, 0 ],
+                [ 2, 6, 4 ],
+            ], dtype=numpy.uint8)
+
+            self.room_gfx_obj = gfx.IndexedPrimitives.faceted_triangles(
+                verts, indices, ROOM_COLOR, None)
+            
+            self.room_gfx_obj.specular_strength = 0.25
         
     def render(self):
 
         self.render_setup()
 
         self.floor_gfx_obj.render()
+        self.room_gfx_obj.render()
 
         for obj in self.pylons + self.tape_strips + self.boxes + self.walls:
             obj.render()

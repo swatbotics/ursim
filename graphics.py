@@ -369,41 +369,46 @@ class IndexedPrimitives:
         check_opengl_errors('IndexedPrimitives program')
 
     @classmethod
-    def faceted_triangles(cls, verts, indices, color, texture, model_pose=None):
+    def faceted_triangles(cls, verts, indices, color,
+                          texture, model_pose=None, flip=False):
 
         assert verts.dtype == numpy.float32
         
         assert len(verts.shape) == 2 and verts.shape[1] == 3
         
-        assert len(indices.shape) == 2 and indices.shape[1] == 4
-        
+        assert len(indices.shape) == 2 and indices.shape[1] == 3
 
-        UPPER_TEX_COORDS = numpy.array([
-            [ 0, 0 ],
-            [ 1, 1 ],
-            [ 0, 1 ]
-        ], dtype=numpy.float32)
+        if flip:
+            indices[:, :3] = indices[:, 2::-1]
+            
+        vmin = verts.min(axis=0)
+        vmax = verts.max(axis=0)
 
-        LOWER_TEX_COORDS = numpy.array([
-            [ 0, 0 ],
-            [ 1, 0 ],
-            [ 1, 1 ]
-        ], dtype=numpy.float32)
+        dims = vmax - vmin
 
         vout = []
         
         for tri in indices:
 
-            tri_verts = verts[tri[:3]]
-            is_upper = tri[3]
+            tri_verts = verts[tri]
 
             n = numpy.cross(tri_verts[1]-tri_verts[0], tri_verts[2]-tri_verts[0])
             n /= numpy.linalg.norm(n)
 
-            tc = UPPER_TEX_COORDS if is_upper else LOWER_TEX_COORDS
+            # get nearest plane
+            w_axis = numpy.abs(n).argmax()
 
-            for v, t in zip(tri_verts, tc):
-                vout.append( [ v[0], v[1], v[2], n[0], n[1], n[2], t[0], t[1] ] )
+            u_axis = (w_axis + 1) % 3
+            v_axis = (w_axis + 2) % 3
+
+            if n[w_axis] < 0:
+                voffs, vsign = vmax, -1
+            else:
+                voffs, vsign = vmin, 1
+
+            for v in tri_verts:
+                t = (v - voffs)*vsign
+                vout.append( [ v[0], v[1], v[2], n[0], n[1], n[2], t[u_axis], t[v_axis] ] )
 
 
         positions_normals_texcoords = numpy.array(vout, dtype=numpy.float32)
@@ -588,7 +593,7 @@ class IndexedPrimitives:
                    indices, color, texture, model_pose)
 
     @classmethod
-    def box(cls, dims, color, texture, model_pose=None):
+    def box(cls, dims, color, texture, model_pose=None, flip=False):
 
         rx, ry, rz = dims * numpy.array([0.5, 0.5, 0.5])
 
@@ -605,21 +610,21 @@ class IndexedPrimitives:
 
         # TODO: redo so wraps around Z axis with X forward?
         indices = numpy.array([
-            [ 0, 4, 6, 0 ],
-            [ 0, 6, 2, 1 ],
-            [ 1, 0, 2, 0 ],
-            [ 1, 2, 3, 1 ],
-            [ 5, 1, 3, 0 ],
-            [ 5, 3, 7, 1 ],
-            [ 4, 5, 7, 0 ],
-            [ 4, 7, 6, 1 ],
-            [ 1, 5, 4, 0 ],
-            [ 1, 4, 0, 1 ],
-            [ 6, 7, 3, 0 ],
-            [ 6, 3, 2, 1 ]
+            [ 0, 4, 6 ],
+            [ 0, 6, 2 ],
+            [ 1, 0, 2 ],
+            [ 1, 2, 3 ],
+            [ 5, 1, 3 ],
+            [ 5, 3, 7 ],
+            [ 4, 5, 7 ],
+            [ 4, 7, 6 ],
+            [ 1, 5, 4 ],
+            [ 1, 4, 0 ],
+            [ 6, 7, 3 ],
+            [ 6, 3, 2 ]
         ], dtype=numpy.uint8)
 
-        return cls.faceted_triangles(verts, indices, color, texture, model_pose)
+        return cls.faceted_triangles(verts, indices, color, texture, model_pose, flip)
     
     def __init__(self, positions_normals_texcoords, mode, indices, color,
                  texture, model_pose=None):
