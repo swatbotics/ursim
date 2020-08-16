@@ -14,8 +14,10 @@
 <circle style="fill:#FF8C00;" cx="401.1" cy="453.3" r="5"/>
 <circle style="fill:#FF8C00;" cx="607.8" cy="500.1" r="5"/>
 <circle style="fill:#00E000;" cx="587.4" cy="454.4" r="5"/>
+<circle style="fill:#7700ff;" cx="450" cy="337.5" r="20"/>
 <line id="tag1" style="fill:none;stroke:#D6BA9D;stroke-width:5;stroke-miterlimit:10;" x1="423.8" y1="255.6" x2="507.3" y2="283.4"/>
 <line id="tag2" style="fill:none;stroke:#D6BA9D;stroke-width:5;stroke-miterlimit:10;" x1="700.8" y1="480.4" x2="724.1" y2="395.6"/>
+<line style="fill:none;stroke:blue;stroke-width:5;" x1="600" y1="300" x2="600" y2="380"/>
 <rect x="183" y="272" transform="matrix(0.5141 -0.8577 0.8577 0.5141 -169.0045 333.6524)" style="fill:#D6BA9D;" width="54" height="88"/>
 <rect x="457.9" y="527.1" transform="matrix(0.9962 -8.763360e-02 8.763360e-02 0.9962 -46.6227 46.1135)" style="fill:#D6BA9D;" width="88" height="54"/>
 <rect x="743.2" y="247.9" transform="matrix(0.9985 -5.524988e-02 5.524988e-02 0.9985 -14.9509 42.9987)" style="fill:#D6BA9D;" width="54" height="88"/>

@@ -857,17 +857,24 @@ class GlfwApp:
         self.need_render = True
 
     ############################################################
-        
+
+    def update(self):
+        pass
+
+    ############################################################
+    
     def run(self):
 
         assert self.window is not None
 
         while not glfw.window_should_close(self.window):
-            
+
             if self.animating:
                 glfw.poll_events()
             else:
                 glfw.wait_events()
+
+            self.update()
                 
             if self.need_render or self.animating:
                 self._render()

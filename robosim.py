@@ -16,17 +16,30 @@ import sys
 import glfw
 from CleanGL import gl
 
+import Box2D as B2D
+
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
 CARDBOARD_COLOR = gfx.vec3(0.8, 0.7, 0.6)
 
+LINE_COLORS = [
+    TAPE_COLOR,
+    CARDBOARD_COLOR
+]
+
 PYLON_COLORS = [
     gfx.vec3(1.0, 0.5, 0),
-    gfx.vec3(0, 0.8, 0)
+    gfx.vec3(0, 0.8, 0),
 ]
+
+BALL_COLOR = gfx.vec3(0.5, 0, 1)
+
+CIRCLE_COLORS = [ BALL_COLOR ] + PYLON_COLORS
 
 PYLON_RADIUS = 0.05
 PYLON_HEIGHT = 0.20
+
+BALL_RADIUS = 0.1
 
 TAPE_RADIUS = 0.025
 
@@ -45,7 +58,20 @@ def vec_from_color(color):
 
 ######################################################################
 
-class Pylon:
+class SimObject:
+
+    def render_setup(self):
+        pass
+
+    def render(self):
+        pass
+
+    def setup_sim(self, world):
+        pass
+
+######################################################################
+
+class Pylon(SimObject):
 
     gfx_object = None
 
@@ -81,7 +107,44 @@ class Pylon:
 
 ######################################################################
 
-class Box:
+class Ball(SimObject):
+
+    gfx_object = None
+
+    def __init__(self, position):
+        
+        assert position.shape == (2,) and position.dtype == numpy.float32
+
+        self.position = position
+
+    def render_setup(self):
+
+        self.model_pose = gfx.translation_matrix(
+            gfx.vec3(self.position[0], self.position[1], BALL_RADIUS))
+
+        if self.gfx_object is None:
+            
+            self.gfx_object = gfx.IndexedPrimitives.sphere(
+                BALL_RADIUS, 32, 24, 
+                BALL_COLOR, None, self.model_pose)
+
+            self.gfx_object.specular_exponent = 100.
+            self.gfx_object.specular_strength = 0.01
+
+        else:
+
+            self.gfx_object.model_pose = self.model_pose
+        
+    def render(self):
+
+        self.render_setup()
+
+        self.gfx_object.render()
+
+
+######################################################################
+
+class Box(SimObject):
 
     def __init__(self, dims, position, angle, color):
 
@@ -100,7 +163,6 @@ class Box:
         self.model_pose = gfx.rigid_2d_matrix(self.position,
                                               self.angle,
                                               0.5*self.dims[2])
-
 
         if self.gfx_object is None:
 
@@ -129,7 +191,84 @@ def line_intersect(l1, l2):
 
 ######################################################################
 
-class TapeStrip:
+class Room(SimObject):
+
+    def __init__(self, dims):
+
+        self.dims = dims
+
+        self.floor_texture = None
+        self.floor_gfx_obj = None
+        self.room_gfx_obj = None
+
+    def render_setup(self):
+
+        if self.floor_gfx_obj is None:
+        
+            self.floor_texture = gfx.load_texture('textures/floor_texture.png')
+
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+            
+            w, h = self.dims
+
+            vdata = numpy.array([
+                [0, 0, 0, 0, 0, 1, 0, 0],
+                [w, 0, 0, 0, 0, 1, w, 0],
+                [w, h, 0, 0, 0, 1, w, h],
+                [0, h, 0, 0, 0, 1, 0, h],
+            ], dtype=numpy.float32)
+
+            mode = gl.TRIANGLES
+
+            indices = numpy.array([0, 1, 2, 0, 2, 3], dtype=numpy.uint8)
+
+            self.floor_gfx_obj = gfx.IndexedPrimitives(
+                vdata, mode, indices, 0.8*gfx.vec3(1, 1, 1),
+                self.floor_texture)
+
+            self.floor_gfx_obj.specular_strength = 0.25
+
+            w, h = self.dims
+            z = ROOM_HEIGHT
+            
+            verts = numpy.array([
+                [ 0, 0, 0 ],
+                [ w, 0, 0 ],
+                [ 0, h, 0 ],
+                [ w, h, 0 ],
+                [ 0, 0, z ],
+                [ w, 0, z ],
+                [ 0, h, z ],
+                [ w, h, z ],
+            ], dtype=numpy.float32)
+
+            indices = numpy.array([
+                [ 0, 5, 1 ], 
+                [ 0, 4, 5 ],
+                [ 1, 7, 3 ], 
+                [ 1, 5, 7 ],
+                [ 3, 6, 2 ],
+                [ 3, 7, 6 ],
+                [ 2, 4, 0 ],
+                [ 2, 6, 4 ],
+            ], dtype=numpy.uint8)
+
+            self.room_gfx_obj = gfx.IndexedPrimitives.faceted_triangles(
+                verts, indices, ROOM_COLOR, None)
+            
+            self.room_gfx_obj.specular_strength = 0.25
+
+    def render(self):
+
+        self.render_setup()
+
+        self.floor_gfx_obj.render()
+        self.room_gfx_obj.render()
+        
+######################################################################
+
+class TapeStrip(SimObject):
 
     def __init__(self, points):
 
@@ -285,81 +424,11 @@ class Environment:
 
         self.dims = numpy.array([-1, -1], dtype=numpy.float32)
 
-        self.floor_texture = None
-        self.floor_gfx_obj = None
-        self.room_gfx_obj = None
-        
-        self.pylons = []
-        self.tape_strips = []
-        self.boxes = []
-        self.walls = []
+        self.objects = []
 
-    def render_setup(self):
-
-        if self.floor_gfx_obj is None:
-        
-            self.floor_texture = gfx.load_texture('textures/floor_texture.png')
-
-            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-            
-            w, h = self.dims
-
-            vdata = numpy.array([
-                [0, 0, 0, 0, 0, 1, 0, 0],
-                [w, 0, 0, 0, 0, 1, w, 0],
-                [w, h, 0, 0, 0, 1, w, h],
-                [0, h, 0, 0, 0, 1, 0, h],
-            ], dtype=numpy.float32)
-
-            mode = gl.TRIANGLES
-
-            indices = numpy.array([0, 1, 2, 0, 2, 3], dtype=numpy.uint8)
-
-            self.floor_gfx_obj = gfx.IndexedPrimitives(
-                vdata, mode, indices, 0.8*gfx.vec3(1, 1, 1),
-                self.floor_texture)
-
-            self.floor_gfx_obj.specular_strength = 0.25
-
-            w, h = self.dims
-            z = ROOM_HEIGHT
-            
-            verts = numpy.array([
-                [ 0, 0, 0 ],
-                [ w, 0, 0 ],
-                [ 0, h, 0 ],
-                [ w, h, 0 ],
-                [ 0, 0, z ],
-                [ w, 0, z ],
-                [ 0, h, z ],
-                [ w, h, z ],
-            ], dtype=numpy.float32)
-
-            indices = numpy.array([
-                [ 0, 5, 1 ], 
-                [ 0, 4, 5 ],
-                [ 1, 7, 3 ], 
-                [ 1, 5, 7 ],
-                [ 3, 6, 2 ],
-                [ 3, 7, 6 ],
-                [ 2, 4, 0 ],
-                [ 2, 6, 4 ],
-            ], dtype=numpy.uint8)
-
-            self.room_gfx_obj = gfx.IndexedPrimitives.faceted_triangles(
-                verts, indices, ROOM_COLOR, None)
-            
-            self.room_gfx_obj.specular_strength = 0.25
-        
     def render(self):
 
-        self.render_setup()
-
-        self.floor_gfx_obj.render()
-        self.room_gfx_obj.render()
-
-        for obj in self.pylons + self.tape_strips + self.boxes + self.walls:
+        for obj in self.objects:
             obj.render()
             
     @classmethod
@@ -368,6 +437,7 @@ class Environment:
         env = Environment()
 
         svg = se.SVG.parse(svgfile, color='none')
+        print('parsed', svgfile)
 
         scl = 1e-2
         
@@ -376,6 +446,8 @@ class Environment:
 
         env.dims = xform.dims
 
+        env.objects.append(Room(env.dims))
+
         for item in svg:
 
             xx, yx, xy, yy, x0, y0 = [getattr(item.transform, letter) for letter in 'abcdef']
@@ -383,10 +455,6 @@ class Environment:
             det = xx*yy - yx*xy
             is_rigid = (abs(det - 1) < 1e-4)
             
-            print('  transform:', xx, yx, xy, yy, x0, y0)
-            print('  determinant:', det)
-            print('  is_rigid:', is_rigid)
-
             assert(is_rigid)
 
             xform.set_local_transform(xx, yx, xy, yy, x0, y0)
@@ -399,7 +467,6 @@ class Environment:
 
             if item.stroke.value is not None:
                 scolor = vec_from_color(item.stroke)
-            
 
             if isinstance(item, se.Rect):
 
@@ -409,7 +476,6 @@ class Environment:
                 cy = item.y + 0.5*item.height
 
                 if numpy.all(fcolor == 1):
-                    print('skipping arena')
                     continue
 
                 dims = gfx.vec3(w, h, min(w, h))
@@ -418,48 +484,49 @@ class Environment:
                 delta = pfwd-pctr
                 theta = numpy.arctan2(delta[1], delta[0])
 
-                print('pctr is', pctr)
-
-                env.boxes.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
+                env.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
                 
-                print('rect', item.x, item.y, item.width, item.height)
-
             elif isinstance(item, se.Circle):
                 
-                print('circle', item.cx, item.cy, item.rx)
-
-                _, color = match_color(fcolor, PYLON_COLORS)
+                cidx, color = match_color(fcolor, CIRCLE_COLORS)
 
                 position = xform.transform(item.cx, item.cy)
-                
-                env.pylons.append(Pylon(position, color))
+
+                if cidx == 0:
+                    env.objects.append(Ball(position))
+                else:
+                    env.objects.append(Pylon(position, color))
                                         
             elif isinstance(item, se.SimpleLine):
 
                 p0 = xform.transform(item.x1, item.y1)
                 p1 = xform.transform(item.x2, item.y2)
 
-                pctr = 0.5*(p0 + p1)
+                cidx, color = match_color(scolor, LINE_COLORS)
 
+                if cidx == 0:
+                    
+                    points = numpy.array([p0, p1])
+                    env.objects.append(TapeStrip(points))
+                    
+                else:
 
-                delta = p1 - p0
-                theta = numpy.arctan2(delta[1], delta[0])
+                    pctr = 0.5*(p0 + p1)
 
-                dims = gfx.vec3(numpy.linalg.norm(delta),
-                                WALL_THICKNESS, WALL_HEIGHT)
-                
-                env.walls.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
-                
-                print('line', item.x1, item.y1, item.x2, item.y2)
+                    delta = p1 - p0
+                    theta = numpy.arctan2(delta[1], delta[0])
+
+                    dims = gfx.vec3(numpy.linalg.norm(delta),
+                                    WALL_THICKNESS, WALL_HEIGHT)
+
+                    env.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
                 
             elif isinstance(item, se.Polyline):
                 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
                 
-                print('polyline', points)
-
-                env.tape_strips.append(TapeStrip(points))
+                env.objects.append(TapeStrip(points))
                 
             else:
                 
@@ -470,9 +537,25 @@ class Environment:
 
 ######################################################################
 
-class RoboSimApp(gfx.GlfwApp):
+class RoboSim:
 
     def __init__(self, env):
+
+        self.env = env
+        self.world = B2D.b2World(gravity=(0, 0), doSleep=True)
+
+        
+
+        print('created the world!')
+
+        
+        
+
+######################################################################
+
+class RoboSimApp(gfx.GlfwApp):
+
+    def __init__(self, env, sim):
 
         super().__init__()
 
@@ -482,9 +565,8 @@ class RoboSimApp(gfx.GlfwApp):
         gl.Enable(gl.FRAMEBUFFER_SRGB)
 
         self.env = env
+        self.sim = sim
 
-        self.env.render_setup()
-        
         self.perspective = None
         self.view = None
 
@@ -494,6 +576,9 @@ class RoboSimApp(gfx.GlfwApp):
         self.mouse_pos = numpy.array(self.framebuffer_size/2, dtype=numpy.float32)
 
         self.handle_mouse_rot()
+
+        self.animating = True
+        self.was_animating = False
 
     def key(self, key, scancode, action, mods):
         if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
@@ -517,15 +602,34 @@ class RoboSimApp(gfx.GlfwApp):
         foo = (self.mouse_pos / self.framebuffer_size)
 
         self.yrot = gfx.mix(-2*numpy.pi, 2*numpy.pi, foo[0])
-        self.xrot = gfx.mix(numpy.pi/2, -numpy.pi/2, numpy.clip(foo[1], 0, 1))
+        self.xrot = gfx.mix(numpy.pi/2, 0, numpy.clip(foo[1], 0, 1))
 
         self.need_render = True
         self.view = None
+
+    ############################################################
             
     def framebuffer_resized(self):
         self.perspective = None
 
+    ############################################################
+        
+    def update(self):
+
+        if self.animating:
+            now = glfw.get_time()
+            if self.was_animating:
+                seconds_per_update = now - self.prev_update
+                #print('seconds per update:', seconds_per_update)
+            self.was_animating = True
+            self.prev_update = now
+
+        pass
+
     def render(self):
+
+        if gfx.IndexedPrimitives.program is None:
+            gfx.IndexedPrimitives.static_init()
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -554,10 +658,11 @@ class RoboSimApp(gfx.GlfwApp):
             R_mouse = numpy.dot(Rx, Ry)
 
             w, h = self.env.dims
+            m = numpy.linalg.norm([w, h])
         
-            self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h, 5.0),
-                                    center=gfx.vec3(0.5*w, 0.5*h, 0),
-                                    up=gfx.vec3(0, 1, 0),
+            self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
+                                    center=gfx.vec3(0.5*w, 0.5*h, 0.75*ROOM_HEIGHT),
+                                    up=gfx.vec3(0, 0, 1),
                                     Rextra=R_mouse)
 
             view_pos = -numpy.dot(numpy.linalg.inv(self.view[:3, :3]),
@@ -581,7 +686,11 @@ def _test_load_environment():
 
     env = Environment.load_svg('environments/first_environment.svg')
 
-    app = RoboSimApp(env)
+    sim = RoboSim(env)
+
+    #return
+
+    app = RoboSimApp(env, sim)
 
     app.run()
 
