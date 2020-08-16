@@ -13,8 +13,6 @@ import svgelements as se
 import re
 import sys
 
-import matplotlib.pyplot as plt
-
 import glfw
 from CleanGL import gl
 
