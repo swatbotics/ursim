@@ -69,9 +69,15 @@ def vec_from_color(color):
 class SimObject:
 
     def __init__(self):
+        
         self.gfx_objects = []
+        
         self.body = None
+        
         self.model_z = 0.0
+
+        self.body_linear_mu = 0.0
+        self.body_angular_mu = 0.0
 
     def init_render(self):
         pass
@@ -90,8 +96,19 @@ class SimObject:
     def setup_sim(self, world):
         pass
 
-    def sim_update(self):
-        pass
+    def sim_update(self, world, time):
+
+        if self.body is not None:
+
+            if self.body_linear_mu:
+                self.body.ApplyForce(
+                    -self.body_linear_mu * self.body.linearVelocity,
+                    self.body.worldCenter, True)
+
+            if self.body_angular_mu:
+                self.body.ApplyTorque(
+                    -self.body_angular_mu * self.body.angularVelocity,
+                    True)
 
 ######################################################################
 
@@ -120,12 +137,16 @@ class Pylon(SimObject):
             position = b2ple(position),
             fixtures = B2D.b2FixtureDef(
                 shape = B2D.b2CircleShape(radius=PYLON_RADIUS),
-                density = 1.0
+                density = 1.0,
+                restitution = 0.25,
+                friction = 0.95,
             )
         )
-        
+
         self.body.massData = B2D.b2MassData(mass=PYLON_MASS,
                                             I=PYLON_I)
+
+        self.body_linear_mu = 0.9 * PYLON_MASS * 10.0
 
         print('pylon has radius={}, mass={}, I={}'.format(
             PYLON_RADIUS, PYLON_MASS, PYLON_I))
@@ -165,11 +186,16 @@ class Ball(SimObject):
             position = b2ple(position),
             fixtures = B2D.b2FixtureDef(
                 shape = B2D.b2CircleShape(radius=BALL_RADIUS),
-                density = BALL_DENSITY
+                density = BALL_DENSITY,
+                restitution = 0.98,
+                friction = 0.95
             )
         )
 
+        self.body_linear_mu = 0.05 * BALL_MASS * 10.0
+        
         self.model_z = BALL_RADIUS
+
 
         print('ball has radius={}, mass={} ({}), I={}'.format(
             BALL_RADIUS, BALL_MASS, self.body.mass, self.body.inertia))
@@ -203,10 +229,14 @@ class Box(SimObject):
             position = b2ple(position),
             angle = float(angle),
             fixtures = B2D.b2FixtureDef(
-                shape = B2D.b2PolygonShape(box=(b2ple(dims[:2]))),
-                density = 1.0
+                shape = B2D.b2PolygonShape(box=(b2ple(0.5*dims[:2]))),
+                density = 1.0,
+                restitution = 0.1,
+                friction = 0.95
             )
         )
+
+        print(self.body)
 
         rho = CARDBOARD_DENSITY_PER_M2
 
@@ -232,6 +262,9 @@ class Box(SimObject):
 
         print('this {} has dims={}, mass={}, I={}'.format(thing, dims, mass, I))
 
+        self.body_linear_mu = 0.9 * mass * 10.0
+        self.body_angular_mu = I * 4.0
+        
         self.body.massData = B2D.b2MassData(
             mass = mass,
             I = I
@@ -504,6 +537,16 @@ class RoboSim:
 
         self.objects = []
 
+        self.dt = 0.01
+
+        self.velocity_iterations = 6
+        self.position_iterations = 2
+
+        
+        self.remaining_sim_time = 0.0
+        self.sim_time = 0.0
+
+
         
         print('created the world!')
 
@@ -616,7 +659,30 @@ class RoboSim:
 
         for obj in self.objects:
             obj.render()
-        
+
+    def update(self, time_since_last_update):
+
+        self.remaining_sim_time += time_since_last_update
+
+        while self.remaining_sim_time >= self.dt:
+            
+            self.sim_time += self.dt
+            self.remaining_sim_time -= self.dt
+
+            print('sim update, t={}'.format(self.sim_time))
+
+            for obj in self.objects:
+                obj.sim_update(self.world, self.sim_time)
+
+            self.world.Step(self.dt,
+                            self.velocity_iterations,
+                            self.position_iterations)
+
+            self.world.ClearForces()
+
+            print('clearing forces')
+
+                
         
 ######################################################################
 
@@ -649,9 +715,47 @@ class RoboSimApp(gfx.GlfwApp):
         self.animating = True
         self.was_animating = False
 
+    def set_animating(self, a):
+
+        if not a:
+            self.was_animating = False
+            self.prev_update = None
+
+        self.animating = a
+
     def key(self, key, scancode, action, mods):
-        if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
+
+        if action != glfw.PRESS:
+            return
+        
+        if key == glfw.KEY_ESCAPE:
+            
             glfw.set_window_should_close(self.window, gl.TRUE)
+
+        elif key == glfw.KEY_ENTER:
+
+            self.set_animating(not self.animating)
+
+            print('toggled animating =', self.animating)
+
+        elif key == glfw.KEY_SPACE:
+
+            print('single step')
+
+            if self.animating:
+                self.set_animating(False)
+
+            self.sim.remaining_sim_time = 0
+            self.sim.update(self.sim.dt)
+            self.need_render = True
+
+        if key == glfw.KEY_B:
+            for obj in self.sim.objects:
+                if isinstance(obj, Ball):
+                    #rdir = numpy.random.random(2) * 2 - 1
+                    rdir = (1.0, -0.2)
+                    obj.body.ApplyLinearImpulse(rdir, obj.body.position, True)
+                    print('kicked the ball')
 
 
     def mouse(self, button_index, is_press, x, y):
@@ -688,7 +792,8 @@ class RoboSimApp(gfx.GlfwApp):
         if self.animating:
             now = glfw.get_time()
             if self.was_animating:
-                seconds_per_update = now - self.prev_update
+                since_last_update = now - self.prev_update
+                self.sim.update(since_last_update)
                 #print('seconds per update:', seconds_per_update)
             self.was_animating = True
             self.prev_update = now
