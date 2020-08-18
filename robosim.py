@@ -39,15 +39,23 @@ CIRCLE_COLORS = [ BALL_COLOR ] + PYLON_COLORS
 PYLON_RADIUS = 0.05
 PYLON_HEIGHT = 0.20
 
+PYLON_MASS = 0.250
+PYLON_I = PYLON_MASS * PYLON_RADIUS * PYLON_RADIUS
+
 BALL_RADIUS = 0.1
 
 TAPE_RADIUS = 0.025
 
 TAPE_POLYGON_OFFSET = 0.001
 
+BALL_MASS = 0.1
+BALL_AREA = 2*numpy.pi*BALL_RADIUS**2
+BALL_DENSITY = BALL_MASS / BALL_AREA
 
-WALL_THICKNESS = 0.01
+WALL_THICKNESS = 0.005
 WALL_HEIGHT = 0.5
+
+CARDBOARD_DENSITY_PER_M2 = 0.45
 
 ROOM_HEIGHT = 1.5
 
@@ -60,11 +68,24 @@ def vec_from_color(color):
 
 class SimObject:
 
+    def __init__(self):
+        self.gfx_objects = []
+        self.body = None
+        self.model_z = 0.0
+
     def init_render(self):
         pass
 
     def render(self):
-        pass
+        
+        for obj in self.gfx_objects:
+            
+            if self.body is not None and hasattr(obj, 'model_pose'):
+                
+                obj.model_pose = b2xform(self.body.transform,
+                                         self.model_z)
+
+            obj.render()
 
     def setup_sim(self, world):
         pass
@@ -74,17 +95,44 @@ class SimObject:
 
 ######################################################################
 
+def b2ple(array):
+
+    return tuple([float(ai) for ai in array])
+
+def b2xform(transform, z=0.0):
+    return gfx.rigid_2d_matrix(transform.position, transform.angle, z)
+    
+
+######################################################################
+
 class Pylon(SimObject):
 
     gfx_object = None
 
-    def __init__(self, position, color):
+    def __init__(self, world, position, color):
+
+        super().__init__()
         
         assert position.shape == (2,) and position.dtype == numpy.float32
         assert color.shape == (3,) and color.dtype == numpy.float32
 
-        self.position = position
+        self.body = world.CreateDynamicBody(
+            position = b2ple(position),
+            fixtures = B2D.b2FixtureDef(
+                shape = B2D.b2CircleShape(radius=PYLON_RADIUS),
+                density = 1.0
+            )
+        )
+        
+        self.body.massData = B2D.b2MassData(mass=PYLON_MASS,
+                                            I=PYLON_I)
+
+        print('pylon has radius={}, mass={}, I={}'.format(
+            PYLON_RADIUS, PYLON_MASS, PYLON_I))
+
         self.color = color
+
+        self.model_z = 0.5*PYLON_HEIGHT
 
     def init_render(self):
 
@@ -92,16 +140,14 @@ class Pylon(SimObject):
             self.gfx_object = gfx.IndexedPrimitives.cylinder(
                 PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
                 self.color, None, None)
+
+        self.gfx_objects = [self.gfx_object]
         
     def render(self):
 
-        self.model_pose = gfx.translation_matrix(
-            gfx.vec3(self.position[0], self.position[1], 0.5*PYLON_HEIGHT))
-
         self.gfx_object.color = self.color
-        self.gfx_object.model_pose = self.model_pose
         
-        self.gfx_object.render()
+        super().render()
 
 ######################################################################
 
@@ -109,11 +155,25 @@ class Ball(SimObject):
 
     gfx_object = None
 
-    def __init__(self, position):
+    def __init__(self, world, position):
+
+        super().__init__()
         
         assert position.shape == (2,) and position.dtype == numpy.float32
 
-        self.position = position
+        self.body = world.CreateDynamicBody(
+            position = b2ple(position),
+            fixtures = B2D.b2FixtureDef(
+                shape = B2D.b2CircleShape(radius=BALL_RADIUS),
+                density = BALL_DENSITY
+            )
+        )
+
+        self.model_z = BALL_RADIUS
+
+        print('ball has radius={}, mass={} ({}), I={}'.format(
+            BALL_RADIUS, BALL_MASS, self.body.mass, self.body.inertia))
+        
 
     def init_render(self):
 
@@ -125,55 +185,73 @@ class Ball(SimObject):
 
             self.gfx_object.specular_exponent = 100.
             self.gfx_object.specular_strength = 0.01
+
+        self.gfx_objects = [ self.gfx_object ]
         
-    def render(self):
-
-        self.model_pose = gfx.translation_matrix(
-            gfx.vec3(self.position[0], self.position[1], BALL_RADIUS))
-        
-        self.gfx_object.model_pose = self.model_pose
-        self.gfx_object.render()
-
-
 ######################################################################
 
 class Box(SimObject):
 
-    def __init__(self, dims, position, angle, color):
+    def __init__(self, world, dims, position, angle, color):
 
+        super().__init__()
+        
         assert dims.shape == (3,) and dims.dtype == numpy.float32
         assert position.shape == (2,) and position.dtype == numpy.float32
 
-        self.dims = dims
-        self.position = position
-        self.angle = angle
-        self.color = color
+        self.body = world.CreateDynamicBody(
+            position = b2ple(position),
+            angle = float(angle),
+            fixtures = B2D.b2FixtureDef(
+                shape = B2D.b2PolygonShape(box=(b2ple(dims[:2]))),
+                density = 1.0
+            )
+        )
 
-        self.gfx_object = None
-        
-    def init_render(self):
+        rho = CARDBOARD_DENSITY_PER_M2
 
-        self.model_pose = gfx.rigid_2d_matrix(self.position,
-                                              self.angle,
-                                              0.5*self.dims[2])
+        mx = rho * (dims[1] * dims[2])
+        my = rho * (dims[0] * dims[2])
+        mz = rho * (dims[0] * dims[1])
 
-        if self.gfx_object is None:
+        Ix = mx * dims[0]**2 / 12
+        Iy = my * dims[1]**2 / 12
+        Iz = mz*(dims[0]**2 + dims[1]**2)/12
 
-            self.gfx_object = gfx.IndexedPrimitives.box(
-                self.dims, self.color, None, self.model_pose)
+        if dims[1] <= WALL_THICKNESS * 1.0001:
 
-            self.gfx_object.specular_exponent = 100.0
-            self.gfx_object.specular_strength = 0.1
+            mass = mx
+            I = Ix
+            thing = 'wall'
 
         else:
 
-            self.gfx_object.model_pose = self.model_pose
+            mass = 2*(mx + my + mz)
+            I = 2 * (Ix + Iy + mx * dims[0]**2/4 + my * dims[1]**2/4 + Iz)
+            thing = 'box'
 
-    def render(self):
+        print('this {} has dims={}, mass={}, I={}'.format(thing, dims, mass, I))
 
-        self.init_render()
-        self.gfx_object.render()
+        self.body.massData = B2D.b2MassData(
+            mass = mass,
+            I = I
+        )
 
+        self.dims = dims
+        self.color = color
+
+        self.model_z = 0.5*dims[2]
+
+    def init_render(self):
+
+        gfx_object = gfx.IndexedPrimitives.box(
+            self.dims, self.color, None, None)
+
+        gfx_object.specular_exponent = 100.0
+        gfx_object.specular_strength = 0.1
+
+        self.gfx_objects = [gfx_object]
+        
         
 ######################################################################
 
@@ -186,78 +264,88 @@ def line_intersect(l1, l2):
 
 class Room(SimObject):
 
-    def __init__(self, dims):
+    floor_texture = None
+    
+    def __init__(self, world, dims):
 
+        super().__init__()
+        
         self.dims = dims
 
-        self.floor_texture = None
-        self.floor_gfx_obj = None
-        self.room_gfx_obj = None
+        self.body = world.CreateStaticBody()
+
+        # clockwise is inwards
+        w, h = b2ple(dims)
+        
+        verts = [
+            (0., 0.),
+            (0., h),
+            (w, h),
+            (w, 0.)
+        ]
+        
+        self.body.CreateLoopFixture(vertices=verts)
 
     def init_render(self):
 
-        if self.floor_gfx_obj is None:
-        
+        if self.floor_texture is None:
             self.floor_texture = gfx.load_texture('textures/floor_texture.png')
-
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-            
-            w, h = self.dims
 
-            vdata = numpy.array([
-                [0, 0, 0, 0, 0, 1, 0, 0],
-                [w, 0, 0, 0, 0, 1, w, 0],
-                [w, h, 0, 0, 0, 1, w, h],
-                [0, h, 0, 0, 0, 1, 0, h],
-            ], dtype=numpy.float32)
 
-            mode = gl.TRIANGLES
+        w, h = self.dims
 
-            indices = numpy.array([0, 1, 2, 0, 2, 3], dtype=numpy.uint8)
+        vdata = numpy.array([
+            [0, 0, 0, 0, 0, 1, 0, 0],
+            [w, 0, 0, 0, 0, 1, w, 0],
+            [w, h, 0, 0, 0, 1, w, h],
+            [0, h, 0, 0, 0, 1, 0, h],
+        ], dtype=numpy.float32)
 
-            self.floor_gfx_obj = gfx.IndexedPrimitives(
-                vdata, mode, indices, 0.8*gfx.vec3(1, 1, 1),
-                self.floor_texture)
+        mode = gl.TRIANGLES
 
-            self.floor_gfx_obj.specular_strength = 0.25
+        indices = numpy.array([0, 1, 2, 0, 2, 3], dtype=numpy.uint8)
 
-            w, h = self.dims
-            z = ROOM_HEIGHT
-            
-            verts = numpy.array([
-                [ 0, 0, 0 ],
-                [ w, 0, 0 ],
-                [ 0, h, 0 ],
-                [ w, h, 0 ],
-                [ 0, 0, z ],
-                [ w, 0, z ],
-                [ 0, h, z ],
-                [ w, h, z ],
-            ], dtype=numpy.float32)
+        floor_obj = gfx.IndexedPrimitives(
+            vdata, mode, indices, 0.8*gfx.vec3(1, 1, 1),
+            self.floor_texture)
 
-            indices = numpy.array([
-                [ 0, 5, 1 ], 
-                [ 0, 4, 5 ],
-                [ 1, 7, 3 ], 
-                [ 1, 5, 7 ],
-                [ 3, 6, 2 ],
-                [ 3, 7, 6 ],
-                [ 2, 4, 0 ],
-                [ 2, 6, 4 ],
-            ], dtype=numpy.uint8)
+        floor_obj.specular_strength = 0.25
 
-            self.room_gfx_obj = gfx.IndexedPrimitives.faceted_triangles(
-                verts, indices, ROOM_COLOR, None)
-            
-            self.room_gfx_obj.specular_strength = 0.25
+        w, h = self.dims
+        z = ROOM_HEIGHT
 
-    def render(self):
+        verts = numpy.array([
+            [ 0, 0, 0 ],
+            [ w, 0, 0 ],
+            [ 0, h, 0 ],
+            [ w, h, 0 ],
+            [ 0, 0, z ],
+            [ w, 0, z ],
+            [ 0, h, z ],
+            [ w, h, z ],
+        ], dtype=numpy.float32)
 
-        self.init_render()
+        indices = numpy.array([
+            [ 0, 5, 1 ], 
+            [ 0, 4, 5 ],
+            [ 1, 7, 3 ], 
+            [ 1, 5, 7 ],
+            [ 3, 6, 2 ],
+            [ 3, 7, 6 ],
+            [ 2, 4, 0 ],
+            [ 2, 6, 4 ],
+        ], dtype=numpy.uint8)
 
-        self.floor_gfx_obj.render()
-        self.room_gfx_obj.render()
+        room_obj = gfx.IndexedPrimitives.faceted_triangles(
+            verts, indices, ROOM_COLOR, None)
+
+        room_obj.specular_strength = 0.25
+
+        self.gfx_objects = [ floor_obj, room_obj ]
+
+
         
 ######################################################################
 
@@ -265,86 +353,81 @@ class TapeStrip(SimObject):
 
     def __init__(self, points):
 
-        self.points = points
+        super().__init__()
 
-        self.gfx_object = None
+        self.points = points
 
     def init_render(self):
 
 
-        if self.gfx_object is None:
+        r = TAPE_RADIUS
+        offset = gfx.vec3(0, 0, r)
 
-            r = TAPE_RADIUS
-            offset = gfx.vec3(0, 0, r)
-            
-            prev_line_l = None
-            prev_line_r = None
+        prev_line_l = None
+        prev_line_r = None
 
-            points_l = []
-            points_r = []
+        points_l = []
+        points_r = []
 
-            for i, p0 in enumerate(self.points[:-1]):
+        for i, p0 in enumerate(self.points[:-1]):
 
-                p1 = self.points[i+1]
+            p1 = self.points[i+1]
 
-                tangent = gfx.normalize(p1 - p0)
-                normal = numpy.array([-tangent[1], tangent[0]], dtype=numpy.float32)
+            tangent = gfx.normalize(p1 - p0)
+            normal = numpy.array([-tangent[1], tangent[0]], dtype=numpy.float32)
 
-                line = gfx.vec3(normal[0], normal[1], -numpy.dot(normal, p0))
+            line = gfx.vec3(normal[0], normal[1], -numpy.dot(normal, p0))
 
-                line_l = line - offset
-                line_r = line + offset
+            line_l = line - offset
+            line_r = line + offset
 
-                if i == 0:
-                    
-                    points_l.append( p0 + r * (normal - tangent) )
-                    points_r.append( p0 + r * (-normal - tangent) )
+            if i == 0:
+
+                points_l.append( p0 + r * (normal - tangent) )
+                points_r.append( p0 + r * (-normal - tangent) )
+
+            else:
+
+                if abs(numpy.dot(line_l[:2], prev_line_l[:2])) > 0.999:
+
+                    points_l.append( p0 + r * normal )
+                    points_r.append( p0 - r * normal )
 
                 else:
 
-                    if abs(numpy.dot(line_l[:2], prev_line_l[:2])) > 0.999:
+                    points_l.append( line_intersect(line_l, prev_line_l) )
+                    points_r.append( line_intersect(line_r, prev_line_r) )
 
-                        points_l.append( p0 + r * normal )
-                        points_r.append( p0 - r * normal )
+            if i == len(self.points) - 2:
 
-                    else:
+                points_l.append( p1 + r * (normal + tangent) )
+                points_r.append( p1 + r * (-normal + tangent) )
 
-                        points_l.append( line_intersect(line_l, prev_line_l) )
-                        points_r.append( line_intersect(line_r, prev_line_r) )
+            prev_line_l = line_l
+            prev_line_r = line_r
 
-                if i == len(self.points) - 2:
+        points_l = numpy.array(points_l)
+        points_r = numpy.array(points_r)
 
-                    points_l.append( p1 + r * (normal + tangent) )
-                    points_r.append( p1 + r * (-normal + tangent) )
+        vdata = numpy.zeros((2*len(self.points), 8), dtype=numpy.float32)
 
-                prev_line_l = line_l
-                prev_line_r = line_r
+        vdata[0::2, :2] = points_l
+        vdata[1::2, :2] = points_r
+        vdata[:, 2] = TAPE_POLYGON_OFFSET
+        vdata[:, 5] = 1
+        vdata[:, 6:8] = vdata[:, 0:2]
 
-            points_l = numpy.array(points_l)
-            points_r = numpy.array(points_r)
+        gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLE_STRIP,
+                                                indices=None,
+                                                color=TAPE_COLOR,
+                                                texture=None, model_pose=None)
 
-            vdata = numpy.zeros((2*len(self.points), 8), dtype=numpy.float32)
-
-            vdata[0::2, :2] = points_l
-            vdata[1::2, :2] = points_r
-            vdata[:, 2] = TAPE_POLYGON_OFFSET
-            vdata[:, 5] = 1
-            vdata[:, 6:8] = vdata[:, 0:2]
-
-            self.gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLE_STRIP,
-                                                    indices=None,
-                                                    color=TAPE_COLOR,
-                                                    texture=None, model_pose=None)
-
-            self.gfx_object.specular_exponent = 100.0
-            self.gfx_object.specular_strength = 0.05
+        gfx_object.specular_exponent = 100.0
+        gfx_object.specular_strength = 0.05
             
+        self.gfx_objects = [ gfx_object ]
 
 
-    def render(self):
-
-        self.init_render()
-        self.gfx_object.render()
         
 
 ######################################################################
@@ -436,11 +519,12 @@ class RoboSim:
         
         self.dims = xform.dims
 
-        self.objects.append(Room(self.dims))
+        self.objects.append(Room(self.world, self.dims))
 
         for item in svg:
 
-            xx, yx, xy, yy, x0, y0 = [getattr(item.transform, letter) for letter in 'abcdef']
+            xx, yx, xy, yy, x0, y0 = [getattr(item.transform, letter)
+                                      for letter in 'abcdef']
 
             det = xx*yy - yx*xy
             is_rigid = (abs(det - 1) < 1e-4)
@@ -474,7 +558,9 @@ class RoboSim:
                 delta = pfwd-pctr
                 theta = numpy.arctan2(delta[1], delta[0])
 
-                self.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
+                self.objects.append( Box(self.world, dims,
+                                         pctr, theta,
+                                         CARDBOARD_COLOR) )
                 
             elif isinstance(item, se.Circle):
                 
@@ -483,9 +569,9 @@ class RoboSim:
                 position = xform.transform(item.cx, item.cy)
 
                 if cidx == 0:
-                    self.objects.append(Ball(position))
+                    self.objects.append(Ball(self.world, position))
                 else:
-                    self.objects.append(Pylon(position, color))
+                    self.objects.append(Pylon(self.world, position, color))
                                         
             elif isinstance(item, se.SimpleLine):
 
@@ -509,7 +595,9 @@ class RoboSim:
                     dims = gfx.vec3(numpy.linalg.norm(delta),
                                     WALL_THICKNESS, WALL_HEIGHT)
 
-                    self.objects.append( Box(dims, pctr, theta, CARDBOARD_COLOR) )
+                    self.objects.append( Box(self.world, dims,
+                                             pctr, theta,
+                                             CARDBOARD_COLOR) )
                 
             elif isinstance(item, se.Polyline):
                 
