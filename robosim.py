@@ -58,6 +58,7 @@ BALL_DENSITY = BALL_MASS / BALL_AREA
 
 WALL_THICKNESS = 0.005
 WALL_HEIGHT = 0.5
+WALL_Z = 0.03
 
 CARDBOARD_DENSITY_PER_M2 = 0.45
 
@@ -257,7 +258,7 @@ class Wall(SimObject):
         print('this wall has dims={}, mass={}, I={}'.format(dims, mass, I))
 
         self.body_linear_mu = 0.9 * mass * 10.0
-        self.body_angular_mu = I * 4.0
+        self.body_angular_mu = I * 10.0
         
         self.body.massData = B2D.b2MassData(
             mass = mass,
@@ -271,7 +272,7 @@ class Wall(SimObject):
 
         gfx_object = gfx.IndexedPrimitives.box(
             self.dims, CARDBOARD_COLOR,
-            pre_transform=tz(0.5*self.dims[2]))
+            pre_transform=tz(WALL_Z + 0.5*self.dims[2]))
 
         self.gfx_objects = [gfx_object]
 
@@ -324,7 +325,7 @@ class Box(SimObject):
         print('this box has dims={}, mass={}, I={}'.format(dims, mass, I))
 
         self.body_linear_mu = 0.9 * mass * 10.0
-        self.body_angular_mu = I * 4.0
+        self.body_angular_mu = I * 10.0
         
         self.body.massData = B2D.b2MassData(
             mass = mass,
@@ -804,7 +805,7 @@ class RoboSimApp(gfx.GlfwApp):
                             dist = diff.length
                             if wdist is None or dist < wdist:
                                 wdist = dist
-                                desired_vel = 50*diff/dist
+                                desired_vel = 20*diff/dist
                                 actual_vel = obj.body.linearVelocity
                                 kick_impulse = (desired_vel - actual_vel)*BALL_MASS
                     obj.body.ApplyLinearImpulse(kick_impulse, obj.body.position, True)
