@@ -30,26 +30,22 @@ class HelloWorldApp(gfx.GlfwApp):
         
         self.fsquad = gfx.FullscreenQuad(texture)
 
-        ballpos = np.eye(4, dtype=np.float32)
-        ballpos[:3, 3] = gfx.vec3(1.5, 0, 0)
+        ballpos = gfx.translation_matrix(gfx.vec3(1.5, 0, 0))
 
-        cylpos = np.eye(4, dtype=np.float32)
-        cylpos[:3, 3] = gfx.vec3(0, 1.5, 0)
+        cylpos = gfx.translation_matrix(gfx.vec3(0, 1.5, 0))
         
         self.objects = [
             
             gfx.IndexedPrimitives.box(gfx.vec3(1, 1, 1),
-                                      gfx.vec3(0.5, 0.75, 1.0),
-                                      None),
+                                      gfx.vec3(0.5, 0.75, 1.0)),
             
             gfx.IndexedPrimitives.sphere(0.5, 32, 24,
                                          gfx.vec3(1, 0, 0),
-                                         None, ballpos),
+                                         model_pose=ballpos),
             
             gfx.IndexedPrimitives.cylinder(0.5, 1, 32, 1,
                                            gfx.vec3(1, 0, 1),
-                                           None,
-                                           cylpos)
+                                           model_pose=cylpos)
             
         ]
         

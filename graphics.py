@@ -282,6 +282,9 @@ class IndexedPrimitives:
         numpy.dtype('uint16'): gl.UNSIGNED_SHORT,
         numpy.dtype('uint32'): gl.UNSIGNED_INT,
     }
+
+    DEFAULT_SPECULAR_EXPONENT = 40.0
+    DEFAULT_SPECULAR_STRENGTH = 0.5
     
     program = None
 
@@ -369,8 +372,7 @@ class IndexedPrimitives:
         check_opengl_errors('IndexedPrimitives program')
 
     @classmethod
-    def faceted_triangles(cls, verts, indices, color,
-                          texture, model_pose=None, flip=False):
+    def faceted_triangles(cls, verts, indices, color, **kwargs):
 
         assert verts.dtype == numpy.float32
         
@@ -378,9 +380,6 @@ class IndexedPrimitives:
         
         assert len(indices.shape) == 2 and indices.shape[1] == 3
 
-        if flip:
-            indices[:, :3] = indices[:, 2::-1]
-            
         vmin = verts.min(axis=0)
         vmax = verts.max(axis=0)
 
@@ -414,10 +413,10 @@ class IndexedPrimitives:
         positions_normals_texcoords = numpy.array(vout, dtype=numpy.float32)
 
         return cls(positions_normals_texcoords, gl.TRIANGLES,
-                   None, color, texture, model_pose)
+                   None, color, **kwargs)
 
     @classmethod
-    def sphere(cls, radius, slices, stacks, color, texture, model_pose=None):
+    def sphere(cls, radius, slices, stacks, color, **kwargs):
 
         u = numpy.linspace(0, 1, slices+1)
         v = numpy.linspace(1, 0, stacks+1)
@@ -490,11 +489,10 @@ class IndexedPrimitives:
         indices = numpy.array(indices, dtype=numpy.uint32)
         
         return cls(positions_normals_texcoords, gl.TRIANGLES,
-                   indices, color, texture, model_pose)
+                   indices, color, **kwargs)
 
     @classmethod
-    def cylinder(cls, radius, height, slices, stacks,
-                 color, texture, model_pose=None):
+    def cylinder(cls, radius, height, slices, stacks, color, **kwargs):
 
         u = numpy.linspace(0, 1, slices+1)
         v = numpy.linspace(0, 1, stacks+1)
@@ -590,10 +588,10 @@ class IndexedPrimitives:
         indices = numpy.array(indices, dtype=numpy.uint32)
         
         return cls(positions_normals_texcoords, gl.TRIANGLES,
-                   indices, color, texture, model_pose)
+                   indices, color, **kwargs)
 
     @classmethod
-    def box(cls, dims, color, texture, model_pose=None, flip=False):
+    def box(cls, dims, color, **kwargs):
 
         rx, ry, rz = dims * numpy.array([0.5, 0.5, 0.5])
 
@@ -624,10 +622,12 @@ class IndexedPrimitives:
             [ 6, 3, 2 ]
         ], dtype=numpy.uint8)
 
-        return cls.faceted_triangles(verts, indices, color, texture, model_pose, flip)
+        return cls.faceted_triangles(verts, indices, color, **kwargs)
     
     def __init__(self, positions_normals_texcoords, mode, indices, color,
-                 texture, model_pose=None):
+                 texture=None, model_pose=None, pre_transform=None,
+                 specular_exponent=None,
+                 specular_strength=None):
         
         # uniform for color
 
@@ -638,6 +638,26 @@ class IndexedPrimitives:
         
         assert vdata.dtype == numpy.float32
         assert len(vdata.shape) == 2 and vdata.shape[1] == 8
+
+        if pre_transform is not None:
+            
+            assert pre_transform.shape == (4, 4) and pre_transform.dtype == numpy.float32
+
+            R = numpy.linalg.inv(pre_transform.T)[:3, :3]
+            
+            for i in range(len(vdata)):
+                
+                vertex = vdata[i, 0:3]
+                normal = vdata[i, 3:6]
+                
+                vertex = vec4(vertex[0], vertex[1], vertex[2], 1.0)
+
+                vertex = numpy.dot(pre_transform, vertex)[:3]
+                normal = numpy.dot(R, normal)
+
+                vdata[i, 0:3] = vertex
+                vdata[i, 3:6] = normal
+
 
         self.mode = mode
 
@@ -685,8 +705,14 @@ class IndexedPrimitives:
         self.color = color
         self.texture = texture
 
-        self.specular_exponent = 40.0
-        self.specular_strength = 0.75
+        if specular_exponent is None:
+            specular_exponent = self.DEFAULT_SPECULAR_EXPONENT
+
+        if specular_strength is None:
+            specular_strength = self.DEFAULT_SPECULAR_STRENGTH
+            
+        self.specular_exponent = specular_exponent
+        self.specular_strength = specular_strength
         
     def render(self):
 

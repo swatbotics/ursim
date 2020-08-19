@@ -18,6 +18,10 @@ from CleanGL import gl
 
 import Box2D as B2D
 
+# TODO: teardown graphics
+# TODO: teardown sim
+# TODO: reset sim and env
+
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
 CARDBOARD_COLOR = gfx.vec3(0.8, 0.7, 0.6)
@@ -57,6 +61,10 @@ WALL_HEIGHT = 0.5
 
 CARDBOARD_DENSITY_PER_M2 = 0.45
 
+BLOCK_MASS = 0.5
+BLOCK_SZ = 0.1
+BLOCK_COLOR = gfx.vec3(0.5, 0.25, 0)
+
 ROOM_HEIGHT = 1.5
 
 ROOM_COLOR = gfx.vec3(1, 0.97, 0.93)
@@ -74,8 +82,6 @@ class SimObject:
         
         self.body = None
         
-        self.model_z = 0.0
-
         self.body_linear_mu = 0.0
         self.body_angular_mu = 0.0
 
@@ -88,8 +94,7 @@ class SimObject:
             
             if self.body is not None and hasattr(obj, 'model_pose'):
                 
-                obj.model_pose = b2xform(self.body.transform,
-                                         self.model_z)
+                obj.model_pose = b2xform(self.body.transform)
 
             obj.render()
 
@@ -113,18 +118,17 @@ class SimObject:
 ######################################################################
 
 def b2ple(array):
-
     return tuple([float(ai) for ai in array])
 
 def b2xform(transform, z=0.0):
     return gfx.rigid_2d_matrix(transform.position, transform.angle, z)
-    
 
+def tz(z):
+    return gfx.translation_matrix(gfx.vec3(0, 0, z))
+                                
 ######################################################################
 
 class Pylon(SimObject):
-
-    gfx_object = None
 
     def __init__(self, world, position, color):
 
@@ -153,28 +157,18 @@ class Pylon(SimObject):
 
         self.color = color
 
-        self.model_z = 0.5*PYLON_HEIGHT
-
     def init_render(self):
 
-        if self.gfx_object is None:
-            self.gfx_object = gfx.IndexedPrimitives.cylinder(
-                PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
-                self.color, None, None)
+        gfx_object = gfx.IndexedPrimitives.cylinder(
+            PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
+            self.color,
+            pre_transform=tz(0.5*PYLON_HEIGHT))
 
-        self.gfx_objects = [self.gfx_object]
-        
-    def render(self):
-
-        self.gfx_object.color = self.color
-        
-        super().render()
+        self.gfx_objects = [gfx_object]
 
 ######################################################################
 
 class Ball(SimObject):
-
-    gfx_object = None
 
     def __init__(self, world, position):
 
@@ -194,31 +188,109 @@ class Ball(SimObject):
 
         self.body_linear_mu = 0.05 * BALL_MASS * 10.0
         
-        self.model_z = BALL_RADIUS
-
-
         print('ball has radius={}, mass={} ({}), I={}'.format(
             BALL_RADIUS, BALL_MASS, self.body.mass, self.body.inertia))
         
 
     def init_render(self):
-
-        if self.gfx_object is None:
-            
-            self.gfx_object = gfx.IndexedPrimitives.sphere(
-                BALL_RADIUS, 32, 24, 
-                BALL_COLOR, None, None)
-
-            self.gfx_object.specular_exponent = 100.
-            self.gfx_object.specular_strength = 0.01
-
-        self.gfx_objects = [ self.gfx_object ]
         
+        gfx_object = gfx.IndexedPrimitives.sphere(
+            BALL_RADIUS, 32, 24, 
+            BALL_COLOR,
+            pre_transform=tz(BALL_RADIUS),
+            specular_exponent=40.0,
+            specular_strength=0.5)
+        
+        self.gfx_objects = [ gfx_object ]
+        
+######################################################################
+
+class Wall(SimObject):
+
+    def __init__(self, world, p0, p1):
+
+        super().__init__()
+        
+        position = 0.5*(p0 + p1)
+        
+        delta = p1 - p0
+        theta = numpy.arctan2(delta[1], delta[0])
+
+        length = numpy.linalg.norm(delta)
+        
+        dims = gfx.vec3(length,
+                        WALL_THICKNESS, WALL_HEIGHT)
+
+
+        self.dims = dims
+
+        r = 0.5*BLOCK_SZ
+        bx = 0.5*float(length) - 1.5*BLOCK_SZ
+
+        shapes = [
+            B2D.b2PolygonShape(box=(b2ple(0.5*dims[:2]))),
+            B2D.b2PolygonShape(box=(r, r, (bx, 0), 0)),
+            B2D.b2PolygonShape(box=(r, r, (-bx, 0), 0)),
+        ]
+            
+        
+        self.body = world.CreateDynamicBody(
+            position = b2ple(position),
+            angle = float(theta),
+            shapes = shapes,
+            shapeFixture = B2D.b2FixtureDef(density=1,
+                                            restitution=0.1,
+                                            friction=0.95)
+        )
+
+
+        rho = CARDBOARD_DENSITY_PER_M2
+
+        mx = rho * (dims[1] * dims[2])
+        Ix = mx * dims[0]**2 / 12
+
+        Ib = BLOCK_MASS*BLOCK_SZ**2/6
+
+        mass = mx + 2*BLOCK_MASS 
+        I = Ix + 2*(Ib + BLOCK_MASS*bx**2)
+
+        print('this wall has dims={}, mass={}, I={}'.format(dims, mass, I))
+
+        self.body_linear_mu = 0.9 * mass * 10.0
+        self.body_angular_mu = I * 4.0
+        
+        self.body.massData = B2D.b2MassData(
+            mass = mass,
+            I = I
+        )
+
+        self.bx = bx
+        self.dims = dims
+
+    def init_render(self):
+
+        gfx_object = gfx.IndexedPrimitives.box(
+            self.dims, CARDBOARD_COLOR,
+            pre_transform=tz(0.5*self.dims[2]))
+
+        self.gfx_objects = [gfx_object]
+
+        for x in [-self.bx, self.bx]:
+
+            block = gfx.IndexedPrimitives.box(
+                gfx.vec3(BLOCK_SZ, BLOCK_SZ, BLOCK_SZ),
+                BLOCK_COLOR,
+                pre_transform=gfx.translation_matrix(
+                    gfx.vec3(x, 0, 0.5*BLOCK_SZ)))
+
+            self.gfx_objects.append(block)
+        
+
 ######################################################################
 
 class Box(SimObject):
 
-    def __init__(self, world, dims, position, angle, color):
+    def __init__(self, world, dims, position, angle):
 
         super().__init__()
         
@@ -236,8 +308,6 @@ class Box(SimObject):
             )
         )
 
-        print(self.body)
-
         rho = CARDBOARD_DENSITY_PER_M2
 
         mx = rho * (dims[1] * dims[2])
@@ -248,19 +318,10 @@ class Box(SimObject):
         Iy = my * dims[1]**2 / 12
         Iz = mz*(dims[0]**2 + dims[1]**2)/12
 
-        if dims[1] <= WALL_THICKNESS * 1.0001:
+        mass = 2*(mx + my + mz)
+        I = 2 * (Ix + Iy + mx * dims[0]**2/4 + my * dims[1]**2/4 + Iz)
 
-            mass = mx
-            I = Ix
-            thing = 'wall'
-
-        else:
-
-            mass = 2*(mx + my + mz)
-            I = 2 * (Ix + Iy + mx * dims[0]**2/4 + my * dims[1]**2/4 + Iz)
-            thing = 'box'
-
-        print('this {} has dims={}, mass={}, I={}'.format(thing, dims, mass, I))
+        print('this box has dims={}, mass={}, I={}'.format(dims, mass, I))
 
         self.body_linear_mu = 0.9 * mass * 10.0
         self.body_angular_mu = I * 4.0
@@ -271,17 +332,11 @@ class Box(SimObject):
         )
 
         self.dims = dims
-        self.color = color
-
-        self.model_z = 0.5*dims[2]
 
     def init_render(self):
 
         gfx_object = gfx.IndexedPrimitives.box(
-            self.dims, self.color, None, None)
-
-        gfx_object.specular_exponent = 100.0
-        gfx_object.specular_strength = 0.1
+            self.dims, CARDBOARD_COLOR)
 
         self.gfx_objects = [gfx_object]
         
@@ -342,9 +397,9 @@ class Room(SimObject):
 
         floor_obj = gfx.IndexedPrimitives(
             vdata, mode, indices, 0.8*gfx.vec3(1, 1, 1),
-            self.floor_texture)
-
-        floor_obj.specular_strength = 0.25
+            texture=self.floor_texture,
+            specular_exponent = 40.0,
+            specular_strength = 0.5)
 
         w, h = self.dims
         z = ROOM_HEIGHT
@@ -372,14 +427,12 @@ class Room(SimObject):
         ], dtype=numpy.uint8)
 
         room_obj = gfx.IndexedPrimitives.faceted_triangles(
-            verts, indices, ROOM_COLOR, None)
+            verts, indices, ROOM_COLOR)
 
         room_obj.specular_strength = 0.25
 
         self.gfx_objects = [ floor_obj, room_obj ]
 
-
-        
 ######################################################################
 
 class TapeStrip(SimObject):
@@ -451,9 +504,8 @@ class TapeStrip(SimObject):
         vdata[:, 6:8] = vdata[:, 0:2]
 
         gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLE_STRIP,
-                                                indices=None,
-                                                color=TAPE_COLOR,
-                                                texture=None, model_pose=None)
+                                           indices=None,
+                                           color=TAPE_COLOR)
 
         gfx_object.specular_exponent = 100.0
         gfx_object.specular_strength = 0.05
@@ -602,8 +654,7 @@ class RoboSim:
                 theta = numpy.arctan2(delta[1], delta[0])
 
                 self.objects.append( Box(self.world, dims,
-                                         pctr, theta,
-                                         CARDBOARD_COLOR) )
+                                         pctr, theta) )
                 
             elif isinstance(item, se.Circle):
                 
@@ -630,17 +681,7 @@ class RoboSim:
                     
                 else:
 
-                    pctr = 0.5*(p0 + p1)
-
-                    delta = p1 - p0
-                    theta = numpy.arctan2(delta[1], delta[0])
-
-                    dims = gfx.vec3(numpy.linalg.norm(delta),
-                                    WALL_THICKNESS, WALL_HEIGHT)
-
-                    self.objects.append( Box(self.world, dims,
-                                             pctr, theta,
-                                             CARDBOARD_COLOR) )
+                    self.objects.append( Wall(self.world, p0, p1) )
                 
             elif isinstance(item, se.Polyline):
                 
@@ -693,6 +734,9 @@ class RoboSimApp(gfx.GlfwApp):
         super().__init__()
 
         self.create_window('Robot simulator', 1200, 1080)
+
+        gfx.IndexedPrimitives.DEFAULT_SPECULAR_EXPONENT = 100.0
+        gfx.IndexedPrimitives.DEFAULT_SPECULAR_STRENGTH = 0.1
 
         for obj in sim.objects:
             obj.init_render()
@@ -752,9 +796,19 @@ class RoboSimApp(gfx.GlfwApp):
         if key == glfw.KEY_B:
             for obj in self.sim.objects:
                 if isinstance(obj, Ball):
-                    #rdir = numpy.random.random(2) * 2 - 1
-                    rdir = (1.0, -0.2)
-                    obj.body.ApplyLinearImpulse(rdir, obj.body.position, True)
+                    kick_impulse = B2D.b2Vec2(1, 0)
+                    wdist = None
+                    for other in self.sim.objects:
+                        if isinstance(other, Wall):
+                            diff = other.body.position - obj.body.position
+                            dist = diff.length
+                            if wdist is None or dist < wdist:
+                                wdist = dist
+                                desired_vel = 50*diff/dist
+                                actual_vel = obj.body.linearVelocity
+                                kick_impulse = (desired_vel - actual_vel)*BALL_MASS
+                    obj.body.ApplyLinearImpulse(kick_impulse, obj.body.position, True)
+                    obj.body.bullet = True
                     print('kicked the ball')
 
 
