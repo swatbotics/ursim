@@ -52,7 +52,7 @@ def check_opengl_errors(context='doing stuff'):
         sys.stderr.write(context + ': OpenGL error: ' + gluErrorString(error))
         glfw.terminate()
         sys.exit(1)
-
+        
 ######################################################################
 
 def make_shader(stype, srcs):
@@ -108,6 +108,18 @@ def make_program(vertex_shader, fragment_shader):
         uniforms[name] = gl.GetUniformLocation(program, name)
 
     return program, uniforms
+
+######################################################################
+
+def delete_program(program):
+
+    # get attachments and delete all of them
+    shaders = gl.GetAttachedShaders(program)
+
+    for shader in shaders:
+        gl.DeleteShader(shader)
+
+    gl.DeleteProgram(program)
 
 ######################################################################
 
@@ -370,6 +382,12 @@ class IndexedPrimitives:
         set_uniform(cls.uniforms['lightDir'], normalize(vec3(0.5, 0.25, 2)))
 
         check_opengl_errors('IndexedPrimitives program')
+
+    @classmethod
+    def static_destroy(cls):
+        if cls.program is not None:
+            delete_program(cls.program)
+            cls.program = None
 
     @classmethod
     def faceted_triangles(cls, verts, indices, color, **kwargs):
@@ -740,6 +758,20 @@ class IndexedPrimitives:
             gl.DrawArrays(self.mode, 0, self.element_count)
             
         check_opengl_errors('IndexedPrimitives.render')
+
+    def destroy(self, destroy_static=False):
+
+        gl.DeleteVertexArrays(1, [self.vao])
+        gl.DeleteBuffers(1, [self.vertex_buffer])
+        self.vao = None
+        self.vertex_buffer = None
+
+        if self.element_buffer is not None:
+            gl.DeleteBuffers(1, [self.element_buffer])
+            self.element_buffer = None
+
+        if destroy_static:
+            self.static_destroy()
     
 ######################################################################
 
@@ -817,6 +849,20 @@ class FullscreenQuad:
 
         check_opengl_errors('setting up vertexPosition')
 
+    @classmethod
+    def static_destroy(cls):
+
+        if cls.program is not None:
+            delete_program(cls.program)
+            cls.program = None
+
+        if cls.vao is not None:
+            gl.DeleteVertexArrays(1, [cls.vao])
+            gl.DeleteBuffers(1, [cls.vertex_buffer])
+            gl.DeleteBuffers(1, [cls.element_buffer])
+            cls.vao = None
+            cls.vertex_buffer = None
+            cls.element_buffer = None
         
     def __init__(self, texture):
         
@@ -839,6 +885,11 @@ class FullscreenQuad:
         gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, None)
 
         check_opengl_errors('FullscreenQuad.render')
+
+    def destroy(self, destroy_static=False):
+
+        if destroy_static:
+            self.static_destroy()
     
 ######################################################################
 
@@ -887,8 +938,11 @@ class GlfwApp:
     def update(self):
         pass
 
+    def destroy(self):
+        pass
+
     ############################################################
-    
+
     def run(self):
 
         assert self.window is not None
@@ -905,6 +959,8 @@ class GlfwApp:
             if self.need_render or self.animating:
                 self._render()
 
+        self.destroy()
+        
         glfw.destroy_window(self.window)
 
         glfw.terminate()

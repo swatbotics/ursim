@@ -21,6 +21,9 @@ import Box2D as B2D
 # TODO: teardown graphics
 # TODO: teardown sim
 # TODO: reset sim and env
+# TODO: sim robot
+# TODO: implement renderbuffers in graphics
+# TODO: robot camera
 
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
@@ -353,8 +356,6 @@ def line_intersect(l1, l2):
 
 class Room(SimObject):
 
-    floor_texture = None
-    
     def __init__(self, world, dims):
 
         super().__init__()
@@ -374,6 +375,8 @@ class Room(SimObject):
         ]
         
         self.body.CreateLoopFixture(vertices=verts)
+
+        self.floor_texture = None
 
     def init_render(self):
 

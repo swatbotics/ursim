@@ -26,9 +26,9 @@ class HelloWorldApp(gfx.GlfwApp):
         gl.Enable(gl.CULL_FACE)
         gl.Enable(gl.FRAMEBUFFER_SRGB)
 
-        texture = gfx.load_texture('textures/monalisa.jpg', 'RGB')
+        self.texture = gfx.load_texture('textures/monalisa.jpg', 'RGB')
         
-        self.fsquad = gfx.FullscreenQuad(texture)
+        self.fsquad = gfx.FullscreenQuad(self.texture)
 
         ballpos = gfx.translation_matrix(gfx.vec3(1.5, 0, 0))
 
@@ -136,11 +136,21 @@ class HelloWorldApp(gfx.GlfwApp):
         for obj in self.objects:
             obj.render()
 
+    def destroy(self):
+        
+        print('hello world app is going away!')
+
+        gl.DeleteTextures(1, [self.texture])
+
+        for obj in self.objects:
+            obj.destroy(destroy_static=True)
+        
 
 def main():
 
     app = HelloWorldApp()
     app.run()
+
 
 if __name__ == "__main__":
     main()
