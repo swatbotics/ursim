@@ -12,15 +12,16 @@ import graphics as gfx
 import svgelements as se
 import re
 import sys
+import os
 
 import glfw
 from CleanGL import gl
 
 import Box2D as B2D
 
-# TODO: teardown graphics
-# TODO: teardown sim
-# TODO: reset sim and env
+# DONE: teardown graphics
+# DONE: teardown sim
+# DONE: reset sim and env
 # TODO: sim robot
 # TODO: implement renderbuffers in graphics
 # TODO: robot camera
@@ -91,6 +92,11 @@ class SimObject:
 
     def init_render(self):
         pass
+
+    def destroy_render(self):
+        for obj in self.gfx_objects:
+            obj.destroy()
+        self.gfx_objects = []
 
     def render(self):
         
@@ -602,9 +608,33 @@ class RoboSim:
         self.remaining_sim_time = 0.0
         self.sim_time = 0.0
 
-
+        self.svg_filename = None
         
         print('created the world!')
+
+    def reload(self):
+
+        self.clear()
+
+        print('world bodies:', self.world.bodies)
+        print('world:', self.world)
+        
+        if self.svg_filename is not None:
+            self.load_svg(self.svg_filename)
+
+    def clear(self):
+
+        self.remaining_sim_time = 0.0
+        self.sim_time = 0.0
+        
+        for obj in self.objects:
+            
+            if obj.body is not None:
+                self.world.DestroyBody(obj.body)
+                
+            obj.destroy_render()
+            
+        self.objects = []
 
     def load_svg(self, svgfile):
 
@@ -698,10 +728,19 @@ class RoboSim:
                 
                 print('*** warning: ignoring SVG item:', item, '***')
                 continue
-        
 
+        self.svg_filename = os.path.abspath(svgfile)
+
+            
+    def init_render(self):
+        for obj in self.objects:
+            obj.init_render()
+
+    def destroy_render(self):
+        for obj in self.objects:
+            obj.destroy_render()
+            
     def render(self):
-
         for obj in self.objects:
             obj.render()
 
@@ -714,8 +753,6 @@ class RoboSim:
             self.sim_time += self.dt
             self.remaining_sim_time -= self.dt
 
-            print('sim update, t={}'.format(self.sim_time))
-
             for obj in self.objects:
                 obj.sim_update(self.world, self.sim_time)
 
@@ -724,10 +761,6 @@ class RoboSim:
                             self.position_iterations)
 
             self.world.ClearForces()
-
-            print('clearing forces')
-
-                
         
 ######################################################################
 
@@ -742,8 +775,7 @@ class RoboSimApp(gfx.GlfwApp):
         gfx.IndexedPrimitives.DEFAULT_SPECULAR_EXPONENT = 100.0
         gfx.IndexedPrimitives.DEFAULT_SPECULAR_STRENGTH = 0.1
 
-        for obj in sim.objects:
-            obj.init_render()
+        sim.init_render()
 
         gl.Enable(gl.CULL_FACE)
         gl.Enable(gl.FRAMEBUFFER_SRGB)
@@ -797,7 +829,13 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.update(self.sim.dt)
             self.need_render = True
 
-        if key == glfw.KEY_B:
+        elif key == glfw.KEY_R:
+
+            self.sim.reload()
+            self.sim.init_render()
+            self.need_render = True
+
+        elif key == glfw.KEY_B:
             for obj in self.sim.objects:
                 if isinstance(obj, Ball):
                     kick_impulse = B2D.b2Vec2(1, 0)
