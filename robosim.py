@@ -23,7 +23,7 @@ import Box2D as B2D
 # DONE: teardown sim
 # DONE: reset sim and env
 # DONE: sim robot
-# TODO: virtual bump sensors
+# DONE: virtual bump sensors
 # TODO: implement renderbuffers in graphics
 # TODO: robot camera
 
@@ -81,6 +81,8 @@ ROBOT_BASE_Z = 0.01
 ROBOT_BASE_MASS = 2.35
 ROBOT_BASE_I = 0.5*ROBOT_BASE_MASS*ROBOT_BASE_RADIUS**2
 
+ROBOT_BASE_COLOR = gfx.vec3(0.1, 0.1, 0.1)
+
 ROBOT_CAMERA_DIMS = gfx.vec3(0.08, 0.25, 0.04)
 ROBOT_CAMERA_Z = 0.30
 
@@ -88,7 +90,16 @@ ROBOT_WHEEL_OFFSET = 0.5*0.230
 ROBOT_WHEEL_RADIUS = 0.035
 ROBOT_WHEEL_WIDTH = 0.021
 
-ROBOT_BASE_COLOR = gfx.vec3(0.1, 0.1, 0.1)
+DEG = numpy.pi / 180
+
+BUMP_ANGLE_RANGES = numpy.array([
+    [ 20, 70 ],
+    [ -25, 25 ],
+    [ -70, -25 ]
+], dtype=numpy.float32) * DEG
+
+BUMP_DIST = 0.005
+
 
 def vec_from_color(color):
     return gfx.vec3(color.red, color.green, color.blue) / 255.
@@ -168,17 +179,15 @@ class Pylon(SimObject):
                 shape = B2D.b2CircleShape(radius=PYLON_RADIUS),
                 density = 1.0,
                 restitution = 0.25,
-                friction = 0.95,
-            )
+                friction = 0.6
+            ),
+            userData = self
         )
 
         self.body.massData = B2D.b2MassData(mass=PYLON_MASS,
                                             I=PYLON_I)
 
         self.body_linear_mu = 0.9 * PYLON_MASS * 10.0
-
-        print('pylon has radius={}, mass={}, I={}'.format(
-            PYLON_RADIUS, PYLON_MASS, PYLON_I))
 
         self.color = color
 
@@ -219,15 +228,12 @@ class Ball(SimObject):
                 density = BALL_DENSITY,
                 restitution = 0.98,
                 friction = 0.95
-            )
+            ),
+            userData = self
         )
 
-        self.body_linear_mu = 0.05 * BALL_MASS * 10.0
+        self.body_linear_mu = 0.01 * BALL_MASS * 10.0
         
-        print('ball has radius={}, mass={} ({}), I={}'.format(
-            BALL_RADIUS, BALL_MASS, self.body.mass, self.body.inertia))
-        
-
     def init_render(self):
 
         if self.static_gfx_object is None:
@@ -281,7 +287,8 @@ class Wall(SimObject):
             shapes = shapes,
             shapeFixture = B2D.b2FixtureDef(density=1,
                                             restitution=0.1,
-                                            friction=0.95)
+                                            friction=0.95),
+            userData = self
         )
 
 
@@ -294,8 +301,6 @@ class Wall(SimObject):
 
         mass = mx + 2*BLOCK_MASS 
         I = Ix + 2*(Ib + BLOCK_MASS*bx**2)
-
-        print('this wall has dims={}, mass={}, I={}'.format(dims, mass, I))
 
         self.body_linear_mu = 0.9 * mass * 10.0
         self.body_angular_mu = I * 10.0
@@ -345,8 +350,9 @@ class Box(SimObject):
                 shape = B2D.b2PolygonShape(box=(b2ple(0.5*dims[:2]))),
                 density = 1.0,
                 restitution = 0.1,
-                friction = 0.95
-            )
+                friction = 0.6
+            ),
+            userData = self
         )
 
         rho = CARDBOARD_DENSITY_PER_M2
@@ -361,8 +367,6 @@ class Box(SimObject):
 
         mass = 2*(mx + my + mz)
         I = 2 * (Ix + Iy + mx * dims[0]**2/4 + my * dims[1]**2/4 + Iz)
-
-        print('this box has dims={}, mass={}, I={}'.format(dims, mass, I))
 
         self.body_linear_mu = 0.9 * mass * 10.0
         self.body_angular_mu = I * 10.0
@@ -400,19 +404,55 @@ class Room(SimObject):
         
         self.dims = dims
 
-        self.body = world.CreateStaticBody()
+        shapes = []
 
-        # clockwise is inwards
-        w, h = b2ple(dims)
+        thickness = 1.0
+
+        w = float(dims[0])
+        h = float(dims[1])
+
+
+        shapes.append(
+            B2D.b2PolygonShape(
+                box=(
+                    thickness, 0.5*h+thickness,
+                    (-thickness, 0.5*h), 0.0
+                )
+            )
+        )
         
-        verts = [
-            (0., 0.),
-            (0., h),
-            (w, h),
-            (w, 0.)
-        ]
+        shapes.append(
+            B2D.b2PolygonShape(
+                box=(
+                    thickness, 0.5*h+thickness,
+                    (w+thickness, 0.5*h), 0.0
+                )
+            )
+        )
+
+        shapes.append(
+            B2D.b2PolygonShape(
+                box=(
+                    0.5*w+thickness, thickness,
+                    (0.5*w, -thickness), 0.0
+                )
+            )
+        )
+
+        shapes.append(
+            B2D.b2PolygonShape(
+                box=(
+                    0.5*w+thickness, thickness,
+                    (0.5*w, h+thickness), 0.0
+                )
+            )
+        )
         
-        self.body.CreateLoopFixture(vertices=verts)
+        self.body = world.CreateStaticBody(
+            userData = self,
+            shapes = shapes
+        )
+
 
         self.floor_texture = None
 
@@ -583,8 +623,6 @@ def clamp_abs(quantity, limit):
 
 ######################################################################
 
-
-
 class Robot(SimObject):
 
     def __init__(self, world, position, angle):
@@ -598,8 +636,9 @@ class Robot(SimObject):
                 shape = B2D.b2CircleShape(radius=ROBOT_BASE_RADIUS),
                 density = 1.0,
                 restitution = 0.25,
-                friction = 0.95,
-            )
+                friction = 0.1,
+            ),
+            userData = self
         )
 
         self.body.massData = B2D.b2MassData(
@@ -620,13 +659,19 @@ class Robot(SimObject):
 
         self.wheel_velocity_fitler_accel = 2.0 # m/s^2
 
-        self.desired_linear_angular_velocity = numpy.array([0.0, 0.0], dtype=numpy.float32)
+        self.desired_linear_angular_velocity = numpy.array(
+            [0.0, 0.0], dtype=numpy.float32)
 
-        self.desired_wheel_velocity_filtered = numpy.array([0.0, 0.0], dtype=numpy.float32)
+        self.desired_wheel_velocity_filtered = numpy.array(
+            [0.0, 0.0], dtype=numpy.float32)
 
         self.rolling_mu = 0.5
         
         self.motors_enabled = True
+
+        self.bump = numpy.zeros(len(BUMP_ANGLE_RANGES), dtype=numpy.uint8)
+
+        self.colliders = set()
 
     def init_render(self):
 
@@ -669,7 +714,7 @@ class Robot(SimObject):
                     specular_strength=0.75
                 )
             )
-
+        
     def sim_update(self, world, time, dt):
 
         body = self.body
@@ -722,7 +767,55 @@ class Robot(SimObject):
                 
                 body.ApplyForce(-self.rolling_mu*wheel_fwd_velocity * current_normal,
                                 world_point, True)
+
+        self.bump[:] = 0
+
+        transformA = self.body.transform
+
+        finished_colliders = set()
+
+        for collider in self.colliders:
             
+            transformB = collider.body.transform
+
+            min_dist = None
+            min_pointA = None
+            
+            for fixtureA in self.body.fixtures:
+                shapeA = fixtureA.shape
+
+                for fixtureB in collider.body.fixtures:
+                    shapeB = fixtureB.shape
+
+                    pointA, _, distance, _ = B2D.b2Distance(
+                        shapeA = shapeA,
+                        shapeB = shapeB,
+                        transformA = transformA,
+                        transformB = transformB
+                    )
+
+                    if min_dist is None or distance < min_dist:
+                        min_dist = distance
+                        min_pointA = pointA
+
+            if min_dist > BUMP_DIST:
+                
+                finished_colliders.add(collider)
+
+            else:
+
+                lx, ly = self.body.GetLocalPoint(min_pointA)
+
+                theta = numpy.arctan2(ly, lx)
+
+                in_range = ( (theta >= BUMP_ANGLE_RANGES[:,0]) &
+                             (theta <= BUMP_ANGLE_RANGES[:,1]) )
+
+                self.bump |= in_range
+                    
+        self.colliders -= finished_colliders
+
+                                
 ######################################################################
 
 def match_color(color, carray):
@@ -787,15 +880,20 @@ class SvgTransformer:
 
 ######################################################################
 
-class RoboSim:
+    
+class RoboSim(B2D.b2ContactListener):
 
     def __init__(self):
 
+        super().__init__()
+
         self.world = B2D.b2World(gravity=(0, 0), doSleep=True)
+        self.world.contactListener = self
 
         self.dims = numpy.array([-1, -1], dtype=numpy.float32)
 
         self.objects = []
+        self.robot = None
 
         self.dt = 0.01
 
@@ -814,9 +912,6 @@ class RoboSim:
 
         self.clear()
 
-        print('world bodies:', self.world.bodies)
-        print('world:', self.world)
-        
         if self.svg_filename is not None:
             self.load_svg(self.svg_filename)
 
@@ -833,6 +928,7 @@ class RoboSim:
             obj.destroy_render()
             
         self.objects = []
+        self.robot = None
 
     def load_svg(self, svgfile):
 
@@ -950,19 +1046,19 @@ class RoboSim:
                 k = 3-i-j
 
                 tangent = diffs[a]
-                print('tangent:', tangent, points[i] - points[j])
                 ctr = 0.5*(points[i] + points[j])
 
-                normal = gfx.vec2(-tangent[1], tangent[0])
+                normal = gfx.normalize(gfx.vec2(-tangent[1], tangent[0]))
 
-                if numpy.dot(normal, points[k]-ctr) < 0:
+                dist = numpy.dot(normal, points[k]-ctr)
+
+                if dist < 0:
                     normal = -normal
+                    dist = -dist
 
-                print('normal:', normal)
-
-                robot_init_position = ctr
+                print('dist:', dist)
+                robot_init_position = ctr + 0.5 * dist * normal
                 robot_init_angle = numpy.arctan2(normal[1], normal[0])
-                
 
             else:
                 
@@ -996,13 +1092,19 @@ class RoboSim:
 
     def update(self, time_since_last_update):
 
+
         self.remaining_sim_time += time_since_last_update
 
+        #print('simulating {} worth of real time'.format(
+        #    self.remaining_sim_time))
+        
         while self.remaining_sim_time >= self.dt:
             
             self.sim_time += self.dt
             self.remaining_sim_time -= self.dt
 
+            now = glfw.get_time()
+            
             for obj in self.objects:
                 obj.sim_update(self.world, self.sim_time, self.dt)
 
@@ -1011,6 +1113,24 @@ class RoboSim:
                             self.position_iterations)
 
             self.world.ClearForces()
+
+            elapsed = glfw.get_time() - now
+            #print('  sim step took', elapsed, 'seconds')
+
+
+    def PreSolve(self, contact, old_manifold):
+
+        other = None
+
+        if contact.fixtureA.body == self.robot.body:
+            other = contact.fixtureB.body
+        elif contact.fixtureB.body == self.robot.body:
+            other = contact.fixtureA.body
+
+        if other is None:
+            return
+
+        self.robot.colliders.add(other.userData)
         
 ######################################################################
 
@@ -1101,7 +1221,7 @@ class RoboSimApp(gfx.GlfwApp):
                             dist = diff.length
                             if wdist is None or dist < wdist:
                                 wdist = dist
-                                desired_vel = 20*diff/dist
+                                desired_vel = 4.0*diff/dist
                                 actual_vel = obj.body.linearVelocity
                                 kick_impulse = (desired_vel - actual_vel)*BALL_MASS
                     obj.body.ApplyLinearImpulse(kick_impulse, obj.body.position, True)
@@ -1126,7 +1246,8 @@ class RoboSimApp(gfx.GlfwApp):
         foo = (self.mouse_pos / self.framebuffer_size)
 
         self.yrot = gfx.mix(-2*numpy.pi, 2*numpy.pi, foo[0])
-        self.xrot = gfx.mix(numpy.pi/2, 0, numpy.clip(foo[1], 0, 1))
+        #self.xrot = gfx.mix(numpy.pi/2, 0, numpy.clip(foo[1], 0, 1))
+        self.xrot = gfx.mix(numpy.pi/2, -numpy.pi/2, numpy.clip(foo[1], 0, 1))
 
         self.need_render = True
         self.view = None
@@ -1144,7 +1265,7 @@ class RoboSimApp(gfx.GlfwApp):
             now = glfw.get_time()
             if self.was_animating:
                 since_last_update = now - self.prev_update
-                self.sim.update(since_last_update)
+                self.sim.update(since_last_update)                
                 #print('seconds per update:', seconds_per_update)
             self.was_animating = True
             self.prev_update = now
@@ -1201,11 +1322,21 @@ class RoboSimApp(gfx.GlfwApp):
 
             w, h = self.sim.dims
             m = numpy.linalg.norm([w, h])
-        
+
             self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
                                     center=gfx.vec3(0.5*w, 0.5*h, 0.75*ROOM_HEIGHT),
                                     up=gfx.vec3(0, 0, 1),
                                     Rextra=R_mouse)
+
+
+            '''
+            rx, ry = self.sim.robot.body.position
+
+            self.view = gfx.look_at(eye=gfx.vec3(rx, ry-1.5, 0),
+                                    center=gfx.vec3(rx, ry, 0),
+                                    up=gfx.vec3(0, 0, 1),
+                                    Rextra=R_mouse)
+            '''
 
             view_pos = -numpy.dot(numpy.linalg.inv(self.view[:3, :3]),
                                   self.view[:3, 3])
@@ -1216,6 +1347,7 @@ class RoboSimApp(gfx.GlfwApp):
         gl.Enable(gl.DEPTH_TEST)
 
         self.sim.render()
+        #self.sim.robot.render()
 
 
         
