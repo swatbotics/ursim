@@ -84,7 +84,7 @@ ROBOT_BASE_I = 0.5*ROBOT_BASE_MASS*ROBOT_BASE_RADIUS**2
 ROBOT_BASE_COLOR = gfx.vec3(0.1, 0.1, 0.1)
 
 ROBOT_CAMERA_DIMS = gfx.vec3(0.08, 0.25, 0.04)
-ROBOT_CAMERA_Z = 0.30
+ROBOT_CAMERA_Z = 0.27
 
 ROBOT_WHEEL_OFFSET = 0.5*0.230
 ROBOT_WHEEL_RADIUS = 0.035
@@ -677,7 +677,7 @@ class Robot(SimObject):
 
         self.gfx_objects.append(
             gfx.IndexedPrimitives.cylinder(
-                ROBOT_BASE_RADIUS, ROBOT_BASE_HEIGHT, 32, 1,
+                ROBOT_BASE_RADIUS, ROBOT_BASE_HEIGHT, 64, 1,
                 ROBOT_BASE_COLOR,
                 pre_transform=tz(0.5*ROBOT_BASE_HEIGHT + ROBOT_BASE_Z),
                 specular_exponent=40.0,
@@ -1140,7 +1140,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         super().__init__()
 
-        self.create_window('Robot simulator', 1200, 1080)
+        self.create_window('Robot simulator', 640, 480, units='window')
 
         gfx.IndexedPrimitives.DEFAULT_SPECULAR_EXPONENT = 100.0
         gfx.IndexedPrimitives.DEFAULT_SPECULAR_STRENGTH = 0.1
@@ -1154,6 +1154,13 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.perspective = None
         self.view = None
+
+        self.camR = numpy.array([
+            [ 0, -1, 0, 0 ],
+            [ 0,  0, 1, 0 ],
+            [-1,  0, 0, 0 ],
+            [ 0,  0, 0, 1 ]
+        ], dtype=numpy.float32)
 
         self.xrot = 0
         self.yrot = 0
@@ -1270,25 +1277,30 @@ class RoboSimApp(gfx.GlfwApp):
             self.was_animating = True
             self.prev_update = now
 
-        la = self.sim.robot.desired_linear_angular_velocity
-        old_la = la.copy()
+        la = numpy.zeros(2)
 
         if self.key_is_down(glfw.KEY_I):
-            la[:] = (0.5, 0)
-        elif self.key_is_down(glfw.KEY_K):
-            la[:] = (-0.5, 0)
-        elif self.key_is_down(glfw.KEY_J):
-            la[:] = (0, 2.0)
-        elif self.key_is_down(glfw.KEY_L):
-            la[:] = (0, -2.0)
-        elif self.key_is_down(glfw.KEY_U):
-            la[:] = (0.5, 1.0)
-        elif self.key_is_down(glfw.KEY_O): 
-            la[:] = (0.5, -1.0)
-        else:
-            la[:] = 0
+            la += (0.5, 0)
+            
+        if self.key_is_down(glfw.KEY_K):
+            la += (-0.5, 0)
+            
+        if self.key_is_down(glfw.KEY_J):
+            la += (0, 2.0)
+            
+        if self.key_is_down(glfw.KEY_L):
+            la += (0, -2.0)
+            
+        if self.key_is_down(glfw.KEY_U):
+            la += (0.5, 1.0)
+            
+        if self.key_is_down(glfw.KEY_O): 
+            la += (0.5, -1.0)
+
+        self.sim.robot.desired_linear_angular_velocity[:] = la
+            
         
-        if numpy.abs(la).sum() and numpy.any(la != old_la):
+        if numpy.any(la):
             self.sim.robot.motors_enabled = True
 
         
@@ -1308,25 +1320,43 @@ class RoboSimApp(gfx.GlfwApp):
             w, h = self.framebuffer_size
             aspect = w / max(h, 1)
 
-            self.perspective = gfx.perspective_matrix(45.0, aspect, 0.1, 25.0)
+            self.perspective = gfx.perspective_matrix(
+                45, aspect, 0.005, 25.0)
 
             gfx.set_uniform(gfx.IndexedPrimitives.uniforms['perspective'],
                             self.perspective)
 
-        if self.view is None:
+        view_robot = True
 
-            Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
-            Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
+        if self.view is None or view_robot:
 
-            R_mouse = numpy.dot(Rx, Ry)
+            if view_robot:
 
-            w, h = self.sim.dims
-            m = numpy.linalg.norm([w, h])
+                M = b2xform(self.sim.robot.body.transform,
+                            ROBOT_CAMERA_Z + 0.5*ROBOT_CAMERA_DIMS[2])
 
-            self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
-                                    center=gfx.vec3(0.5*w, 0.5*h, 0.75*ROOM_HEIGHT),
-                                    up=gfx.vec3(0, 0, 1),
-                                    Rextra=R_mouse)
+                #M = numpy.dot(M, gfx.translation_matrix(
+                #    gfx.vec3(-0.95*ROBOT_CAMERA_DIMS[0], 0, 0)))
+
+                M = numpy.linalg.inv(M)
+                M = numpy.dot(self.camR, M)
+
+                self.view = M
+
+            else:
+
+                Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
+                Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
+
+                R_mouse = numpy.dot(Rx, Ry)
+
+                w, h = self.sim.dims
+                m = numpy.linalg.norm([w, h])
+
+                self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
+                                        center=gfx.vec3(0.5*w, 0.5*h, 0.75*ROOM_HEIGHT),
+                                        up=gfx.vec3(0, 0, 1),
+                                        Rextra=R_mouse)
 
 
             '''

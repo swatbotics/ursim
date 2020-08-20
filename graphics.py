@@ -1028,19 +1028,23 @@ class GlfwApp:
 
     ############################################################
             
-    def create_window(self, name, width, height, hints=DEFAULT_WINDOW_HINTS):
+    def create_window(self, name, width, height, hints=DEFAULT_WINDOW_HINTS, units='framebuffer'):
+
+        assert units in ['framebuffer', 'window']
+
+        create_window_size = numpy.array([width, height])
         
-        self.window_size[:] = (width, height)
+        if units == 'framebuffer':
 
-        try:
-            monitor = glfw.get_primary_monitor()
-            monitor_scale = glfw.get_monitor_content_scale(monitor)
-            print('detected monitor_scale', monitor_scale)
-        except:
-            monitor_scale = (1.0, 1.0)
+            try:
+                monitor = glfw.get_primary_monitor()
+                monitor_scale = glfw.get_monitor_content_scale(monitor)
+                print('detected monitor_scale', monitor_scale)
+            except:
+                monitor_scale = (1.0, 1.0)
 
-        create_window_size = numpy.round(self.window_size /
-                                         monitor_scale).astype(numpy.int32)
+                create_window_size = numpy.round(
+                    create_window_size / monitor_scale).astype(numpy.int32)
         
         for hint, value in hints:
             glfw.window_hint(hint, value)
