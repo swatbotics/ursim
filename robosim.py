@@ -377,7 +377,8 @@ class Box(SimObject):
     def init_render(self):
 
         gfx_object = gfx.IndexedPrimitives.box(
-            self.dims, CARDBOARD_COLOR)
+            self.dims, CARDBOARD_COLOR,
+            pre_transform=tz(0.5*self.dims[2]))
 
         self.gfx_objects = [gfx_object]
         
@@ -712,15 +713,8 @@ class Robot(SimObject):
                     wheel_velocity_error * body.mass,
                     self.max_forward_impulse)
 
-                if 1:
-
-                    body.ApplyForce((0.5 * forward_impulse / dt) * current_normal,
-                                    world_point, True)
-                    
-                else:
-
-                    body.ApplyLinearImpulse(0.5 * forward_impulse * current_normal,
-                                            world_point, True)
+                body.ApplyLinearImpulse(0.5 * forward_impulse * current_normal,
+                                        world_point, True)
                 
             else:
 
