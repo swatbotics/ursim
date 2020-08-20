@@ -24,12 +24,12 @@
 <circle class="st3" cx="401.1" cy="443.3" r="5"/>
 <circle class="st3" cx="607.8" cy="510.1" r="5"/>
 <circle class="st1" cx="587.4" cy="444.4" r="5"/>
-<circle class="st4" cx="262.1" cy="568.8" r="20"/>
+<circle class="st4" cx="536.2" cy="243.1" r="20"/>
 <line id="tag1" class="st5" x1="423.8" y1="255.6" x2="507.3" y2="283.4"/>
 <line id="tag2" class="st5" x1="700.8" y1="480.4" x2="724.1" y2="395.6"/>
 <line class="st6" x1="600" y1="300" x2="600" y2="380"/>
 <rect x="42" y="103.8" transform="matrix(0.8211 -0.5708 0.5708 0.8211 -59.259 72.5013)" class="st7" width="88" height="54"/>
 <rect x="457.9" y="527.1" transform="matrix(0.9962 -8.762947e-02 8.762947e-02 0.9962 -46.6268 46.1153)" class="st7" width="88" height="54"/>
 <rect x="726.5" y="211.6" transform="matrix(0.9985 -5.524837e-02 5.524837e-02 0.9985 -12.9706 42.0195)" class="st7" width="54" height="88"/>
-<polygon class="st8" points="320.6,351.4 321,368 365.8,358.7 "/>
+<polygon class="st8" points="476.6,189.1 465.9,201.8 505.8,224.2 "/>
 </svg>

@@ -615,10 +615,10 @@ class Robot(SimObject):
             [-ROBOT_WHEEL_OFFSET, 0]
         ], dtype=float)
         
-        self.max_lateral_impulse = 3.0 # m/(s*kg)
-        self.max_forward_impulse = 1.0 # m/(s*kg)
+        self.max_lateral_impulse = 0.05 # m/(s*kg)
+        self.max_forward_impulse = 0.05 # m/(s*kg)
 
-        self.wheel_velocity_fitler_accel = 1.0 # m/s^2
+        self.wheel_velocity_fitler_accel = 2.0 # m/s^2
 
         self.desired_linear_angular_velocity = numpy.array([0.0, 0.0], dtype=numpy.float32)
 
