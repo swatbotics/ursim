@@ -978,6 +978,9 @@ class GlfwApp:
         self._render()
 
     ############################################################
+
+    def key_is_down(self, key):
+        return glfw.get_key(self.window, key) == glfw.PRESS
         
     def _key_callback(self, window, key, scancode, action, mods):
         self.key(key, scancode, action, mods)

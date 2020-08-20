@@ -22,7 +22,8 @@ import Box2D as B2D
 # DONE: teardown graphics
 # DONE: teardown sim
 # DONE: reset sim and env
-# TODO: sim robot
+# DONE: sim robot
+# TODO: virtual bump sensors
 # TODO: implement renderbuffers in graphics
 # TODO: robot camera
 
@@ -56,7 +57,7 @@ TAPE_RADIUS = 0.025
 
 TAPE_POLYGON_OFFSET = 0.001
 
-BALL_MASS = 0.1
+BALL_MASS = 0.05
 BALL_AREA = 2*numpy.pi*BALL_RADIUS**2
 BALL_DENSITY = BALL_MASS / BALL_AREA
 
@@ -73,6 +74,21 @@ BLOCK_COLOR = gfx.vec3(0.5, 0.25, 0)
 ROOM_HEIGHT = 1.5
 
 ROOM_COLOR = gfx.vec3(1, 0.97, 0.93)
+
+ROBOT_BASE_RADIUS = 0.5*0.36
+ROBOT_BASE_HEIGHT = 0.12
+ROBOT_BASE_Z = 0.01
+ROBOT_BASE_MASS = 2.35
+ROBOT_BASE_I = 0.5*ROBOT_BASE_MASS*ROBOT_BASE_RADIUS**2
+
+ROBOT_CAMERA_DIMS = gfx.vec3(0.08, 0.25, 0.04)
+ROBOT_CAMERA_Z = 0.30
+
+ROBOT_WHEEL_OFFSET = 0.5*0.230
+ROBOT_WHEEL_RADIUS = 0.035
+ROBOT_WHEEL_WIDTH = 0.021
+
+ROBOT_BASE_COLOR = gfx.vec3(0.1, 0.1, 0.1)
 
 def vec_from_color(color):
     return gfx.vec3(color.red, color.green, color.blue) / 255.
@@ -108,17 +124,14 @@ class SimObject:
 
             obj.render()
 
-    def setup_sim(self, world):
-        pass
-
-    def sim_update(self, world, time):
+    def sim_update(self, world, time, dt):
 
         if self.body is not None:
 
             if self.body_linear_mu:
-                self.body.ApplyForce(
+                self.body.ApplyForceToCenter(
                     -self.body_linear_mu * self.body.linearVelocity,
-                    self.body.worldCenter, True)
+                    True)
 
             if self.body_angular_mu:
                 self.body.ApplyTorque(
@@ -139,6 +152,8 @@ def tz(z):
 ######################################################################
 
 class Pylon(SimObject):
+
+    static_gfx_object = None
 
     def __init__(self, world, position, color):
 
@@ -169,16 +184,27 @@ class Pylon(SimObject):
 
     def init_render(self):
 
-        gfx_object = gfx.IndexedPrimitives.cylinder(
-            PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
-            self.color,
-            pre_transform=tz(0.5*PYLON_HEIGHT))
+        if self.static_gfx_object is None:
+            self.static_gfx_object = gfx.IndexedPrimitives.cylinder(
+                PYLON_RADIUS, PYLON_HEIGHT, 32, 1,
+                self.color,
+                pre_transform=tz(0.5*PYLON_HEIGHT))
 
-        self.gfx_objects = [gfx_object]
+        self.gfx_objects = [self.static_gfx_object]
+
+    def render(self):
+        self.static_gfx_object.color = self.color
+        super().render()
+
+    def destroy_render(self):
+        self.gfx_objects = []
+    
 
 ######################################################################
 
 class Ball(SimObject):
+
+    static_gfx_object = None
 
     def __init__(self, world, position):
 
@@ -203,15 +229,20 @@ class Ball(SimObject):
         
 
     def init_render(self):
+
+        if self.static_gfx_object is None:
         
-        gfx_object = gfx.IndexedPrimitives.sphere(
-            BALL_RADIUS, 32, 24, 
-            BALL_COLOR,
-            pre_transform=tz(BALL_RADIUS),
-            specular_exponent=40.0,
-            specular_strength=0.5)
+            self.static_gfx_object = gfx.IndexedPrimitives.sphere(
+                BALL_RADIUS, 32, 24, 
+                BALL_COLOR,
+                pre_transform=tz(BALL_RADIUS),
+                specular_exponent=40.0,
+                specular_strength=0.5)
         
-        self.gfx_objects = [ gfx_object ]
+        self.gfx_objects = [ self.static_gfx_object ]
+
+    def destroy_render(self):
+        self.gfx_objects = []
         
 ######################################################################
 
@@ -523,8 +554,181 @@ class TapeStrip(SimObject):
         self.gfx_objects = [ gfx_object ]
 
 
-        
+######################################################################
 
+def linear_angular_from_wheel_lr(wheel_lr_vel):
+
+    l, r = wheel_lr_vel
+
+    linear = (r+l)/2
+    angular = (r-l)/(2*ROBOT_WHEEL_OFFSET)
+
+    return linear, angular
+
+def wheel_lr_from_linear_angular(linear_angular):
+
+    linear, angular = linear_angular
+
+    l = linear - angular*ROBOT_WHEEL_OFFSET
+    r = linear + angular*ROBOT_WHEEL_OFFSET
+
+    return numpy.array([l, r])
+
+######################################################################
+
+def clamp_abs(quantity, limit):
+    return numpy.clip(quantity, -limit, limit)
+    
+
+######################################################################
+
+
+
+class Robot(SimObject):
+
+    def __init__(self, world, position, angle):
+
+        super().__init__()
+
+        self.body = world.CreateDynamicBody(
+            position = b2ple(position),
+            angle = float(angle),
+            fixtures = B2D.b2FixtureDef(
+                shape = B2D.b2CircleShape(radius=ROBOT_BASE_RADIUS),
+                density = 1.0,
+                restitution = 0.25,
+                friction = 0.95,
+            )
+        )
+
+        self.body.massData = B2D.b2MassData(
+            mass = ROBOT_BASE_MASS,
+            I = ROBOT_BASE_I
+        )
+
+        # left and then right
+        self.wheel_vel_cmd = numpy.array([0, 0], dtype=float)
+
+        self.wheel_offsets = numpy.array([
+            [ ROBOT_WHEEL_OFFSET, 0],
+            [-ROBOT_WHEEL_OFFSET, 0]
+        ], dtype=float)
+        
+        self.max_lateral_impulse = 3.0 # m/(s*kg)
+        self.max_forward_impulse = 1.0 # m/(s*kg)
+
+        self.wheel_velocity_fitler_accel = 1.0 # m/s^2
+
+        self.desired_linear_angular_velocity = numpy.array([0.0, 0.0], dtype=numpy.float32)
+
+        self.desired_wheel_velocity_filtered = numpy.array([0.0, 0.0], dtype=numpy.float32)
+
+        self.rolling_mu = 0.5
+        
+        self.motors_enabled = True
+
+    def init_render(self):
+
+        self.gfx_objects.append(
+            gfx.IndexedPrimitives.cylinder(
+                ROBOT_BASE_RADIUS, ROBOT_BASE_HEIGHT, 32, 1,
+                ROBOT_BASE_COLOR,
+                pre_transform=tz(0.5*ROBOT_BASE_HEIGHT + ROBOT_BASE_Z),
+                specular_exponent=40.0,
+                specular_strength=0.75
+            )
+        )
+
+        tx = -0.5*ROBOT_CAMERA_DIMS[0]
+        
+        self.gfx_objects.append(
+            gfx.IndexedPrimitives.box(
+                ROBOT_CAMERA_DIMS,
+                ROBOT_BASE_COLOR,
+                pre_transform=gfx.translation_matrix(
+                    gfx.vec3(tx, 0, 0.5*ROBOT_CAMERA_DIMS[2] + ROBOT_CAMERA_Z)),
+                specular_exponent=40.0,
+                specular_strength=0.75
+            )
+        )
+
+        btop = ROBOT_BASE_Z + ROBOT_BASE_HEIGHT
+        cbottom = ROBOT_CAMERA_Z
+
+        pheight = cbottom - btop
+
+        for y in [-0.1, 0.1]:
+
+            self.gfx_objects.append(
+                gfx.IndexedPrimitives.cylinder(
+                    0.01, pheight, 32, 1,
+                    gfx.vec3(0.75, 0.75, 0.75),
+                    pre_transform=gfx.translation_matrix(gfx.vec3(tx, y, 0.5*pheight + btop)),
+                    specular_exponent=20.0,
+                    specular_strength=0.75
+                )
+            )
+
+    def sim_update(self, world, time, dt):
+
+        body = self.body
+
+        current_normal = body.GetWorldVector((1, 0))
+        current_tangent = body.GetWorldVector((0, 1))
+
+        lateral_velocity = body.linearVelocity.dot(current_tangent)
+
+        lateral_impulse = clamp_abs(-body.mass * lateral_velocity,
+                                    self.max_lateral_impulse)
+
+        body.ApplyLinearImpulse(lateral_impulse * current_tangent,
+                                body.position, True)
+
+        desired_wheel_velocity = wheel_lr_from_linear_angular(
+            self.desired_linear_angular_velocity
+        )
+
+        self.desired_wheel_velocity_filtered += clamp_abs(
+            desired_wheel_velocity - self.desired_wheel_velocity_filtered,
+            self.wheel_velocity_fitler_accel * dt)
+
+        for idx, side in enumerate([1.0, -1.0]):
+
+            offset = B2D.b2Vec2(0, side * ROBOT_WHEEL_OFFSET)
+
+            world_point = body.GetWorldPoint(offset)
+
+            wheel_velocity = body.GetLinearVelocityFromWorldPoint(world_point)
+
+            wheel_fwd_velocity = wheel_velocity.dot(current_normal)
+
+            if self.motors_enabled:
+
+                wheel_velocity_error = (
+                    self.desired_wheel_velocity_filtered[idx] - wheel_fwd_velocity
+                )
+
+                forward_impulse = clamp_abs(
+                    wheel_velocity_error * body.mass,
+                    self.max_forward_impulse)
+
+                if 1:
+
+                    body.ApplyForce((0.5 * forward_impulse / dt) * current_normal,
+                                    world_point, True)
+                    
+                else:
+
+                    body.ApplyLinearImpulse(0.5 * forward_impulse * current_normal,
+                                            world_point, True)
+                
+            else:
+
+                self.desired_wheel_velocity_filtered[idx] = 0.0
+                
+                body.ApplyForce(-self.rolling_mu*wheel_fwd_velocity * current_normal,
+                                world_point, True)
+            
 ######################################################################
 
 def match_color(color, carray):
@@ -650,6 +854,9 @@ class RoboSim:
 
         self.objects.append(Room(self.world, self.dims))
 
+        robot_init_position = 0.5*self.dims
+        robot_init_angle = 0.0
+
         for item in svg:
 
             xx, yx, xy, yy, x0, y0 = [getattr(item.transform, letter)
@@ -678,17 +885,20 @@ class RoboSim:
                 cx = item.x + 0.5*item.width
                 cy = item.y + 0.5*item.height
 
-                if numpy.all(fcolor == 1):
-                    continue
-
                 dims = gfx.vec3(w, h, min(w, h))
                 pctr = xform.transform(cx, cy)
                 pfwd = xform.transform(cx+1, cy)
                 delta = pfwd-pctr
                 theta = numpy.arctan2(delta[1], delta[0])
+                
+                if numpy.all(fcolor == 1):
+                    
+                    continue
 
-                self.objects.append( Box(self.world, dims,
-                                         pctr, theta) )
+                else:
+
+                    self.objects.append( Box(self.world, dims,
+                                             pctr, theta) )
                 
             elif isinstance(item, se.Circle):
                 
@@ -723,12 +933,58 @@ class RoboSim:
                     [xform.transform(p.x, p.y) for p in item.points])
                 
                 self.objects.append(TapeStrip(points))
+
+            elif isinstance(item, se.Polygon):
+
+                points = numpy.array(
+                    [xform.transform(p.x, p.y) for p in item.points])
+
+                assert len(points) == 3
+
+                pairs = numpy.array([
+                    [0, 1],
+                    [1, 2],
+                    [2, 0]
+                ])
+
+                diffs = points[pairs[:,0]] - points[pairs[:,1]]
+
+                dists = numpy.linalg.norm(diffs, axis=1)
+                a = dists.argmin()
+
+                i, j = pairs[a]
+                k = 3-i-j
+
+                tangent = diffs[a]
+                print('tangent:', tangent, points[i] - points[j])
+                ctr = 0.5*(points[i] + points[j])
+
+                normal = gfx.vec2(-tangent[1], tangent[0])
+
+                if numpy.dot(normal, points[k]-ctr) < 0:
+                    normal = -normal
+
+                print('normal:', normal)
+
+                robot_init_position = ctr
+                robot_init_angle = numpy.arctan2(normal[1], normal[0])
                 
+
             else:
                 
                 print('*** warning: ignoring SVG item:', item, '***')
                 continue
 
+
+        print('robot will start at {} {}'.format(
+            robot_init_position, robot_init_angle))
+
+        self.robot = Robot(self.world,
+                           robot_init_position,
+                           robot_init_angle)
+
+        self.objects.append(self.robot)
+            
         self.svg_filename = os.path.abspath(svgfile)
 
             
@@ -754,7 +1010,7 @@ class RoboSim:
             self.remaining_sim_time -= self.dt
 
             for obj in self.objects:
-                obj.sim_update(self.world, self.sim_time)
+                obj.sim_update(self.world, self.sim_time, self.dt)
 
             self.world.Step(self.dt,
                             self.velocity_iterations,
@@ -835,13 +1091,18 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.init_render()
             self.need_render = True
 
+        elif key == glfw.KEY_M:
+
+            self.sim.robot.motors_enabled = not self.sim.robot.motors_enabled
+            
+
         elif key == glfw.KEY_B:
             for obj in self.sim.objects:
                 if isinstance(obj, Ball):
                     kick_impulse = B2D.b2Vec2(1, 0)
                     wdist = None
                     for other in self.sim.objects:
-                        if isinstance(other, Wall):
+                        if isinstance(other, Robot):
                             diff = other.body.position - obj.body.position
                             dist = diff.length
                             if wdist is None or dist < wdist:
@@ -894,8 +1155,28 @@ class RoboSimApp(gfx.GlfwApp):
             self.was_animating = True
             self.prev_update = now
 
-        pass
+        la = self.sim.robot.desired_linear_angular_velocity
+        old_la = la.copy()
 
+        if self.key_is_down(glfw.KEY_I):
+            la[:] = (0.5, 0)
+        elif self.key_is_down(glfw.KEY_K):
+            la[:] = (-0.5, 0)
+        elif self.key_is_down(glfw.KEY_J):
+            la[:] = (0, 2.0)
+        elif self.key_is_down(glfw.KEY_L):
+            la[:] = (0, -2.0)
+        elif self.key_is_down(glfw.KEY_U):
+            la[:] = (0.5, 1.0)
+        elif self.key_is_down(glfw.KEY_O): 
+            la[:] = (0.5, -1.0)
+        else:
+            la[:] = 0
+        
+        if numpy.abs(la).sum() and numpy.any(la != old_la):
+            self.sim.robot.motors_enabled = True
+
+        
     def render(self):
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
