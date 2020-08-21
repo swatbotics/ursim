@@ -675,7 +675,7 @@ class Robot(SimObject):
         self.desired_wheel_velocity_filtered = numpy.array(
             [0.0, 0.0], dtype=numpy.float32)
 
-        self.rolling_mu = 0.5
+        self.rolling_mu = 4.0
         
         self.motors_enabled = True
 
@@ -1116,6 +1116,8 @@ class RoboSim(B2D.b2ContactListener):
 
     def render_framebuffer(self):
 
+        now = glfw.get_time()
+
         self.framebuffer.activate()
 
         gl.Viewport(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT)
@@ -1152,6 +1154,9 @@ class RoboSim(B2D.b2ContactListener):
         #print('zmin:', z.min(), 'zmax:', z.max())
         
         self.camera_depth = d
+
+        elapsed = glfw.get_time() - now
+        print('render_framebuffer took', elapsed, 'seconds')
 
     def update(self, time_since_last_update):
 
