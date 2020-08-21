@@ -920,7 +920,7 @@ class RoboSim(B2D.b2ContactListener):
         self.framebuffer = None
         
         self.camera_perspective = gfx.perspective_matrix(
-            CAMERA_FOV_Y, CAMERA_WIDTH/CAMERA_HEIGHT,
+            CAMERA_FOV_Y, CAMERA_ASPECT,
             CAMERA_NEAR, CAMERA_FAR)
 
         self.camera_rotation = numpy.array([
@@ -1118,7 +1118,7 @@ class RoboSim(B2D.b2ContactListener):
 
     def render_framebuffer(self):
 
-        now = glfw.get_time()
+        #now = glfw.get_time()
 
         self.framebuffer.activate()
 
@@ -1159,8 +1159,8 @@ class RoboSim(B2D.b2ContactListener):
         
         self.camera_depth = z_image
 
-        elapsed = glfw.get_time() - now
-        print('render_framebuffer took', elapsed, 'seconds')
+        #elapsed = glfw.get_time() - now
+        #print('render_framebuffer took', elapsed, 'seconds')
 
     def update(self, time_since_last_update):
 
@@ -1242,6 +1242,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.animating = True
         self.was_animating = False
 
+        self.image_file_number = 0
 
     def set_animating(self, a):
 
@@ -1286,7 +1287,10 @@ class RoboSimApp(gfx.GlfwApp):
         elif key == glfw.KEY_M:
 
             self.sim.robot.motors_enabled = not self.sim.robot.motors_enabled
-            
+
+        elif key == glfw.KEY_C:
+
+            self.save_camera_images()
 
         elif key == glfw.KEY_B:
             for obj in self.sim.objects:
@@ -1334,6 +1338,29 @@ class RoboSimApp(gfx.GlfwApp):
             
     def framebuffer_resized(self):
         self.perspective = None
+
+    ############################################################
+
+    def save_camera_images(self):
+
+        while True:
+            rgb_filename = 'camera_rgb_{:04d}.png'.format(self.image_file_number)
+            depth_filename = 'camera_depth_{:04d}.png'.format(self.image_file_number)
+            if not (os.path.exists(rgb_filename) or os.path.exists(depth_filename)):
+                break
+            self.image_file_number += 1
+
+        Image.fromarray(self.sim.camera_rgb).save(rgb_filename)
+
+        d = self.sim.camera_depth
+        drng = d.max() - d.min()
+        d = (d - d.min()) / numpy.where(drng, drng, 1)
+        d = (d*255).astype(numpy.uint8)
+
+        Image.fromarray(d).save(depth_filename)
+
+        print('wrote {} and {}'.format(rgb_filename, depth_filename))
+        
 
     ############################################################
         
@@ -1439,14 +1466,6 @@ def _test_load_environment():
 
     app.run()
 
-    Image.fromarray(app.sim.camera_rgb).save('camera_rgb.png')
-
-    d = app.sim.camera_depth
-    drng = d.max() - d.min()
-    d = (d - d.min()) / numpy.where(drng, drng, 1)
-    d = (d*255).astype(numpy.uint8)
-    
-    Image.fromarray(d).save('camera_depth.png')
 
         
 if __name__ == '__main__':
