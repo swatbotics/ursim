@@ -773,8 +773,6 @@ class Robot(SimObject):
                 
             else:
 
-                self.desired_wheel_velocity_filtered[idx] = 0.0
-                
                 body.ApplyForce(-self.rolling_mu*wheel_fwd_velocity * current_normal,
                                 world_point, True)
 
@@ -1317,8 +1315,8 @@ class RoboSimApp(gfx.GlfwApp):
         foo = (self.mouse_pos / self.framebuffer_size)
 
         self.yrot = gfx.mix(-2*numpy.pi, 2*numpy.pi, foo[0])
-        #self.xrot = gfx.mix(numpy.pi/2, 0, numpy.clip(foo[1], 0, 1))
-        self.xrot = gfx.mix(numpy.pi/2, -numpy.pi/2, numpy.clip(foo[1], 0, 1))
+        self.xrot = gfx.mix(numpy.pi/2, 0, numpy.clip(foo[1], 0, 1))
+        #self.xrot = gfx.mix(numpy.pi/2, -numpy.pi/2, numpy.clip(foo[1], 0, 1))
 
         self.need_render = True
         self.view = None
@@ -1363,8 +1361,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.sim.robot.desired_linear_angular_velocity[:] = la
         
-        if numpy.any(la):
-            self.sim.robot.motors_enabled = True
+        self.sim.robot.motors_enabled = numpy.any(la)
         
     def render(self):
 
@@ -1411,7 +1408,11 @@ class RoboSimApp(gfx.GlfwApp):
 
         gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim.framebuffer.fbo)
         gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
-        gl.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST)
+        
+        gl.BlitFramebuffer(0, 0, w, h,
+                           0, self.framebuffer_size[1]-h//2,
+                           w//2, self.framebuffer_size[1],
+                           gl.COLOR_BUFFER_BIT, gl.NEAREST)
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
