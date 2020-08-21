@@ -19,6 +19,8 @@ from CleanGL import gl
 
 import Box2D as B2D
 
+from PIL import Image
+
 # DONE: teardown graphics
 # DONE: teardown sim
 # DONE: reset sim and env
@@ -99,6 +101,14 @@ BUMP_ANGLE_RANGES = numpy.array([
 ], dtype=numpy.float32) * DEG
 
 BUMP_DIST = 0.005
+
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
+CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
+CAMERA_FOV_Y = 45.0 
+
+CAMERA_NEAR = 0.01
+CAMERA_FAR = 50.0
 
 
 def vec_from_color(color):
@@ -895,16 +905,30 @@ class RoboSim(B2D.b2ContactListener):
         self.objects = []
         self.robot = None
 
-        self.dt = 0.01
+        self.dt = 0.01 # 100 HZ
+        self.ticks_per_camera_frame = 4
 
         self.velocity_iterations = 6
         self.position_iterations = 2
-
         
         self.remaining_sim_time = 0.0
         self.sim_time = 0.0
+        self.sim_ticks = 0
 
         self.svg_filename = None
+
+        self.framebuffer = None
+        
+        self.camera_perspective = gfx.perspective_matrix(
+            CAMERA_FOV_Y, CAMERA_WIDTH/CAMERA_HEIGHT,
+            CAMERA_NEAR, CAMERA_FAR)
+
+        self.camera_rotation = numpy.array([
+            [ 0, -1, 0, 0 ],
+            [ 0,  0, 1, 0 ],
+            [-1,  0, 0, 0 ],
+            [ 0,  0, 0, 1 ]
+        ], dtype=numpy.float32)
         
         print('created the world!')
 
@@ -919,15 +943,15 @@ class RoboSim(B2D.b2ContactListener):
 
         self.remaining_sim_time = 0.0
         self.sim_time = 0.0
-        
+        self.sim_ticks = 0
+
         for obj in self.objects:
-            
+            obj.destroy_render()
             if obj.body is not None:
                 self.world.DestroyBody(obj.body)
-                
-            obj.destroy_render()
             
         self.objects = []
+        
         self.robot = None
 
     def load_svg(self, svgfile):
@@ -1074,24 +1098,64 @@ class RoboSim(B2D.b2ContactListener):
                            robot_init_angle)
 
         self.objects.append(self.robot)
+
             
         self.svg_filename = os.path.abspath(svgfile)
 
-            
     def init_render(self):
+        
         for obj in self.objects:
             obj.init_render()
 
-    def destroy_render(self):
-        for obj in self.objects:
-            obj.destroy_render()
-            
+        if self.framebuffer is None:
+            self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT)
+
+        self.render_framebuffer()
+
     def render(self):
         for obj in self.objects:
             obj.render()
 
-    def update(self, time_since_last_update):
+    def render_framebuffer(self):
 
+        self.framebuffer.activate()
+
+        gl.Viewport(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT)
+        gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+        # set up modelview and perspective matrices
+
+        M = b2xform(self.robot.body.transform,
+                    ROBOT_CAMERA_Z + 0.5*ROBOT_CAMERA_DIMS[2])
+
+        M = numpy.linalg.inv(M)
+        M = numpy.dot(self.camera_rotation, M)
+
+        gfx.IndexedPrimitives.set_view_matrix(M)
+
+        gfx.IndexedPrimitives.set_perspective_matrix(self.camera_perspective)
+
+        self.render()
+
+        self.framebuffer.deactivate()
+
+        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.rgb_texture)
+        pixels = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE)
+        pixels = numpy.frombuffer(pixels, dtype=numpy.uint8)
+        self.camera_rgb = pixels.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)[::-1].copy()
+
+        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
+        pixels = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
+        pixels = numpy.frombuffer(pixels, dtype=numpy.float32)
+
+        d = pixels.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)[::-1].copy()
+        
+        #z = (CAMERA_FAR*CAMERA_NEAR) / (d*(CAMERA_NEAR-CAMERA_FAR) + CAMERA_FAR)
+        #print('zmin:', z.min(), 'zmax:', z.max())
+        
+        self.camera_depth = d
+
+    def update(self, time_since_last_update):
 
         self.remaining_sim_time += time_since_last_update
 
@@ -1102,8 +1166,12 @@ class RoboSim(B2D.b2ContactListener):
             
             self.sim_time += self.dt
             self.remaining_sim_time -= self.dt
+            self.sim_ticks += 1
 
-            now = glfw.get_time()
+            if self.sim_ticks % self.ticks_per_camera_frame == 0:
+                self.render_framebuffer()
+            
+            #now = glfw.get_time()
             
             for obj in self.objects:
                 obj.sim_update(self.world, self.sim_time, self.dt)
@@ -1114,7 +1182,7 @@ class RoboSim(B2D.b2ContactListener):
 
             self.world.ClearForces()
 
-            elapsed = glfw.get_time() - now
+            #elapsed = glfw.get_time() - now
             #print('  sim step took', elapsed, 'seconds')
 
 
@@ -1145,22 +1213,17 @@ class RoboSimApp(gfx.GlfwApp):
         gfx.IndexedPrimitives.DEFAULT_SPECULAR_EXPONENT = 100.0
         gfx.IndexedPrimitives.DEFAULT_SPECULAR_STRENGTH = 0.1
 
-        sim.init_render()
-
-        gl.Enable(gl.CULL_FACE)
+        
         gl.Enable(gl.FRAMEBUFFER_SRGB)
+        gl.Enable(gl.DEPTH_TEST)
+        gl.Enable(gl.CULL_FACE)
+
+        sim.init_render()
 
         self.sim = sim
 
         self.perspective = None
         self.view = None
-
-        self.camR = numpy.array([
-            [ 0, -1, 0, 0 ],
-            [ 0,  0, 1, 0 ],
-            [-1,  0, 0, 0 ],
-            [ 0,  0, 0, 1 ]
-        ], dtype=numpy.float32)
 
         self.xrot = 0
         self.yrot = 0
@@ -1171,6 +1234,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.animating = True
         self.was_animating = False
+
 
     def set_animating(self, a):
 
@@ -1298,11 +1362,9 @@ class RoboSimApp(gfx.GlfwApp):
             la += (0.5, -1.0)
 
         self.sim.robot.desired_linear_angular_velocity[:] = la
-            
         
         if numpy.any(la):
             self.sim.robot.motors_enabled = True
-
         
     def render(self):
 
@@ -1312,8 +1374,6 @@ class RoboSimApp(gfx.GlfwApp):
         gl.Viewport(0, 0,
                    self.framebuffer_size[0],
                    self.framebuffer_size[1])
-
-        gl.UseProgram(gfx.IndexedPrimitives.program)
         
         if self.perspective is None:
             
@@ -1321,68 +1381,39 @@ class RoboSimApp(gfx.GlfwApp):
             aspect = w / max(h, 1)
 
             self.perspective = gfx.perspective_matrix(
-                45, aspect, 0.005, 25.0)
+                45, aspect, CAMERA_NEAR, CAMERA_FAR)
 
             gfx.set_uniform(gfx.IndexedPrimitives.uniforms['perspective'],
                             self.perspective)
 
-        view_robot = True
+        if self.view is None:
 
-        if self.view is None or view_robot:
+            Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
+            Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
 
-            if view_robot:
+            R_mouse = numpy.dot(Rx, Ry)
 
-                M = b2xform(self.sim.robot.body.transform,
-                            ROBOT_CAMERA_Z + 0.5*ROBOT_CAMERA_DIMS[2])
+            w, h = self.sim.dims
+            m = numpy.linalg.norm([w, h])
 
-                #M = numpy.dot(M, gfx.translation_matrix(
-                #    gfx.vec3(-0.95*ROBOT_CAMERA_DIMS[0], 0, 0)))
-
-                M = numpy.linalg.inv(M)
-                M = numpy.dot(self.camR, M)
-
-                self.view = M
-
-            else:
-
-                Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
-                Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
-
-                R_mouse = numpy.dot(Rx, Ry)
-
-                w, h = self.sim.dims
-                m = numpy.linalg.norm([w, h])
-
-                self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
-                                        center=gfx.vec3(0.5*w, 0.5*h, 0.75*ROOM_HEIGHT),
-                                        up=gfx.vec3(0, 0, 1),
-                                        Rextra=R_mouse)
-
-
-            '''
-            rx, ry = self.sim.robot.body.position
-
-            self.view = gfx.look_at(eye=gfx.vec3(rx, ry-1.5, 0),
-                                    center=gfx.vec3(rx, ry, 0),
+            self.view = gfx.look_at(eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*ROOM_HEIGHT),
+                                    center=gfx.vec3(0.5*w, 0.5*h, 0.75*ROOM_HEIGHT),
                                     up=gfx.vec3(0, 0, 1),
                                     Rextra=R_mouse)
-            '''
 
-            view_pos = -numpy.dot(numpy.linalg.inv(self.view[:3, :3]),
-                                  self.view[:3, 3])
-
-            gfx.set_uniform(gfx.IndexedPrimitives.uniforms['viewPos'], view_pos)
-            gfx.set_uniform(gfx.IndexedPrimitives.uniforms['view'], self.view)
-
-        gl.Enable(gl.DEPTH_TEST)
+        gfx.IndexedPrimitives.set_perspective_matrix(self.perspective)
+        gfx.IndexedPrimitives.set_view_matrix(self.view)
 
         self.sim.render()
-        #self.sim.robot.render()
 
+        w = min(self.framebuffer_size[0], self.sim.framebuffer.width)
+        h = min(self.framebuffer_size[1], self.sim.framebuffer.height)
 
-        
-        
-        
+        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim.framebuffer.fbo)
+        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
+        gl.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST)
+
+        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
 ######################################################################
             
@@ -1397,6 +1428,15 @@ def _test_load_environment():
     app = RoboSimApp(sim)
 
     app.run()
+
+    Image.fromarray(app.sim.camera_rgb).save('camera_rgb.png')
+
+    d = app.sim.camera_depth
+    drng = d.max() - d.min()
+    d = (d - d.min()) / numpy.where(drng, drng, 1)
+    d = (d*255).astype(numpy.uint8)
+    
+    Image.fromarray(d).save('camera_depth.png')
 
         
 if __name__ == '__main__':

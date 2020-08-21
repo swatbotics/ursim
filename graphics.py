@@ -302,7 +302,7 @@ class Framebuffer:
 
         gl.BindTexture(gl.TEXTURE_2D, self.rgb_texture)
         
-        gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0,
+        gl.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB, width, height, 0,
                       gl.RGB, gl.UNSIGNED_BYTE, None)
 
         gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -336,6 +336,11 @@ class Framebuffer:
         check_opengl_errors('after framebuffer setup')
 
         self.deactivate()
+
+    def destroy(self):
+        gl.DeleteTextures(1, [self.rgb_texture])
+        gl.DeleteTextures(1, [self.depth_texture])
+        gl.DeleteFramebuffers(1, [self.fbo])
 
     def activate(self):
         gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -700,6 +705,21 @@ class IndexedPrimitives:
         ], dtype=numpy.uint8)
 
         return cls.faceted_triangles(verts, indices, color, **kwargs)
+
+    @classmethod
+    def set_perspective_matrix(cls, persp):
+        gl.UseProgram(cls.program)
+        set_uniform(cls.uniforms['perspective'], persp)
+
+    @classmethod
+    def set_view_matrix(cls, view):
+        
+        view_pos = -numpy.dot(numpy.linalg.inv(view[:3, :3]), view[:3, 3])
+
+        gl.UseProgram(cls.program)
+        set_uniform(cls.uniforms['view'], view)
+        set_uniform(cls.uniforms['viewPos'], view_pos)
+        
     
     def __init__(self, positions_normals_texcoords, mode, indices, color,
                  texture=None, model_pose=None, pre_transform=None,

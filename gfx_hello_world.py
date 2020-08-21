@@ -122,7 +122,6 @@ class HelloWorldApp(gfx.GlfwApp):
         gl.Disable(gl.DEPTH_TEST)
         self.fsquad.render()
 
-        gl.UseProgram(gfx.IndexedPrimitives.program)
         
         if self.perspective is None:
             
@@ -131,8 +130,8 @@ class HelloWorldApp(gfx.GlfwApp):
 
             self.perspective = gfx.perspective_matrix(45.0, aspect, 0.1, 10.0)
 
-            gfx.set_uniform(gfx.IndexedPrimitives.uniforms['perspective'],
-                            self.perspective)
+            gfx.IndexedPrimitives.set_perspective_matrix(self.perspective)
+
 
         if self.view is None:
 
@@ -146,10 +145,7 @@ class HelloWorldApp(gfx.GlfwApp):
                                     up=gfx.vec3(0, 0, 1),
                                     Rextra=R_mouse)
 
-            view_pos = -np.dot(np.linalg.inv(self.view[:3, :3]), self.view[:3, 3])
-
-            gfx.set_uniform(gfx.IndexedPrimitives.uniforms['viewPos'], view_pos)
-            gfx.set_uniform(gfx.IndexedPrimitives.uniforms['view'], self.view)
+            gfx.IndexedPrimitives.set_view_matrix(self.view)
 
         gl.Enable(gl.DEPTH_TEST)
 
