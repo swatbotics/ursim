@@ -26,6 +26,8 @@ class HelloWorldApp(gfx.GlfwApp):
         gl.Enable(gl.CULL_FACE)
         gl.Enable(gl.FRAMEBUFFER_SRGB)
 
+        self.framebuffer = gfx.Framebuffer(512, 512)
+
         self.texture = gfx.load_texture('textures/monalisa.jpg', 'RGB')
         
         self.fsquad = gfx.FullscreenQuad(self.texture)
@@ -37,7 +39,8 @@ class HelloWorldApp(gfx.GlfwApp):
         self.objects = [
             
             gfx.IndexedPrimitives.box(gfx.vec3(1, 1, 1),
-                                      gfx.vec3(0.5, 0.75, 1.0)),
+                                      gfx.vec3(0.5, 0.75, 1.0),
+                                      texture=None),
             
             gfx.IndexedPrimitives.sphere(0.5, 32, 24,
                                          gfx.vec3(1, 0, 0),
@@ -48,6 +51,8 @@ class HelloWorldApp(gfx.GlfwApp):
                                            model_pose=cylpos)
             
         ]
+
+        self.box = self.objects[0]
         
         self.mouse_pos = np.array(self.framebuffer_size/2, dtype=np.float32)
 
@@ -92,12 +97,27 @@ class HelloWorldApp(gfx.GlfwApp):
         
     def render(self):
             
-        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-        gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+        self.framebuffer.activate()
+
+        self.box.texture = None
+
+        self.render_step()
+
+        self.framebuffer.deactivate()
+
+        gfx.check_opengl_errors('after framebuffer')
 
         gl.Viewport(0, 0,
                    self.framebuffer_size[0],
                    self.framebuffer_size[1])
+
+        self.box.texture = self.framebuffer.rgb_texture
+        
+        self.render_step()
+
+    def render_step(self):
+        
+        gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
         gl.Disable(gl.DEPTH_TEST)
         self.fsquad.render()

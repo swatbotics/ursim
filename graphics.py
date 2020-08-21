@@ -287,6 +287,65 @@ def load_texture(filename, mode='RGB'):
 
 ######################################################################
 
+class Framebuffer:
+
+    def __init__(self, width, height):
+
+        self.width = width
+        self.height = height
+
+        self.fbo = gl.GenFramebuffers(1)
+
+        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+
+        self.rgb_texture = gl.GenTextures(1)
+
+        gl.BindTexture(gl.TEXTURE_2D, self.rgb_texture)
+        
+        gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0,
+                      gl.RGB, gl.UNSIGNED_BYTE, None)
+
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                gl.COLOR_ATTACHMENT0,
+                                gl.TEXTURE_2D,
+                                self.rgb_texture, 0)
+
+        self.depth_texture = gl.GenTextures(1)
+
+        gl.BindTexture(gl.TEXTURE_2D, self.depth_texture)
+
+        gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0,
+                      gl.DEPTH_COMPONENT, gl.FLOAT, None)
+
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                gl.DEPTH_ATTACHMENT,
+                                gl.TEXTURE_2D,
+                                self.depth_texture, 0)
+
+        gl.BindTexture(gl.TEXTURE_2D, 0)
+        check_opengl_errors('after framebuffer setup')
+
+        self.deactivate()
+
+    def activate(self):
+        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+        gl.Viewport(0, 0, self.width, self.height)
+
+    def deactivate(self):
+        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+
+######################################################################
+
 class IndexedPrimitives:
 
     TYPE_LOOKUP = {
@@ -745,7 +804,6 @@ class IndexedPrimitives:
             set_uniform(self.uniforms['useTexture'], 0)
         else:
             set_uniform(self.uniforms['useTexture'], 1)
-            gl.ActiveTexture(gl.TEXTURE0)
             gl.BindTexture(gl.TEXTURE_2D, self.texture)
 
         gl.BindVertexArray(self.vao)
@@ -875,7 +933,6 @@ class FullscreenQuad:
 
     def render(self):        
 
-        gl.ActiveTexture(gl.TEXTURE0)
         gl.BindTexture(gl.TEXTURE_2D, self.texture)
         
         gl.UseProgram(self.program)
