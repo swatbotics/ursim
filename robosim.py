@@ -86,7 +86,7 @@ ROBOT_BASE_I = 0.5*ROBOT_BASE_MASS*ROBOT_BASE_RADIUS**2
 ROBOT_BASE_COLOR = gfx.vec3(0.1, 0.1, 0.1)
 
 ROBOT_CAMERA_DIMS = gfx.vec3(0.08, 0.25, 0.04)
-ROBOT_CAMERA_Z = 0.27
+ROBOT_CAMERA_Z = 0.18
 
 ROBOT_WHEEL_OFFSET = 0.5*0.230
 ROBOT_WHEEL_RADIUS = 0.035
@@ -105,11 +105,13 @@ BUMP_DIST = 0.005
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
-CAMERA_FOV_Y = 45.0 
+CAMERA_FOV_Y = 48.6 
 
-CAMERA_NEAR = 0.01
+CAMERA_NEAR = 0.15
 CAMERA_FAR = 50.0
 
+CAMERA_A = CAMERA_FAR / (CAMERA_NEAR - CAMERA_FAR)
+CAMERA_B = CAMERA_FAR * CAMERA_NEAR / (CAMERA_NEAR - CAMERA_FAR)
 
 def vec_from_color(color):
     return gfx.vec3(color.red, color.green, color.blue) / 255.
@@ -252,8 +254,8 @@ class Ball(SimObject):
                 BALL_RADIUS, 32, 24, 
                 BALL_COLOR,
                 pre_transform=tz(BALL_RADIUS),
-                specular_exponent=40.0,
-                specular_strength=0.5)
+                specular_exponent=60.0,
+                specular_strength=0.125)
         
         self.gfx_objects = [ self.static_gfx_object ]
 
@@ -1140,20 +1142,22 @@ class RoboSim(B2D.b2ContactListener):
         self.framebuffer.deactivate()
 
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.rgb_texture)
-        pixels = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE)
-        pixels = numpy.frombuffer(pixels, dtype=numpy.uint8)
-        self.camera_rgb = pixels.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)[::-1].copy()
+        
+        rgb_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE)
+        rgb_array = numpy.frombuffer(rgb_buffer, dtype=numpy.uint8)
+        rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
+        
+        self.camera_rgb = rgb_image_flipped[::-1].copy()
 
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
-        pixels = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
-        pixels = numpy.frombuffer(pixels, dtype=numpy.float32)
+        
+        depth_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
+        depth_array = numpy.frombuffer(depth_buffer, dtype=numpy.float32)
+        depth_image_flipped = depth_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
 
-        d = pixels.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)[::-1].copy()
+        z_image = CAMERA_B / (depth_image_flipped[::-1] + CAMERA_A)
         
-        #z = (CAMERA_FAR*CAMERA_NEAR) / (d*(CAMERA_NEAR-CAMERA_FAR) + CAMERA_FAR)
-        #print('zmin:', z.min(), 'zmax:', z.max())
-        
-        self.camera_depth = d
+        self.camera_depth = z_image
 
         elapsed = glfw.get_time() - now
         print('render_framebuffer took', elapsed, 'seconds')
