@@ -60,7 +60,7 @@ TAPE_RADIUS = 0.025
 TAPE_POLYGON_OFFSET = 0.001
 
 BALL_MASS = 0.05
-BALL_AREA = 2*numpy.pi*BALL_RADIUS**2
+BALL_AREA = numpy.pi*BALL_RADIUS**2
 BALL_DENSITY = BALL_MASS / BALL_AREA
 
 WALL_THICKNESS = 0.005
@@ -1303,7 +1303,7 @@ class RoboSimApp(gfx.GlfwApp):
                             dist = diff.length
                             if wdist is None or dist < wdist:
                                 wdist = dist
-                                desired_vel = 4.0*diff/dist
+                                desired_vel = diff * 4 / dist
                                 actual_vel = obj.body.linearVelocity
                                 kick_impulse = (desired_vel - actual_vel)*BALL_MASS
                     obj.body.ApplyLinearImpulse(kick_impulse, obj.body.position, True)
