@@ -179,7 +179,7 @@ def setup_attrib(program, name, size, dtype, normalize, stride, offset):
 
 def perspective_matrix(fovy, aspect, near, far):
 
-    f = 1.0/numpy.tan(fovy*numpy.pi/180)
+    f = 1.0/numpy.tan(fovy*numpy.pi/360.)
 
     return numpy.array([
         [ f/aspect, 0, 0, 0 ],
