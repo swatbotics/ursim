@@ -127,21 +127,21 @@ def label_image(all_bboxes, image):
     h, w = image.shape[:2]
     assert image.shape == (h, w, 3)
 
-    image = image[:, :, None, :]
-    lo = all_bboxes[None, None, :, 0, :]
-    hi = all_bboxes[None, None, :, 1, :]
+    assert nlabels <= 8
 
-    greater = (image >= lo).min(axis=3)
-    less = (image <= hi).min(axis=3)
+    init_mask = (1 << nlabels) - 1
+    labels = init_mask * numpy.ones((h, w), dtype=numpy.uint8)
 
-    is_label = (greater & less)
-    assert is_label.shape == (h, w, nlabels)
+    for label_index in range(nlabels):
+        label_mask = ~numpy.uint8(1 << label_index)
+        for channel in range(3):
+            ichan = image[:, :, channel]
+            lo = all_bboxes[label_index, 0, channel]
+            hi = all_bboxes[label_index, 1, channel]
+            labels[ichan < lo] &= label_mask
+            labels[ichan > hi] &= label_mask
 
-    mask = numpy.any(is_label, axis=2)
-
-    labeled = nlabels*numpy.ones((h, w), dtype=numpy.uint8)
-    labeled[mask] = is_label[mask].argmax(axis=1)
-    return labeled
+    return labels
 
 class ColorBlobDetector:
 
@@ -196,6 +196,13 @@ class ColorBlobDetector:
         
         self.palette = numpy.vstack((display, 191*numpy.ones(3, dtype=numpy.uint8)))
 
+        lpalette = numpy.zeros((256, 3), dtype=numpy.uint8)
+        idx = (1 << numpy.arange(self.num_colors))
+        lpalette[idx] = self.palette[:-1]
+        lpalette[0] = self.palette[-1]
+
+        self.full_palette = lpalette
+
     def save(self, config_filename=None):
         
         if config_filename is None:
@@ -224,6 +231,10 @@ class ColorBlobDetector:
     def label_image(self, image):
         return label_image(self.all_bboxes, image)
 
+    def colorize_labels(self, labels):
+        assert len(labels.shape) == 2 and labels.dtype == numpy.uint8
+        return self.full_palette[labels]
+
     @property
     def num_colors(self):
         return len(self.color_names)
@@ -242,7 +253,7 @@ def _test_me():
 
     print('this should be in order:', labels[:-1])
 
-    assert numpy.all(labels[:-1] == numpy.arange(detector.num_colors))
+    assert numpy.all(labels[:-1] == (1 << numpy.arange(detector.num_colors)))
 
 
 if __name__ == '__main__':            

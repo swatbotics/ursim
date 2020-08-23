@@ -14,6 +14,8 @@ import re
 import sys
 import os
 
+import color_blob_detector as blob
+
 import glfw
 from CleanGL import gl
 
@@ -897,6 +899,8 @@ class RoboSim(B2D.b2ContactListener):
 
         super().__init__()
 
+        self.detector = blob.ColorBlobDetector(mode='rgb')
+
         self.world = B2D.b2World(gravity=(0, 0), doSleep=True)
         self.world.contactListener = self
 
@@ -1149,6 +1153,9 @@ class RoboSim(B2D.b2ContactListener):
         
         self.camera_rgb = rgb_image_flipped[::-1].copy()
 
+        camera_ycbcr = self.detector.convert_to_ycrcb(self.camera_rgb)
+        self.camera_labels = self.detector.label_image(camera_ycbcr)
+
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
         
         depth_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
@@ -1346,10 +1353,16 @@ class RoboSimApp(gfx.GlfwApp):
         while True:
             rgb_filename = 'camera_rgb_{:04d}.png'.format(self.image_file_number)
             depth_filename = 'camera_depth_{:04d}.png'.format(self.image_file_number)
-            if not (os.path.exists(rgb_filename) or os.path.exists(depth_filename)):
+            label_filename = 'camera_label_{:04d}.png'.format(self.image_file_number)
+            filenames = [ rgb_filename, depth_filename, label_filename ]
+            if not any([os.path.exists(f) for f in filenames]):
                 break
             self.image_file_number += 1
 
+
+        paletted_output = self.sim.detector.colorize_labels(self.sim.camera_labels)
+        Image.fromarray(paletted_output).save(label_filename)
+        
         Image.fromarray(self.sim.camera_rgb).save(rgb_filename)
 
         d = self.sim.camera_depth
@@ -1359,7 +1372,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         Image.fromarray(d).save(depth_filename)
 
-        print('wrote {} and {}'.format(rgb_filename, depth_filename))
+        print('wrote {} and {} and {}'.format(rgb_filename, depth_filename, label_filename))
         
 
     ############################################################

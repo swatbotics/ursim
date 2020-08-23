@@ -261,7 +261,7 @@ class ColorPickerApp:
             text.append('Labeled image')
             labels = self.detector.label_image(self.cur_ycrcb)
 
-            self.display = self.detector.palette[labels]
+            self.display = self.detector.colorize_labels(labels)
 
         dy = 20
 
