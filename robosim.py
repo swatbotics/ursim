@@ -59,6 +59,8 @@ BALL_RADIUS = 0.1
 
 TAPE_RADIUS = 0.025
 
+TAPE_DASH_SIZE = 0.15
+
 TAPE_POLYGON_OFFSET = 0.001
 
 BALL_MASS = 0.05
@@ -531,82 +533,175 @@ class Room(SimObject):
 
 ######################################################################
 
-class TapeStrip(SimObject):
+class TapeStrips(SimObject):
 
-    def __init__(self, points):
+    def __init__(self, point_lists):
 
         super().__init__()
 
-        self.points = points
+        self.point_lists = point_lists
 
     def init_render(self):
-
 
         r = TAPE_RADIUS
         offset = gfx.vec3(0, 0, r)
 
-        prev_line_l = None
-        prev_line_r = None
+        self.gfx_objects = []
 
-        points_l = []
-        points_r = []
 
-        for i, p0 in enumerate(self.points[:-1]):
+        dashes = []
 
-            p1 = self.points[i+1]
+        for points in self.point_lists:
 
-            tangent = gfx.normalize(p1 - p0)
-            normal = numpy.array([-tangent[1], tangent[0]], dtype=numpy.float32)
+            points = points.copy() # don't modify original points
 
-            line = gfx.vec3(normal[0], normal[1], -numpy.dot(normal, p0))
+            deltas = points[1:] - points[:-1]
+            segment_lengths = numpy.linalg.norm(deltas, axis=1)
+            tangents = deltas / segment_lengths.reshape(-1, 1)
 
-            line_l = line - offset
-            line_r = line + offset
+            segment_lengths[0] += TAPE_RADIUS
+            points[0] -= TAPE_RADIUS * tangents[0]
+            deltas[0] = points[1] - points[0]
 
-            if i == 0:
+            segment_lengths[-1] += TAPE_RADIUS
+            points[-1] += TAPE_RADIUS * tangents[-1]
+            deltas[-1] = points[-1] - points[-2]
 
-                points_l.append( p0 + r * (normal - tangent) )
-                points_r.append( p0 + r * (-normal - tangent) )
+            total_length = segment_lengths.sum()
 
-            else:
+            num_dashes = int(numpy.ceil(total_length / TAPE_DASH_SIZE))
+            if num_dashes % 2 == 0:
+                num_dashes -= 1
 
-                if abs(numpy.dot(line_l[:2], prev_line_l[:2])) > 0.999:
+            u = numpy.hstack(([numpy.float32(0)], numpy.cumsum(segment_lengths)))
+            u /= u[-1]
 
-                    points_l.append( p0 + r * normal )
-                    points_r.append( p0 - r * normal )
+            cur_dash = [ points[0] ]
+            cur_u = 0.0
+            cur_idx = 0
+            
+            emit_dash = True
+
+            for dash_idx in range(num_dashes):
+
+                target_u = (dash_idx + 1) / num_dashes
+
+                segment_end_u = u[cur_idx+1]
+
+                while segment_end_u < target_u:
+                    cur_idx += 1
+                    cur_dash.append(points[cur_idx])
+                    segment_end_u = u[cur_idx+1]
+
+                segment_start_u = u[cur_idx]
+
+                assert segment_start_u < target_u
+                assert segment_end_u >= target_u
+                
+                segment_alpha = ( (target_u - segment_start_u) /
+                                  (segment_end_u - segment_start_u) )
+
+                cur_dash.append( gfx.mix(points[cur_idx],
+                                         points[cur_idx+1],
+                                         segment_alpha) )
+
+                if emit_dash:
+                    dashes.append(numpy.array(cur_dash, dtype=numpy.float32))
+
+                emit_dash = not emit_dash
+
+                cur_dash = [ cur_dash[-1] ]
+
+
+        npoints_total = sum([len(points) for points in dashes])
+
+        vdata = numpy.zeros((2*npoints_total, 8), dtype=numpy.float32)
+        
+        vdata[:, 2] = TAPE_POLYGON_OFFSET
+        vdata[:, 5]= 1
+
+        vdata_offset = 0
+
+        indices = []
+                
+
+        for points in dashes:
+
+            prev_line_l = None
+            prev_line_r = None
+
+            points_l = []
+            points_r = []
+
+            for i, p0 in enumerate(points[:-1]):
+
+                p1 = points[i+1]
+
+                tangent = gfx.normalize(p1 - p0)
+                normal = numpy.array([-tangent[1], tangent[0]], dtype=numpy.float32)
+
+                line = gfx.vec3(normal[0], normal[1], -numpy.dot(normal, p0))
+
+                line_l = line - offset
+                line_r = line + offset
+
+                if i == 0:
+
+                    points_l.append( p0 + r * (normal) )
+                    points_r.append( p0 + r * (-normal) )
 
                 else:
 
-                    points_l.append( line_intersect(line_l, prev_line_l) )
-                    points_r.append( line_intersect(line_r, prev_line_r) )
+                    if abs(numpy.dot(line_l[:2], prev_line_l[:2])) > 0.999:
 
-            if i == len(self.points) - 2:
+                        points_l.append( p0 + r * normal )
+                        points_r.append( p0 - r * normal )
 
-                points_l.append( p1 + r * (normal + tangent) )
-                points_r.append( p1 + r * (-normal + tangent) )
+                    else:
 
-            prev_line_l = line_l
-            prev_line_r = line_r
+                        points_l.append( line_intersect(line_l, prev_line_l) )
+                        points_r.append( line_intersect(line_r, prev_line_r) )
 
-        points_l = numpy.array(points_l)
-        points_r = numpy.array(points_r)
+                if i == len(points) - 2:
 
-        vdata = numpy.zeros((2*len(self.points), 8), dtype=numpy.float32)
+                    points_l.append( p1 + r * (normal) )
+                    points_r.append( p1 + r * (-normal) )
 
-        vdata[0::2, :2] = points_l
-        vdata[1::2, :2] = points_r
-        vdata[:, 2] = TAPE_POLYGON_OFFSET
-        vdata[:, 5] = 1
-        vdata[:, 6:8] = vdata[:, 0:2]
+                prev_line_l = line_l
+                prev_line_r = line_r
 
-        gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLE_STRIP,
-                                           indices=None,
+                
+
+            for i in range(len(points)-1):
+                a = vdata_offset+2*i
+                b = a + 1
+                c = a + 2
+                d = a + 3
+                indices.extend([a, b, c])
+                indices.extend([c, b, d])
+
+
+            points_l = numpy.array(points_l)
+            points_r = numpy.array(points_r)
+
+            next_vdata_offset = vdata_offset + 2*len(points)
+
+            vdata[vdata_offset:next_vdata_offset:2, :2] = points_l
+            vdata[vdata_offset+1:next_vdata_offset:2, :2] = points_r
+            vdata[vdata_offset:next_vdata_offset, 6:8] = vdata[vdata_offset:next_vdata_offset, 0:2]
+
+            vdata_offset = next_vdata_offset
+
+        indices = numpy.array(indices, dtype=numpy.uint32)
+
+        gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLES,
+                                           indices=indices,
                                            color=TAPE_COLOR)
 
         gfx_object.specular_exponent = 100.0
         gfx_object.specular_strength = 0.05
-            
-        self.gfx_objects = [ gfx_object ]
+
+        self.gfx_objects.append(gfx_object)
 
 
 ######################################################################
@@ -975,6 +1070,8 @@ class RoboSim(B2D.b2ContactListener):
         robot_init_position = 0.5*self.dims
         robot_init_angle = 0.0
 
+        tape_point_lists = []
+
         for item in svg:
 
             xx, yx, xy, yy, x0, y0 = [getattr(item.transform, letter)
@@ -1010,7 +1107,8 @@ class RoboSim(B2D.b2ContactListener):
                 theta = numpy.arctan2(delta[1], delta[0])
                 
                 if numpy.all(fcolor == 1):
-                    
+
+                    # room rectangle
                     continue
 
                 else:
@@ -1039,7 +1137,7 @@ class RoboSim(B2D.b2ContactListener):
                 if cidx == 0:
                     
                     points = numpy.array([p0, p1])
-                    self.objects.append(TapeStrip(points))
+                    tape_point_lists.append(points)
                     
                 else:
 
@@ -1049,8 +1147,8 @@ class RoboSim(B2D.b2ContactListener):
                 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
-                
-                self.objects.append(TapeStrip(points))
+
+                tape_point_lists.append(points)
 
             elif isinstance(item, se.Polygon):
 
@@ -1092,6 +1190,9 @@ class RoboSim(B2D.b2ContactListener):
                 
                 print('*** warning: ignoring SVG item:', item, '***')
                 continue
+
+        if len(tape_point_lists):
+            self.objects.append(TapeStrips(tape_point_lists))
 
 
         print('robot will start at {} {}'.format(
