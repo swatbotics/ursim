@@ -1,0 +1,20 @@
+{
+  "colors": [
+    {
+      "name":         "blue_tape",
+      "bounds_ycrcb": [ [ 152, 117, 172 ], [ 166, 123, 178 ] ]
+    },
+    {
+      "name":         "orange_pylon",
+      "bounds_ycrcb": [ [ 123, 161,  41 ], [ 154, 169,  59 ] ]
+    },
+    {
+      "name":         "green_pylon",
+      "bounds_ycrcb": [ [  90,  48,  65 ], [ 112,  64,  77 ] ]
+    },
+    {
+      "name":         "purple_ball",
+      "bounds_ycrcb": [ [  20, 145, 152 ], [ 144, 201, 224 ] ]
+    }
+  ]
+}
