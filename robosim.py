@@ -885,8 +885,7 @@ class Robot(SimObject):
             
             transformB = collider.body.transform
 
-            min_dist = None
-            min_pointA = None
+            collider_did_hit = False
             
             for fixtureA in self.body.fixtures:
                 shapeA = fixtureA.shape
@@ -901,24 +900,23 @@ class Robot(SimObject):
                         transformB = transformB
                     )
 
-                    if min_dist is None or distance < min_dist:
-                        min_dist = distance
-                        min_pointA = pointA
+                    if distance < BUMP_DIST:
 
-            if min_dist > BUMP_DIST:
-                
+                        collider_did_hit = True
+
+                        lx, ly = self.body.GetLocalPoint(pointA)
+
+                        theta = numpy.arctan2(ly, lx)
+
+                        in_range = ( (theta >= BUMP_ANGLE_RANGES[:,0]) &
+                                     (theta <= BUMP_ANGLE_RANGES[:,1]) )
+
+                        self.bump |= in_range
+                        
+            if not collider_did_hit:
                 finished_colliders.add(collider)
 
-            else:
-
-                lx, ly = self.body.GetLocalPoint(min_pointA)
-
-                theta = numpy.arctan2(ly, lx)
-
-                in_range = ( (theta >= BUMP_ANGLE_RANGES[:,0]) &
-                             (theta <= BUMP_ANGLE_RANGES[:,1]) )
-
-                self.bump |= in_range
+        print('bump:', self.bump)
                     
         self.colliders -= finished_colliders
 
@@ -1310,10 +1308,8 @@ class RoboSim(B2D.b2ContactListener):
         elif contact.fixtureB.body == self.robot.body:
             other = contact.fixtureA.body
 
-        if other is None:
-            return
-
-        self.robot.colliders.add(other.userData)
+        if other is not None:
+            self.robot.colliders.add(other.userData)
         
 ######################################################################
 
@@ -1580,8 +1576,6 @@ def _test_load_environment():
 
     app.run()
 
-
-        
 if __name__ == '__main__':
     
     _test_load_environment()
