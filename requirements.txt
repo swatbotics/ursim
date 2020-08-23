@@ -6,3 +6,4 @@ Box2D ~= 2.3.10
 transformations ~= 2020.1.1
 svgelements ~= 1.2.0
 matplotlib ~= 3.3.1
+opencv-python ~= 4.4.0
