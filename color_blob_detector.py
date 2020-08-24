@@ -13,6 +13,8 @@ import os
 import json
 import sys
 
+#SQRT22 = 0.5*numpy.sqrt(2)
+
 def numpy_from_list(l):
     return numpy.array(l, dtype=numpy.uint8)
 
@@ -149,6 +151,28 @@ def label_image(all_bboxes, image, labels=None):
 
     return labels
 
+######################################################################
+
+class BlobDetection:
+
+    def __init__(self, contour, area, xyz, is_split):
+
+        self.contour = contour
+        self.area = area
+        self.xyz = xyz.copy()
+        self.is_split = is_split
+
+    def ellipse_approx(self):
+
+        mean, principal_components, evals = cv2.PCACompute2(self.xyz, mean=None)
+
+        mean = mean.flatten()
+        axes = 2*numpy.sqrt(evals.flatten())
+
+        return mean, axes, principal_components
+
+######################################################################
+
 class ColorBlobDetector:
 
     def __init__(self, config_filename=None, mode='bgr'):
@@ -241,6 +265,146 @@ class ColorBlobDetector:
         assert len(labels.shape) == 2 and labels.dtype == numpy.uint8
         return self.full_palette[labels]
 
+    def detect_blobs(self,
+                     labels,
+                     min_contour_area=None,
+                     xyz=None,
+                     scratch=None,
+                     split_axis=None,
+                     split_res=None,
+                     split_bins=None):
+
+        if min_contour_area is None:
+            min_contour_area = 0
+
+        assert len(labels.shape) == 2 and labels.dtype == numpy.uint8
+        assert xyz is None or xyz.shape == labels.shape + (3,)
+
+        if (scratch is None or
+            scratch.shape[0] < labels.shape[0] or
+            scratch.shape[1] < labels.shape[1]):
+
+            scratch = numpy.zeros_like(labels)
+
+        detections = dict()
+
+        for color_index in range(self.num_colors):
+
+            color_name = self.color_names[color_index]
+
+            mask = labels & (1 << color_index)
+            
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+
+            color_detections = []
+
+            for contour_index in range(len(contours)):
+
+                contour = contours[contour_index]
+
+                x0, y0, w, h = cv2.boundingRect(contour)
+                
+                if w*h < min_contour_area:
+                    continue
+
+                topleft = (x0, y0)
+                
+                draw_mask = scratch[:h, :w]
+                draw_mask[:] = 0
+
+                shifted = contour - topleft
+
+                cv2.drawContours(draw_mask, [shifted], 0,
+                                 (255, 255, 255), -1)
+
+                area = numpy.count_nonzero(draw_mask)
+                if area < min_contour_area:
+                    continue
+
+                if xyz is None:
+                    
+                    detection = BlobDetection(contour, area,
+                                              xyz=None, is_split=False)
+                    
+                    color_detections.append(detection)
+
+                    continue
+                
+                xyz_subrect = xyz[y0:y0+h, x0:x0+w]
+
+                mask_i, mask_j = numpy.nonzero(draw_mask)
+
+                object_xyz = xyz_subrect[mask_i, mask_j]
+
+                if (split_axis is None or split_res is None or split_bins is None):
+
+                    detection = BlobDetection(contour, area,
+                                              xyz=xyz, is_split = False)
+
+                    color_detections.append(detection)
+
+                    continue
+                
+                split_coords = object_xyz[:, split_axis]
+                start_coord = split_coords.min()
+                
+                bin_idx = ((split_coords - start_coord) / split_res).astype(numpy.int32)
+
+                unique_bins = numpy.unique(bin_idx)
+                
+                diffs = unique_bins[1:] - unique_bins[:-1]
+
+                toobig = (diffs > split_bins)
+
+                if not numpy.any(toobig):
+                    
+                    detection = BlobDetection(contour, area,
+                                              object_xyz, is_split=False)
+                    
+                    color_detections.append(detection)
+
+                else:
+
+                    uidx0 = 0
+
+                    while uidx0 < len(unique_bins):
+                        
+                        uidx1 = uidx0
+                        
+                        while uidx1 < len(toobig) and not toobig[uidx1]:
+                            uidx1 += 1
+                            
+                        first_ok_bin = unique_bins[uidx0]
+                        last_ok_bin = unique_bins[uidx1]
+
+                        xidx, = numpy.nonzero((bin_idx >= first_ok_bin) &
+                                              (bin_idx <= last_ok_bin))
+
+                        area = len(xidx)
+
+                        if area >= min_contour_area:
+                        
+                            xi = mask_i[xidx]
+                            xj = mask_j[xidx]
+
+                            draw_mask[:] = 0
+                            draw_mask[xi, xj] = 255
+
+                            detection = BlobDetection(contour, area,
+                                                      xyz_subrect[xi, xj],
+                                                      is_split=True)
+
+                            color_detections.append(detection)
+
+                        uidx0 = uidx1 + 1
+
+            color_detections.sort(key=lambda d: (-d.area, -d.contour[0,0,1]))
+
+            detections[color_name] = color_detections
+
+        return detections
+
     @property
     def num_colors(self):
         return len(self.color_names)
@@ -260,7 +424,6 @@ def _test_me():
     print('this should be in order:', labels[:-1])
 
     assert numpy.all(labels[:-1] == (1 << numpy.arange(detector.num_colors)))
-
 
 if __name__ == '__main__':            
     _test_me()

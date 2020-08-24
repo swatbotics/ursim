@@ -46,6 +46,96 @@ def normalize(v):
 
 ######################################################################
 
+def line_intersect_2d(l1, l2):
+
+    l3 = numpy.cross(l1, l2)
+    return l3[:2] / l3[2]
+
+######################################################################
+
+def perspective_matrix(fovy, aspect, near, far):
+
+    f = 1.0/numpy.tan(fovy*numpy.pi/360.)
+
+    return numpy.array([
+        [ f/aspect, 0, 0, 0 ],
+        [ 0, f, 0, 0 ],
+        [ 0, 0, (far+near)/(near-far), (2*far*near)/(near-far) ],
+        [ 0, 0, -1, 0 ]
+    ], dtype=numpy.float32)
+
+######################################################################
+
+def rotation_from_axes(idx0, axis0, idx1, axis1_suggestion, dim=4):
+
+    assert idx0 in range(3)
+    assert idx1 in range(3)
+
+    idx2 = 3 - idx0 - idx1
+
+    assert axis0.dtype == numpy.float32 and axis0.shape == (3,)
+    assert axis1_suggestion.dtype == numpy.float32 and axis1_suggestion.shape == (3,)
+
+    R = numpy.identity(dim, dtype=numpy.float32)
+
+    s = 1 if (idx1 == (idx0 + 1) % 3) else -1
+    u = normalize(axis0)
+    w = s*normalize(numpy.cross(u, axis1_suggestion))
+    v = s*numpy.cross(w, u)
+
+    R[idx0,:3] = u
+    R[idx1,:3] = v
+    R[idx2,:3] = w
+
+    return R
+
+######################################################################
+
+def rotation_matrix(angle, axis, point=None):
+    return tf.rotation_matrix(angle, axis, point).astype(numpy.float32)
+
+######################################################################
+
+def translation_matrix(direction):
+    return tf.translation_matrix(direction).astype(numpy.float32)
+
+######################################################################
+
+def tz(z):
+    return translation_matrix(vec3(0, 0, z))
+
+######################################################################
+
+def rigid_2d_matrix(position, angle, z=0.0):
+
+    x, y = position
+    c = numpy.cos(angle)
+    s = numpy.sin(angle)
+
+    return numpy.array([[c, -s, 0, x],
+                        [s, c, 0,  y],
+                        [0, 0, 1,  z],
+                        [0, 0, 0,  1]], dtype=numpy.float32)
+
+######################################################################
+
+def look_at(eye, center, up, Rextra=None):
+
+    diff = eye-center
+    zdist = numpy.linalg.norm(diff)
+
+    RT = rotation_from_axes(2, diff, 1, up, dim=4)
+
+    if Rextra is not None:
+        RT = numpy.dot(Rextra, RT)        
+
+    T1 = translation_matrix(vec3(0, 0, -zdist))
+    T0 = translation_matrix(-center)
+
+    return numpy.dot(T1, numpy.dot(RT, T0))
+
+######################################################################
+
 def check_opengl_errors(context='doing stuff'):
     error = gl.GetError()
     if error:
@@ -174,80 +264,6 @@ def setup_attrib(program, name, size, dtype, normalize, stride, offset):
     gl.EnableVertexAttribArray(attrib_location)
 
     return attrib_location
-
-######################################################################
-
-def perspective_matrix(fovy, aspect, near, far):
-
-    f = 1.0/numpy.tan(fovy*numpy.pi/360.)
-
-    return numpy.array([
-        [ f/aspect, 0, 0, 0 ],
-        [ 0, f, 0, 0 ],
-        [ 0, 0, (far+near)/(near-far), (2*far*near)/(near-far) ],
-        [ 0, 0, -1, 0 ]
-    ], dtype=numpy.float32)
-
-######################################################################
-
-def rotation_from_axes(idx0, axis0, idx1, axis1_suggestion, dim=4):
-
-    assert idx0 in range(3)
-    assert idx1 in range(3)
-
-    idx2 = 3 - idx0 - idx1
-
-    assert axis0.dtype == numpy.float32 and axis0.shape == (3,)
-    assert axis1_suggestion.dtype == numpy.float32 and axis1_suggestion.shape == (3,)
-
-    R = numpy.identity(dim, dtype=numpy.float32)
-
-    s = 1 if (idx1 == (idx0 + 1) % 3) else -1
-    u = normalize(axis0)
-    w = s*normalize(numpy.cross(u, axis1_suggestion))
-    v = s*numpy.cross(w, u)
-
-    R[idx0,:3] = u
-    R[idx1,:3] = v
-    R[idx2,:3] = w
-
-    return R
-
-######################################################################
-
-def rotation_matrix(angle, axis, point=None):
-    return tf.rotation_matrix(angle, axis, point).astype(numpy.float32)
-
-def translation_matrix(direction):
-    return tf.translation_matrix(direction).astype(numpy.float32)
-
-def rigid_2d_matrix(position, angle, z=0.0):
-
-    x, y = position
-    c = numpy.cos(angle)
-    s = numpy.sin(angle)
-
-    return numpy.array([[c, -s, 0, x],
-                        [s, c, 0,  y],
-                        [0, 0, 1,  z],
-                        [0, 0, 0,  1]], dtype=numpy.float32)
-
-######################################################################
-
-def look_at(eye, center, up, Rextra=None):
-
-    diff = eye-center
-    zdist = numpy.linalg.norm(diff)
-
-    RT = rotation_from_axes(2, diff, 1, up, dim=4)
-
-    if Rextra is not None:
-        RT = numpy.dot(Rextra, RT)        
-
-    T1 = translation_matrix(vec3(0, 0, -zdist))
-    T0 = translation_matrix(-center)
-
-    return numpy.dot(T1, numpy.dot(RT, T0))
 
 ######################################################################
 
