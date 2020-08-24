@@ -20,6 +20,7 @@
 	691.9,287.8 684.9,359.3 667.9,422.3 634,465 580.9,482.3 467.9,475.3 328.9,475.3 218.9,468.3 145,490 "/>
 <circle class="st3" cx="343.4" cy="152" r="5"/>
 <circle class="st1" cx="343.4" cy="222" r="5"/>
+<circle class="st1" cx="228" cy="345" r="5"/>
 <circle class="st3" cx="400.9" cy="513.3" r="5"/>
 <circle class="st3" cx="401.1" cy="443.3" r="5"/>
 <circle class="st3" cx="607.8" cy="510.1" r="5"/>
@@ -28,8 +29,10 @@
 <line id="tag1" class="st5" x1="423.8" y1="255.6" x2="507.3" y2="283.4"/>
 <line id="tag2" class="st5" x1="700.8" y1="480.4" x2="724.1" y2="395.6"/>
 <line class="st6" x1="600" y1="300" x2="600" y2="380"/>
-<rect x="42" y="103.8" transform="matrix(0.8211 -0.5708 0.5708 0.8211 -59.2781 72.5009)" class="st7" width="88" height="54"/>
-<rect x="457.9" y="527.1" transform="matrix(0.9962 -8.762538e-02 8.762538e-02 0.9962 -46.6251 46.1125)" class="st7" width="88" height="54"/>
-<rect x="726.5" y="211.6" transform="matrix(0.9985 -5.524686e-02 5.524686e-02 0.9985 -12.9706 42.02)" class="st7" width="54" height="88"/>
-<polygon class="st8" points="122.6,206.6 128.4,222.1 167.4,198.2 "/>
+<rect x="42" y="103.8" transform="matrix(0.8211 -0.5708 0.5708 0.8211 -59.2813 72.49)" class="st7" width="88" height="54"/>
+<rect x="457.9" y="527.1" transform="matrix(0.9962 -8.762132e-02 8.762132e-02 0.9962 -46.6229 46.1102)" class="st7" width="88" height="54"/>
+<rect x="726.5" y="211.6" transform="matrix(0.9985 -5.524535e-02 5.524535e-02 0.9985 -12.9704 42.0189)" class="st7" width="54" height="88"/>
+<polygon class="st8" points="126.9,370.5 129.9,386.7 172.5,369.9 "/>
+<circle class="st1" cx="303.5" cy="330" r="5"/>
+<circle class="st1" cx="374" cy="314.6" r="5"/>
 </svg>

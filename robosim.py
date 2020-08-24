@@ -14,6 +14,8 @@ import re
 import sys
 import os
 
+import cv2
+
 import color_blob_detector as blob
 
 import glfw
@@ -28,8 +30,11 @@ from PIL import Image
 # DONE: reset sim and env
 # DONE: sim robot
 # DONE: virtual bump sensors
-# TODO: implement renderbuffers in graphics
-# TODO: robot camera
+# DONE: implement renderbuffers in graphics
+# DONE: robot camera
+# DONE: object detection
+# TODO: odometry (EKF?)
+# TODO: controller API
 
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
@@ -109,7 +114,7 @@ BUMP_DIST = 0.005
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
-CAMERA_FOV_Y = 48.6 
+CAMERA_FOV_Y = 49
 
 CAMERA_NEAR = 0.15
 CAMERA_FAR = 50.0
@@ -117,8 +122,59 @@ CAMERA_FAR = 50.0
 CAMERA_A = CAMERA_FAR / (CAMERA_NEAR - CAMERA_FAR)
 CAMERA_B = CAMERA_FAR * CAMERA_NEAR / (CAMERA_NEAR - CAMERA_FAR)
 
+CAMERA_F_PX = CAMERA_HEIGHT / (2*numpy.tan(CAMERA_FOV_Y*numpy.pi/360))
+
+CAMERA_K = numpy.array([
+    [ CAMERA_F_PX, 0, 0.5*CAMERA_WIDTH ],
+    [ 0, CAMERA_F_PX, 0.5*CAMERA_HEIGHT ],
+    [ 0, 0, 1 ]], dtype=numpy.float32)
+
+MIN_CONTOUR_AREA = 50
+
+OBJECT_X_RES = 0.02
+OBJECT_X_SPLIT_THRESHOLD = 0.16
+OBJECT_X_SPLIT_BINS = numpy.round(OBJECT_X_SPLIT_THRESHOLD / OBJECT_X_RES)
+
+
+SQRT22 = 0.5*numpy.sqrt(2)
+
 def vec_from_color(color):
     return gfx.vec3(color.red, color.green, color.blue) / 255.
+
+######################################################################
+
+class DetectedObject:
+
+    def __init__(self, contour, area, xyz, is_split):
+
+        self.contour = contour
+        self.area = area
+        self.xyz = xyz.copy()
+        self.is_split = is_split
+
+    def ellipse_approx(self):
+
+        mean, V, evals = cv2.PCACompute2(self.xyz, mean=None)
+
+        mean = mean.flatten()
+        axes = 2*numpy.sqrt(evals.flatten())
+
+        if numpy.abs(V[2,2]) > SQRT22:
+            pivot = V[2,2]
+        else:
+            pivot = -V[2,0]
+
+        if pivot < 0:
+            V[2] = -V[2]
+
+        detV = numpy.dot(V[0], numpy.cross(V[1], V[2]))
+
+        if detV < 0:
+            V[1] = -V[1]
+
+        principal_components = V
+
+        return mean, axes, principal_components
 
 ######################################################################
 
@@ -916,8 +972,7 @@ class Robot(SimObject):
             if not collider_did_hit:
                 finished_colliders.add(collider)
 
-        print('bump:', self.bump)
-                    
+        #print('bump:', self.bump)
         self.colliders -= finished_colliders
 
                                 
@@ -1026,6 +1081,27 @@ class RoboSim(B2D.b2ContactListener):
             [-1,  0, 0, 0 ],
             [ 0,  0, 0, 1 ]
         ], dtype=numpy.float32)
+        
+
+        u = numpy.arange(CAMERA_WIDTH, dtype=numpy.float32)
+        v = numpy.arange(CAMERA_HEIGHT, dtype=numpy.float32)
+
+        u += 0.5 - 0.5*CAMERA_WIDTH
+        v += 0.5 - 0.5*CAMERA_HEIGHT
+
+        self.robot_y_per_camera_z = -u.reshape(1, -1) / CAMERA_F_PX
+        self.robot_z_per_camera_z = -v.reshape(-1, 1) / CAMERA_F_PX
+
+        self.camera_rgb = numpy.zeros(
+            (CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=numpy.uint8)
+        
+        self.camera_labels = numpy.zeros(
+            (CAMERA_HEIGHT, CAMERA_WIDTH), dtype=numpy.uint8)
+
+        self.camera_points = numpy.zeros(
+            (CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=numpy.float32)
+
+        self.detections = None
         
         print('created the world!')
 
@@ -1214,6 +1290,7 @@ class RoboSim(B2D.b2ContactListener):
             self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT)
 
         self.render_framebuffer()
+        self.process_camera()
 
     def render(self):
         for obj in self.objects:
@@ -1250,10 +1327,10 @@ class RoboSim(B2D.b2ContactListener):
         rgb_array = numpy.frombuffer(rgb_buffer, dtype=numpy.uint8)
         rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
         
-        self.camera_rgb = rgb_image_flipped[::-1].copy()
+        self.camera_rgb[:] = rgb_image_flipped[::-1]
 
         camera_ycbcr = self.detector.convert_to_ycrcb(self.camera_rgb)
-        self.camera_labels = self.detector.label_image(camera_ycbcr)
+        self.detector.label_image(camera_ycbcr, self.camera_labels)
 
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
         
@@ -1261,12 +1338,125 @@ class RoboSim(B2D.b2ContactListener):
         depth_array = numpy.frombuffer(depth_buffer, dtype=numpy.float32)
         depth_image_flipped = depth_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
 
-        z_image = CAMERA_B / (depth_image_flipped[::-1] + CAMERA_A)
-        
-        self.camera_depth = z_image
+        depth_image = depth_image_flipped[::-1]
 
-        #elapsed = glfw.get_time() - now
-        #print('render_framebuffer took', elapsed, 'seconds')
+        camera_z = (CAMERA_B / (depth_image + CAMERA_A))
+        
+
+        
+        # camera Z = robot X
+        self.camera_points[:,:,0] = camera_z
+
+        Z = self.camera_points[:,:,0]
+
+        # camera X = negative robot Y
+        self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
+
+        # camera Y = negative robot Z
+        self.camera_points[:,:,2] = Z * self.robot_z_per_camera_z
+
+    def process_camera(self):
+    
+        single_object_mask = numpy.empty((CAMERA_HEIGHT, CAMERA_WIDTH),
+                                         dtype=numpy.uint8)
+
+        self.detections = dict()
+
+        for color_index in range(self.detector.num_colors):
+
+            color_name = self.detector.color_names[color_index]
+
+            mask = self.camera_labels & (1 << color_index)
+            
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+
+            color_detections = []
+
+            for contour_index in range(len(contours)):
+
+                contour = contours[contour_index]
+
+                x0, y0, w, h = cv2.boundingRect(contour)
+                
+                if w*h < MIN_CONTOUR_AREA:
+                    continue
+
+                topleft = (x0, y0)
+                
+                draw_mask = single_object_mask[:h, :w]
+                draw_mask[:] = 0
+
+                shifted = contour - topleft
+
+                cv2.drawContours(draw_mask, [shifted], 0,
+                                 (255, 255, 255), -1)
+
+                area = numpy.count_nonzero(draw_mask)
+                if area < MIN_CONTOUR_AREA:
+                    continue
+                
+                xyz_subrect = self.camera_points[y0:y0+h, x0:x0+w]
+
+                mask_i, mask_j = numpy.nonzero(draw_mask)
+
+                object_xyz = xyz_subrect[mask_i, mask_j]
+
+                object_x = object_xyz[:, 0]
+                ox0 = object_x.min()
+                bin_idx = ((object_x - ox0) / OBJECT_X_RES).astype(numpy.int32)
+
+                unique_bins = numpy.unique(bin_idx)
+                diffs = unique_bins[1:] - unique_bins[:-1]
+
+                toobig = (diffs > OBJECT_X_SPLIT_BINS)
+
+                if not numpy.any(toobig):
+                    
+                    detection = DetectedObject(contour, area,
+                                               object_xyz, is_split=False)
+                    
+                    color_detections.append(detection)
+
+                else:
+
+                    uidx0 = 0
+
+                    while uidx0 < len(unique_bins):
+                        
+                        uidx1 = uidx0
+                        
+                        while uidx1 < len(toobig) and not toobig[uidx1]:
+                            uidx1 += 1
+                            
+                        first_ok_bin = unique_bins[uidx0]
+                        last_ok_bin = unique_bins[uidx1]
+
+                        xidx, = numpy.nonzero((bin_idx >= first_ok_bin) &
+                                              (bin_idx <= last_ok_bin))
+
+                        area = len(xidx)
+
+                        if area > MIN_CONTOUR_AREA:
+                        
+                            xi = mask_i[xidx]
+                            xj = mask_j[xidx]
+
+                            draw_mask[:] = 0
+                            draw_mask[xi, xj] = 255
+
+                            detection = DetectedObject(contour, area,
+                                                       xyz_subrect[xi, xj],
+                                                       is_split=True)
+
+                            color_detections.append(detection)
+
+                        uidx0 = uidx1 + 1
+
+            color_detections.sort(key=lambda d: (-d.area, -d.contour[0,0,1]))
+
+            self.detections[color_name] = color_detections
+                                                   
 
     def update(self, time_since_last_update):
 
@@ -1283,6 +1473,9 @@ class RoboSim(B2D.b2ContactListener):
 
             if self.sim_ticks % self.ticks_per_camera_frame == 0:
                 self.render_framebuffer()
+                self.process_camera()
+
+                # TODO: call controller
             
             #now = glfw.get_time()
             
@@ -1447,29 +1640,75 @@ class RoboSimApp(gfx.GlfwApp):
 
     def save_camera_images(self):
 
-        while True:
-            rgb_filename = 'camera_rgb_{:04d}.png'.format(self.image_file_number)
-            depth_filename = 'camera_depth_{:04d}.png'.format(self.image_file_number)
-            label_filename = 'camera_label_{:04d}.png'.format(self.image_file_number)
-            filenames = [ rgb_filename, depth_filename, label_filename ]
-            if not any([os.path.exists(f) for f in filenames]):
-                break
-            self.image_file_number += 1
+        files = [
+            ('rgb', 'png'),
+            ('labels', 'png'),
+            ('detections', 'png')
+        ]
 
+        while True:
+
+            filenames = dict()
+
+            any_exists = False
+
+            for ftype, extension in files:
+                filename = 'camera_{}_{:04d}.{}'.format(
+                    ftype, self.image_file_number, extension)
+                if os.path.exists(filename):
+                    #any_exists = True
+                    pass
+                filenames[ftype] = filename
+
+            #self.image_file_number += 1
+                
+            if not any_exists:
+                break
 
         paletted_output = self.sim.detector.colorize_labels(self.sim.camera_labels)
-        Image.fromarray(paletted_output).save(label_filename)
+        Image.fromarray(paletted_output).save(filenames['labels'])
+        Image.fromarray(self.sim.camera_rgb).save(filenames['rgb'])
+
+        display = self.sim.camera_rgb[:, :, ::-1].copy()
+        palette = self.sim.detector.palette[:, ::-1] 
+
+        rvec = numpy.zeros(3, dtype=numpy.float32)
+        tvec = rvec.copy()
+        theta = numpy.linspace(0, 2*numpy.pi, 32, False).astype(numpy.float32)
+        ctheta = numpy.cos(theta).reshape(-1, 1)
+        stheta = numpy.sin(theta).reshape(-1, 1)
+        dcoeffs = numpy.zeros(4, dtype=numpy.float32)
+        opoints = numpy.zeros((32, 3), dtype=numpy.float32)
+        R = numpy.array([
+            [ 0, -1, 0 ],
+            [ 0, 0, -1 ],
+            [ 1, 0, 0 ],
+        ], dtype=numpy.float32)
+
+        for color_name, color_detections in self.sim.detections.items():
+            color_index = self.sim.detector.color_names.index(color_name)
+            color_lite = tuple([int(c) for c in palette[color_index] // 2 + 127])
+            for detection in color_detections:
+                cv2.drawContours(display, [detection.contour], 0, color_lite, 2)
+ 
+        for color_name, color_detections in self.sim.detections.items():
+            color_index = self.sim.detector.color_names.index(color_name)
+            color_dark = tuple([int(c) for c in palette[color_index] // 2])
+            for detection in color_detections:
+                mean, axes, pcs = detection.ellipse_approx()
+                mean = numpy.dot(R, mean)
+                pcs = numpy.array([numpy.dot(R, pc) for pc in pcs])
+                opoints = (pcs[0].reshape(1, 3) * ctheta * axes[0] +
+                           pcs[1].reshape(1, 3) * stheta * axes[1] +
+                           mean.reshape(1, 3))
+                ipoints, _ = cv2.projectPoints(opoints, rvec, tvec,
+                                               CAMERA_K, dcoeffs)
+                ipoints = numpy.round(ipoints).astype(int)
+                cv2.drawContours(display, [ipoints], 0, color_dark, 1, cv2.LINE_AA)
         
-        Image.fromarray(self.sim.camera_rgb).save(rgb_filename)
+        cv2.imwrite(filenames['detections'], display)
 
-        d = self.sim.camera_depth
-        drng = d.max() - d.min()
-        d = (d - d.min()) / numpy.where(drng, drng, 1)
-        d = (d*255).astype(numpy.uint8)
-
-        Image.fromarray(d).save(depth_filename)
-
-        print('wrote {} and {} and {}'.format(rgb_filename, depth_filename, label_filename))
+        print('wrote', ', '.join(filenames.values()))
         
 
     ############################################################

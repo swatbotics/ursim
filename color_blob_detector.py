@@ -119,7 +119,7 @@ def get_mask(bbox, image):
     
     return (greater & less)
 
-def label_image(all_bboxes, image):
+def label_image(all_bboxes, image, labels=None):
 
     nlabels = len(all_bboxes)
     assert all_bboxes.shape == (nlabels, 2, 3)
@@ -130,7 +130,13 @@ def label_image(all_bboxes, image):
     assert nlabels <= 8
 
     init_mask = (1 << nlabels) - 1
-    labels = init_mask * numpy.ones((h, w), dtype=numpy.uint8)
+
+    if labels is None:
+        labels = numpy.empty((h, w), dtype=numpy.uint8)
+    else:
+        assert labels.shape == (h, w) and labels.dtype == numpy.uint8
+        
+    labels[:] = init_mask
 
     for label_index in range(nlabels):
         label_mask = ~numpy.uint8(1 << label_index)
@@ -228,8 +234,8 @@ class ColorBlobDetector:
     def convert_from_ycrcb(self, image):
         return cv2.cvtColor(image, self.from_ycrcb)
     
-    def label_image(self, image):
-        return label_image(self.all_bboxes, image)
+    def label_image(self, image, dst=None):
+        return label_image(self.all_bboxes, image, dst)
 
     def colorize_labels(self, labels):
         assert len(labels.shape) == 2 and labels.dtype == numpy.uint8
