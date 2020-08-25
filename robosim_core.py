@@ -5,7 +5,6 @@ import svgelements as se
 import os
 import robosim_logging as rlog
 
-
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
 CARDBOARD_COLOR = gfx.vec3(0.8, 0.7, 0.6)
@@ -99,10 +98,10 @@ LOG_ROBOT_BUMP_LEFT       = 14
 LOG_ROBOT_BUMP_CENTER     = 15
 LOG_ROBOT_BUMP_RIGHT      = 16
 
-LOG_ROBOT_NUM_VARS        = 17
+LOG_NUM_VARS        = 17
 
 
-LOG_ROBOT_NAMES = [
+LOG_NAMES = [
     'robot.pos.x',
     'robot.pos.y',
     'robot.pos.angle',
@@ -119,10 +118,10 @@ LOG_ROBOT_NAMES = [
     'robot.motors_enabled',
     'robot.bump.left',
     'robot.bump.center',
-    'robot.bump.right'
+    'robot.bump.right',
 ]
 
-assert len(LOG_ROBOT_NAMES) == LOG_ROBOT_NUM_VARS
+assert len(LOG_NAMES) == LOG_NUM_VARS
 
 
 ######################################################################
@@ -166,7 +165,6 @@ class SimObject:
         self.body_angular_mu = None
 
     def sim_update(self, world, time, dt):
-
 
         if self.body_linear_mu is not None:
             self.body.ApplyForceToCenter(
@@ -484,7 +482,7 @@ class Robot(SimObject):
 
         self.colliders = set()
 
-        self.log_vars = numpy.zeros(LOG_ROBOT_NUM_VARS, dtype=numpy.float32)
+        self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
 
     def initialize(self, position=None, angle=None):
 
@@ -516,7 +514,7 @@ class Robot(SimObject):
         )
 
     def setup_log(self, logger):
-        logger.add_variables(LOG_ROBOT_NAMES, self.log_vars)
+        logger.add_variables(LOG_NAMES, self.log_vars)
 
     def update_log(self):
 

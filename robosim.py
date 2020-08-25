@@ -490,14 +490,27 @@ class RoboSimApp(gfx.GlfwApp):
 
         assert self.sim.dt == 0.01
 
+        self.last_update_time = None
+
         self.sim_camera.update()
 
         self.sim.add_callback(self.sim_update_callback, 4)
         self.sim.ticks_per_log = 4
 
+        self.log_update_time = numpy.zeros(1, dtype=numpy.float32)
+
+        self.sim.logger.add_variables(['sim.update_time'], self.log_update_time)
+
     def sim_update_callback(self, time):
 
         self.sim_camera.update()
+
+        now = glfw.get_time()
+
+        if self.last_update_time is not None:
+            self.log_update_time[0] = now - self.last_update_time
+            
+        self.last_update_time = now
 
     def set_animating(self, a):
 
@@ -544,6 +557,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.renderables[:] = []
 
             self.sim.reload()
+            self.last_update_time = None
 
             for o in self.sim.objects:
                 self.renderables.append(SimRenderable.create_for_object(o))

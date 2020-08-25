@@ -19,7 +19,7 @@ MAX_PLOTS_PER_FIGURE = MAX_PLOT_ROWS*MAX_PLOT_COLS
 class Logger:
 
     NUMERIC_TYPES = set('bufic')
-    INITIAL_LOG_SIZE = 512
+    INITIAL_LOG_SIZE = 8000
 
     def __init__(self, dt=None):
 
@@ -202,6 +202,7 @@ def plot_log(ldata):
                         if span is not None:
                             matched_name = (matched_name[:span[0]] +
                                             matched_name[span[1]:])
+                break
 
         if matched_name in plot_lookup:
             plot_idx = plot_lookup[matched_name]
