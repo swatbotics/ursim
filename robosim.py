@@ -23,7 +23,7 @@ from CleanGL import gl
 # DONE: robot camera
 # DONE: object detection
 # DONE: clean up code to split into separate files with cleaner dependencies
-# TODO: logging
+# DONE: logging
 # TODO: odometry (EKF?)
 # TODO: controller API
 
@@ -482,19 +482,21 @@ class RoboSimApp(gfx.GlfwApp):
             assert r is not None
             self.renderables.append(r)
 
-        self.sim_camera = scam.SimCamera(sim.robot, self.renderables)
+        self.sim_camera = scam.SimCamera(sim.robot,
+                                         self.renderables,
+                                         self.sim.logger)
 
         assert self.sim.dt == 0.01
 
         self.sim_camera.update()
 
         self.sim.add_callback(self.sim_update_callback, 4)
+        self.sim.ticks_per_log = 4
 
     def sim_update_callback(self, time):
 
         self.sim_camera.update()
-        # TODO: control callback!
-        
+
     def set_animating(self, a):
 
         if not a:
@@ -502,6 +504,9 @@ class RoboSimApp(gfx.GlfwApp):
             self.prev_update = None
 
         self.animating = a
+
+    def destroy(self):
+        self.sim.logger.finish()
 
     def key(self, key, scancode, action, mods):
 
@@ -619,7 +624,6 @@ class RoboSimApp(gfx.GlfwApp):
             la += (0.5, -1.0)
 
         self.sim.robot.desired_linear_angular_velocity[:] = la
-        
         self.sim.robot.motors_enabled = numpy.any(la)
         
     def render(self):

@@ -3,6 +3,8 @@ import graphics as gfx
 import Box2D as B2D
 import svgelements as se
 import os
+import robosim_logging as rlog
+
 
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
@@ -78,6 +80,50 @@ BUMP_ANGLE_RANGES = numpy.array([
 ], dtype=numpy.float32) * DEG
 
 BUMP_DIST = 0.005
+
+LOG_ROBOT_POS_X =           0
+LOG_ROBOT_POS_Y =           1
+LOG_ROBOT_POS_ANGLE =       2
+LOG_ROBOT_VEL_X =           3
+LOG_ROBOT_VEL_Y =           4
+LOG_ROBOT_VEL_ANGLE =       5
+LOG_ROBOT_CMD_VEL_FORWARD = 6
+LOG_ROBOT_CMD_VEL_ANGULAR = 7
+LOG_ROBOT_CMD_VEL_LWHEEL  = 8
+LOG_ROBOT_CMD_VEL_RWHEEL  = 9
+LOG_ROBOT_VEL_FORWARD =     10
+LOG_ROBOT_VEL_LWHEEL =      11
+LOG_ROBOT_VEL_RWHEEL =      12
+LOG_ROBOT_MOTORS_ENABLED  = 13
+LOG_ROBOT_BUMP_LEFT       = 14
+LOG_ROBOT_BUMP_CENTER     = 15
+LOG_ROBOT_BUMP_RIGHT      = 16
+
+LOG_ROBOT_NUM_VARS        = 17
+
+
+LOG_ROBOT_NAMES = [
+    'robot.pos.x',
+    'robot.pos.y',
+    'robot.pos.angle',
+    'robot.vel.x',
+    'robot.vel.y',
+    'robot.vel.angle',
+    'robot.cmd_vel.forward',
+    'robot.cmd_vel.angle',
+    'robot.cmd_wheel_vel.l',
+    'robot.cmd_wheel_vel.r',
+    'robot.vel.forward',
+    'robot.wheel_vel.l',
+    'robot.wheel_vel.r',
+    'robot.motors_enabled',
+    'robot.bump.left',
+    'robot.bump.center',
+    'robot.bump.right'
+]
+
+assert len(LOG_ROBOT_NAMES) == LOG_ROBOT_NUM_VARS
+
 
 ######################################################################
 
@@ -422,11 +468,13 @@ class Robot(SimObject):
 
         self.wheel_velocity_fitler_accel = 2.0 # m/s^2
 
-        self.desired_linear_angular_velocity = numpy.array(
-            [0.0, 0.0], dtype=numpy.float32)
+        self.desired_linear_angular_velocity = numpy.zeros(2, dtype=numpy.float32)
+        self.desired_wheel_velocity = numpy.zeros(2, dtype=numpy.float32)
+        self.desired_wheel_velocity_filtered = numpy.zeros(2, dtype=numpy.float32)
 
-        self.desired_wheel_velocity_filtered = numpy.array(
-            [0.0, 0.0], dtype=numpy.float32)
+        self.wheel_velocity = numpy.zeros(2, dtype=numpy.float32)
+
+        self.forward_velocity = 0.0
 
         self.rolling_mu = 4.0
         
@@ -435,6 +483,8 @@ class Robot(SimObject):
         self.bump = numpy.zeros(len(BUMP_ANGLE_RANGES), dtype=numpy.uint8)
 
         self.colliders = set()
+
+        self.log_vars = numpy.zeros(LOG_ROBOT_NUM_VARS, dtype=numpy.float32)
 
     def initialize(self, position=None, angle=None):
 
@@ -465,32 +515,54 @@ class Robot(SimObject):
             I = ROBOT_BASE_I
         )
 
+    def setup_log(self, logger):
+        logger.add_variables(LOG_ROBOT_NAMES, self.log_vars)
+
+    def update_log(self):
+
+        l = self.log_vars
+
+        l[LOG_ROBOT_POS_X] = self.body.position.x
+        l[LOG_ROBOT_POS_Y] = self.body.position.y
+        l[LOG_ROBOT_POS_ANGLE] = self.body.angle
+        l[LOG_ROBOT_VEL_X] = self.body.linearVelocity.x
+        l[LOG_ROBOT_VEL_Y] = self.body.linearVelocity.y
+        l[LOG_ROBOT_VEL_ANGLE] = self.body.angularVelocity
+        l[LOG_ROBOT_CMD_VEL_FORWARD] = self.desired_linear_angular_velocity[0]
+        l[LOG_ROBOT_CMD_VEL_ANGULAR] = self.desired_linear_angular_velocity[1]
+        l[LOG_ROBOT_CMD_VEL_LWHEEL] = self.desired_wheel_velocity[0]
+        l[LOG_ROBOT_CMD_VEL_RWHEEL] = self.desired_wheel_velocity[1]
+        l[LOG_ROBOT_VEL_FORWARD] = self.forward_velocity
+        l[LOG_ROBOT_VEL_LWHEEL] = self.wheel_velocity[0]
+        l[LOG_ROBOT_VEL_RWHEEL] = self.wheel_velocity[1]
+        l[LOG_ROBOT_MOTORS_ENABLED] = self.motors_enabled
+        l[LOG_ROBOT_BUMP_LEFT:LOG_ROBOT_BUMP_LEFT+3] = self.bump
+
     def sim_update(self, world, time, dt):
 
         body = self.body
 
-        current_normal = body.GetWorldVector((1, 0))
-        current_tangent = body.GetWorldVector((0, 1))
+        current_tangent = body.GetWorldVector((1, 0))
+        current_normal = body.GetWorldVector((0, 1))
 
-        lateral_velocity = body.linearVelocity.dot(current_tangent)
+        self.forward_velocity = body.linearVelocity.dot(current_tangent)
+
+        lateral_velocity = body.linearVelocity.dot(current_normal)
 
         lateral_impulse = clamp_abs(-body.mass * lateral_velocity,
                                     self.max_lateral_impulse)
 
-        body.ApplyLinearImpulse(lateral_impulse * current_tangent,
+        body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
 
-        if self.motors_enabled:
-            desired_wheel_velocity = wheel_lr_from_linear_angular(
-                self.desired_linear_angular_velocity
-            )
-        else:
-            desired_wheel_velocity = numpy.array([0, 0], dtype=numpy.float32)
-
+        self.desired_wheel_velocity = wheel_lr_from_linear_angular(
+            self.desired_linear_angular_velocity
+        )
+        
         self.desired_wheel_velocity_filtered += clamp_abs(
-            desired_wheel_velocity - self.desired_wheel_velocity_filtered,
+            self.desired_wheel_velocity - self.desired_wheel_velocity_filtered,
             self.wheel_velocity_fitler_accel * dt)
-
+        
         for idx, side in enumerate([1.0, -1.0]):
 
             offset = B2D.b2Vec2(0, side * ROBOT_WHEEL_OFFSET)
@@ -499,8 +571,10 @@ class Robot(SimObject):
 
             wheel_velocity = body.GetLinearVelocityFromWorldPoint(world_point)
 
-            wheel_fwd_velocity = wheel_velocity.dot(current_normal)
+            wheel_fwd_velocity = wheel_velocity.dot(current_tangent)
 
+            self.wheel_velocity[idx] = wheel_fwd_velocity
+            
             if self.motors_enabled:
 
                 wheel_velocity_error = (
@@ -511,12 +585,12 @@ class Robot(SimObject):
                     wheel_velocity_error * body.mass,
                     self.max_forward_impulse)
 
-                body.ApplyLinearImpulse(0.5 * forward_impulse * current_normal,
+                body.ApplyLinearImpulse(0.5 * forward_impulse * current_tangent,
                                         world_point, True)
                 
             else:
 
-                body.ApplyForce(-self.rolling_mu*wheel_fwd_velocity * current_normal,
+                body.ApplyForce(-self.rolling_mu*wheel_fwd_velocity * current_tangent,
                                 world_point, True)
 
         self.bump[:] = 0
@@ -563,6 +637,7 @@ class Robot(SimObject):
         #print('bump:', self.bump)
         self.colliders -= finished_colliders
 
+        
                                 
 ######################################################################
 
@@ -628,6 +703,11 @@ class RoboSim(B2D.b2ContactListener):
 
         self.dt = 0.01 # 100 HZ
 
+        self.ticks_per_log = 4 # 25 Hz
+
+        self.logger = rlog.Logger(self.dt)
+        self.robot.setup_log(self.logger)
+
         self.velocity_iterations = 6
         self.position_iterations = 2
         
@@ -646,6 +726,8 @@ class RoboSim(B2D.b2ContactListener):
         print('created the world!')
 
     def reload(self):
+
+        self.logger.finish()
 
         self.clear()
 
@@ -837,6 +919,10 @@ class RoboSim(B2D.b2ContactListener):
 
             self.world.ClearForces()
 
+            if self.sim_ticks % self.ticks_per_log == 0:
+                self.robot.update_log()
+                self.logger.append_log_row()
+                
             self.sim_time += self.dt
             self.remaining_sim_time -= self.dt
             self.sim_ticks += 1

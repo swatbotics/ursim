@@ -48,7 +48,7 @@ CAMERA_PERSPECTIVE = gfx.perspective_matrix(
 
 class SimCamera:
 
-    def __init__(self, robot, renderables):
+    def __init__(self, robot, renderables, logger=None):
 
         self.robot = robot
         self.renderables = renderables
@@ -81,6 +81,24 @@ class SimCamera:
 
         self.image_file_number = 0
 
+
+        if logger is None:
+
+            self.log_vars = None
+
+        else:
+
+            lvars = []
+
+            for idx, color_name in enumerate(self.detector.color_names):
+                prefix = 'blobfinder.' + color_name + '.'
+                lvars.append(prefix + 'num_detections')
+                lvars.append(prefix + 'max_area')
+            
+            self.log_vars = numpy.zeros(len(lvars), dtype=numpy.float32)
+
+            logger.add_variables(lvars, self.log_vars)
+            
     def render(self):
         
         self.framebuffer.activate()
@@ -149,6 +167,19 @@ class SimCamera:
             OBJECT_SPLIT_AXIS,
             OBJECT_SPLIT_RES,
             OBJECT_SPLIT_BINS)
+
+        
+        if self.log_vars is not None:
+            offset = 0
+            for idx, color_name in enumerate(self.detector.color_names):
+                dlist = self.detections[color_name]
+                self.log_vars[offset+0] = len(dlist)
+                if not len(dlist):
+                    self.log_vars[offset+1] = 0
+                else:
+                    biggest = dlist[0]
+                    self.log_vars[offset+1] = biggest.area
+                offset += 2
         
     def update(self):
 

@@ -1,10 +1,19 @@
 import numpy
+import sys
 import os
 from collections import namedtuple
 import datetime
+import matplotlib.pyplot as plt
+import re
 
 LoggerGroup = namedtuple('LoggerGroup',
                          'names, array, idx0, idx1')
+
+MAX_PLOT_ROWS = 6
+MAX_PLOT_COLS = 1
+
+MAX_PLOTS_PER_FIGURE = MAX_PLOT_ROWS*MAX_PLOT_COLS
+
         
 class Logger:
 
@@ -61,6 +70,7 @@ class Logger:
         self.current_log = numpy.zeros((self.INITIAL_LOG_SIZE, self.total_variables),
                                        dtype=numpy.float32)
 
+        print('starting log', self.current_filename)
 
         return self.current_filename
             
@@ -98,9 +108,15 @@ class Logger:
                                names=log_names,
                                data=written_portion)
 
+        print('wrote log', self.current_filename)
+        
         self.current_filename = None
         self.current_log = None
         self.log_rows = 0
+
+    def finish(self):
+        if self.current_log is not None:
+            self.write_log()
         
 def read_log(filename, raw=False):
     
@@ -115,6 +131,133 @@ def read_log(filename, raw=False):
     else:
         lookup = dict([(str(name), data[:,col]) for col, name in enumerate(names)])
         return dt, lookup
+
+    
+PLOT_MERGES = [
+    re.compile(r'.*\.(cmd_)?vel(\.[xy])'),
+    re.compile(r'.*\.(cmd_)?wheel_vel(\.[lr])'), 
+    re.compile(r'.*\.(cmd_)?vel\..*'),
+    re.compile(r'robot\.bump(\.)'),
+    re.compile(r'blobfinder\.(.*\.)num_detections'),
+    re.compile(r'blobfinder\.(.*\.)max_area')
+]
+
+COLORS = dict(blue=[0, 0, 0.8],
+              green=[0, 0.5, 0],
+              orange=[1, 0.5, 0],
+              purple=[0.5, 0, 1])
+
+def plot_log(ldata):
+
+    assert 'time' in ldata.keys()
+
+    time = ldata['time']
+
+    plots = []
+    plot_lookup = dict()
+
+    poses = []
+
+    for name, trace in ldata.items():
+
+        if name == 'time':
+            continue
+
+        if name.endswith('.pos.x'):
+            py = name.replace('.pos.x', '.pos.y')
+            if py in ldata:
+                poses.append(name[:-2])
+
+        matched_name = name
+
+        for expr in PLOT_MERGES:
+            m = expr.match(name)
+            if m is not None:
+                matched_name = m.group(0)
+                if m.lastindex is not None:
+                    for idx in range(m.lastindex, 0, -1):
+                        span = m.span(idx)
+                        if span is not None:
+                            matched_name = (matched_name[:span[0]] +
+                                            matched_name[span[1]:])
+
+        if matched_name in plot_lookup:
+            plot_idx = plot_lookup[matched_name]
+        else:
+            plot_idx = len(plots)
+            plots.append([])
+            plot_lookup[matched_name] = plot_idx
+
+        plots[plot_idx].append((name, trace))
+
+
+    num_plots = len(plots)
+    cur_idx = 0
+
+    total_figures = int(numpy.ceil(len(plots) / MAX_PLOTS_PER_FIGURE))
+    if len(poses):
+        total_figures += 1
+
+    fig = plt.figure()
+    fig_idx = 1
+    fig.canvas.set_window_title('Figure 1/{}'.format(total_figures))
+    
+    for pidx, plist in enumerate(plots):
+        
+        if cur_idx >= MAX_PLOTS_PER_FIGURE:
+            fig_idx += 1
+            fig = plt.figure()
+            fig.canvas.set_window_title('Figure {}/{}'.format(
+                fig_idx, total_figures))
+            cur_idx -= MAX_PLOTS_PER_FIGURE
+            
+        cur_idx += 1
+        plt.subplot(MAX_PLOT_ROWS, MAX_PLOT_COLS, cur_idx)
+
+        plist.sort()
+
+        for name, trace in plist:
+            kwargs = dict()
+            for color, cvalue in COLORS.items():
+                if color in name:
+                    kwargs['color'] = cvalue
+            plt.plot(time, trace, label=name, **kwargs)
+
+        last_in_row = ((cur_idx % MAX_PLOT_ROWS) == 0 or
+                        pidx + 1 == len(plots))
+
+        if not last_in_row:
+            plt.xticks([])
+
+        plt.legend(loc='upper right', fontsize='xx-small')
+
+    if len(poses):
+
+        fig = plt.figure()
+        fig_idx += 1
+        
+        fig.canvas.set_window_title('Figure {}/{}'.format(
+            fig_idx, total_figures))
+        
+        for pname in poses:
+            
+            x = ldata[pname + '.x']
+            y = ldata[pname + '.y']
+
+            plt.plot(x, y, label=pname)
+            
+            tname = pname + '.angle'
+            if tname in ldata:
+                theta = ldata[tname]
+                c = numpy.cos(theta)
+                s = numpy.sin(theta)
+                plt.quiver(x[::8], y[::8], c[::8], s[::8],
+                           label=tname)
+
+        plt.legend(loc='upper right', fontsize='xx-small')
+        plt.axis('equal')
+            
+    plt.show()
         
 def _test_logging():
 
@@ -125,8 +268,8 @@ def _test_logging():
 
     l = Logger(dt=0.04)
 
-    l.add_variables(['robot.position.x', 'robot.position.y', 'robot.angle'], g1_data)
-    l.add_variables(['foo', 'bar'], g2_data)
+    l.add_variables(['robot.pos.x', 'robot.pos.y', 'robot.pos.angle'], g1_data)
+    l.add_variables(['foo.vel.x', 'foo.vel.y'], g2_data)
 
     filename = l.begin_log()
 
@@ -141,30 +284,16 @@ def _test_logging():
 
     dt, ldata = read_log(filename)
 
-    plt.figure()
+    os.unlink(filename)
 
-    time = ldata['time']
-
-    nplots = len(ldata) - 1
-
-    cnt = 0
-
-    for key, values in ldata.items():
-        if key == 'time':
-            continue
-        cnt += 1
-        plt.subplot(nplots, 1, cnt)
-        plt.plot(time, values, label=key)
-        plt.legend()
-
-
-    plt.figure()
-    plt.plot(ldata['robot.position.x'], ldata['robot.position.y'])
-    plt.axis('equal')
-
-    plt.show()
-    
-    
+    plot_log(ldata)
 
 if __name__ == '__main__':
-    _test_logging()
+
+    if len(sys.argv) == 1:
+        _test_logging()
+    else:
+        _, ldata = read_log(sys.argv[1])
+        plot_log(ldata)
+        
+        
