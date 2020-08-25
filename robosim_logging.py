@@ -3,6 +3,7 @@ import sys
 import os
 from collections import namedtuple
 import datetime
+import matplotlib
 import matplotlib.pyplot as plt
 import re
 
@@ -147,6 +148,27 @@ COLORS = dict(blue=[0, 0, 0.8],
               orange=[1, 0.5, 0],
               purple=[0.5, 0, 1])
 
+def keys(event):
+    if event.key == 't':
+        fig = event.canvas.figure
+        for ax in fig.axes:
+            for child in ax.get_children():
+                if isinstance(child, matplotlib.legend.Legend):
+                    is_visible = child.get_visible()
+                    child.set_visible(not is_visible)
+        event.canvas.draw()
+
+def make_figure(fig_idx, total_figures, subplots):  
+    fig = plt.figure(fig_idx)
+    fig.canvas.mpl_connect('key_press_event', keys)
+    fig.canvas.set_window_title('Figure {}/{}'.format(fig_idx, total_figures))
+    fig.suptitle("Press 't' to toggle legend, 'q' to close")
+    if subplots:
+        ax = fig.subplots(MAX_PLOT_ROWS, MAX_PLOT_COLS, sharex=True)
+        return fig, ax
+    else:
+        return fig
+        
 def plot_log(ldata):
 
     assert 'time' in ldata.keys()
@@ -198,21 +220,22 @@ def plot_log(ldata):
     if len(poses):
         total_figures += 1
 
-    fig = plt.figure()
+    for key, value in plt.rcParams.items():
+        if key.startswith('keymap.'):
+            print(key, value)
+
     fig_idx = 1
-    fig.canvas.set_window_title('Figure 1/{}'.format(total_figures))
-    
+    fig, subplots = make_figure(fig_idx, total_figures, True)
+
     for pidx, plist in enumerate(plots):
-        
+
         if cur_idx >= MAX_PLOTS_PER_FIGURE:
             fig_idx += 1
-            fig = plt.figure()
-            fig.canvas.set_window_title('Figure {}/{}'.format(
-                fig_idx, total_figures))
+            fig, subplots = make_figure(fig_idx, total_figures, True)
             cur_idx -= MAX_PLOTS_PER_FIGURE
             
+        ax = subplots[cur_idx]
         cur_idx += 1
-        plt.subplot(MAX_PLOT_ROWS, MAX_PLOT_COLS, cur_idx)
 
         plist.sort()
 
@@ -221,24 +244,18 @@ def plot_log(ldata):
             for color, cvalue in COLORS.items():
                 if color in name:
                     kwargs['color'] = cvalue
-            plt.plot(time, trace, label=name, **kwargs)
+            ax.plot(time, trace, label=name, **kwargs)
 
         last_in_row = ((cur_idx % MAX_PLOT_ROWS) == 0 or
                         pidx + 1 == len(plots))
 
-        if not last_in_row:
-            plt.xticks([])
-
-        plt.legend(loc='upper right', fontsize='xx-small')
+        ax.legend(loc='upper right', fontsize='xx-small')
 
     if len(poses):
 
-        fig = plt.figure()
         fig_idx += 1
-        
-        fig.canvas.set_window_title('Figure {}/{}'.format(
-            fig_idx, total_figures))
-        
+        fig = make_figure(fig_idx, total_figures, False)
+
         for pname in poses:
             
             x = ldata[pname + '.x']
