@@ -4,7 +4,7 @@ import color_blob_detector as blob
 import graphics as gfx
 from PIL import Image
 from CleanGL import gl
-import robosim_physics as phys
+import robosim_core as core
 import os
 
 CAMERA_WIDTH = 640
@@ -88,8 +88,8 @@ class SimCamera:
         gl.Viewport(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-        M = phys.b2xform(self.robot.body.transform, 
-                         phys.ROBOT_CAMERA_Z + 0.5*phys.ROBOT_CAMERA_DIMS[2])
+        M = core.b2xform(self.robot.body.transform, 
+                         core.ROBOT_CAMERA_Z + 0.5*core.ROBOT_CAMERA_DIMS[2])
     
         M = numpy.linalg.inv(M)
         

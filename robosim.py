@@ -9,7 +9,7 @@
 
 import numpy
 import graphics as gfx
-import robosim_physics as phys
+import robosim_core as core
 import robosim_camera as scam
 import glfw
 from CleanGL import gl
@@ -43,7 +43,7 @@ class SimRenderable:
         for obj in self.gfx_objects:
             if (self.sim_object.body is not None and
                 hasattr(obj, 'model_pose')):
-                obj.model_pose = phys.b2xform(self.sim_object.body.transform)
+                obj.model_pose = core.b2xform(self.sim_object.body.transform)
             obj.render()
 
     def destroy(self):
@@ -58,13 +58,13 @@ class SimRenderable:
 
         if cls.factory_lookup is None:
             cls.factory_lookup = {
-                phys.Pylon: PylonRenderable,
-                phys.Ball: BallRenderable,
-                phys.Wall: WallRenderable,
-                phys.Box: BoxRenderable,
-                phys.Room: RoomRenderable,
-                phys.TapeStrips: TapeStripsRenderable,
-                phys.Robot: RobotRenderable
+                core.Pylon: PylonRenderable,
+                core.Ball: BallRenderable,
+                core.Wall: WallRenderable,
+                core.Box: BoxRenderable,
+                core.Room: RoomRenderable,
+                core.TapeStrips: TapeStripsRenderable,
+                core.Robot: RobotRenderable
             }
 
         subclass = cls.factory_lookup[type(sim_object)]
@@ -82,9 +82,9 @@ class PylonRenderable(SimRenderable):
 
         if self.static_gfx_object is None:
             self.static_gfx_object = gfx.IndexedPrimitives.cylinder(
-                phys.PYLON_RADIUS, phys.PYLON_HEIGHT, 32, 1,
+                core.PYLON_RADIUS, core.PYLON_HEIGHT, 32, 1,
                 self.sim_object.color,
-                pre_transform=gfx.tz(0.5*phys.PYLON_HEIGHT))
+                pre_transform=gfx.tz(0.5*core.PYLON_HEIGHT))
             
         self.gfx_objects = [self.static_gfx_object]
         
@@ -109,9 +109,9 @@ class BallRenderable(SimRenderable):
         if self.static_gfx_object is None:
         
             self.static_gfx_object = gfx.IndexedPrimitives.sphere(
-                phys.BALL_RADIUS, 32, 24, 
-                phys.BALL_COLOR,
-                pre_transform=gfx.tz(phys.BALL_RADIUS),
+                core.BALL_RADIUS, 32, 24, 
+                core.BALL_COLOR,
+                pre_transform=gfx.tz(core.BALL_RADIUS),
                 specular_exponent=60.0,
                 specular_strength=0.125)
         
@@ -131,18 +131,18 @@ class WallRenderable(SimRenderable):
         super().__init__(sim_object)
 
         gfx_object = gfx.IndexedPrimitives.box(
-            sim_object.dims, phys.CARDBOARD_COLOR,
-            pre_transform=gfx.tz(phys.WALL_Z + 0.5*self.sim_object.dims[2]))
+            sim_object.dims, core.CARDBOARD_COLOR,
+            pre_transform=gfx.tz(core.WALL_Z + 0.5*self.sim_object.dims[2]))
 
         self.gfx_objects = [gfx_object]
 
         for x in [-self.sim_object.bx, self.sim_object.bx]:
 
             block = gfx.IndexedPrimitives.box(
-                gfx.vec3(phys.BLOCK_SZ, phys.BLOCK_SZ, phys.BLOCK_SZ),
-                phys.BLOCK_COLOR,
+                gfx.vec3(core.BLOCK_SZ, core.BLOCK_SZ, core.BLOCK_SZ),
+                core.BLOCK_COLOR,
                 pre_transform=gfx.translation_matrix(
-                    gfx.vec3(x, 0, 0.5*phys.BLOCK_SZ)))
+                    gfx.vec3(x, 0, 0.5*core.BLOCK_SZ)))
 
             self.gfx_objects.append(block)
 
@@ -156,7 +156,7 @@ class BoxRenderable(SimRenderable):
         super().__init__(sim_object)
         
         gfx_object = gfx.IndexedPrimitives.box(
-            sim_object.dims, phys.CARDBOARD_COLOR,
+            sim_object.dims, core.CARDBOARD_COLOR,
             pre_transform=gfx.tz(0.5*sim_object.dims[2]))
 
         self.gfx_objects = [gfx_object]
@@ -195,7 +195,7 @@ class RoomRenderable(SimRenderable):
             specular_exponent = 40.0,
             specular_strength = 0.5)
 
-        z = phys.ROOM_HEIGHT
+        z = core.ROOM_HEIGHT
 
         verts = numpy.array([
             [ 0, 0, 0 ],
@@ -220,7 +220,7 @@ class RoomRenderable(SimRenderable):
         ], dtype=numpy.uint8)
 
         room_obj = gfx.IndexedPrimitives.faceted_triangles(
-            verts, indices, phys.ROOM_COLOR)
+            verts, indices, core.ROOM_COLOR)
 
         room_obj.specular_strength = 0.25
 
@@ -234,7 +234,7 @@ class TapeStripsRenderable(SimRenderable):
 
         super().__init__(sim_object)
 
-        r = phys.TAPE_RADIUS
+        r = core.TAPE_RADIUS
         offset = gfx.vec3(0, 0, r)
 
         self.gfx_objects = []
@@ -249,17 +249,17 @@ class TapeStripsRenderable(SimRenderable):
             segment_lengths = numpy.linalg.norm(deltas, axis=1)
             tangents = deltas / segment_lengths.reshape(-1, 1)
 
-            segment_lengths[0] += phys.TAPE_RADIUS
-            points[0] -= phys.TAPE_RADIUS * tangents[0]
+            segment_lengths[0] += core.TAPE_RADIUS
+            points[0] -= core.TAPE_RADIUS * tangents[0]
             deltas[0] = points[1] - points[0]
 
-            segment_lengths[-1] += phys.TAPE_RADIUS
-            points[-1] += phys.TAPE_RADIUS * tangents[-1]
+            segment_lengths[-1] += core.TAPE_RADIUS
+            points[-1] += core.TAPE_RADIUS * tangents[-1]
             deltas[-1] = points[-1] - points[-2]
 
             total_length = segment_lengths.sum()
 
-            num_dashes = int(numpy.ceil(total_length / phys.TAPE_DASH_SIZE))
+            num_dashes = int(numpy.ceil(total_length / core.TAPE_DASH_SIZE))
             if num_dashes % 2 == 0:
                 num_dashes -= 1
 
@@ -307,7 +307,7 @@ class TapeStripsRenderable(SimRenderable):
 
         vdata = numpy.zeros((2*npoints_total, 8), dtype=numpy.float32)
         
-        vdata[:, 2] = phys.TAPE_POLYGON_OFFSET
+        vdata[:, 2] = core.TAPE_POLYGON_OFFSET
         vdata[:, 5]= 1
 
         vdata_offset = 0
@@ -386,7 +386,7 @@ class TapeStripsRenderable(SimRenderable):
 
         gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLES,
                                            indices=indices,
-                                           color=phys.TAPE_COLOR)
+                                           color=core.TAPE_COLOR)
 
         gfx_object.specular_exponent = 100.0
         gfx_object.specular_strength = 0.05
@@ -403,29 +403,29 @@ class RobotRenderable(SimRenderable):
 
         self.gfx_objects.append(
             gfx.IndexedPrimitives.cylinder(
-                phys.ROBOT_BASE_RADIUS, phys.ROBOT_BASE_HEIGHT, 64, 1,
-                phys.ROBOT_BASE_COLOR,
-                pre_transform=gfx.tz(0.5*phys.ROBOT_BASE_HEIGHT + phys.ROBOT_BASE_Z),
+                core.ROBOT_BASE_RADIUS, core.ROBOT_BASE_HEIGHT, 64, 1,
+                core.ROBOT_BASE_COLOR,
+                pre_transform=gfx.tz(0.5*core.ROBOT_BASE_HEIGHT + core.ROBOT_BASE_Z),
                 specular_exponent=40.0,
                 specular_strength=0.75
             )
         )
 
-        tx = -0.5*phys.ROBOT_CAMERA_DIMS[0]
+        tx = -0.5*core.ROBOT_CAMERA_DIMS[0]
         
         self.gfx_objects.append(
             gfx.IndexedPrimitives.box(
-                phys.ROBOT_CAMERA_DIMS,
-                phys.ROBOT_BASE_COLOR,
+                core.ROBOT_CAMERA_DIMS,
+                core.ROBOT_BASE_COLOR,
                 pre_transform=gfx.translation_matrix(
-                    gfx.vec3(tx, 0, 0.5*phys.ROBOT_CAMERA_DIMS[2] + phys.ROBOT_CAMERA_Z)),
+                    gfx.vec3(tx, 0, 0.5*core.ROBOT_CAMERA_DIMS[2] + core.ROBOT_CAMERA_Z)),
                 specular_exponent=40.0,
                 specular_strength=0.75
             )
         )
 
-        btop = phys.ROBOT_BASE_Z + phys.ROBOT_BASE_HEIGHT
-        cbottom = phys.ROBOT_CAMERA_Z
+        btop = core.ROBOT_BASE_Z + core.ROBOT_BASE_HEIGHT
+        cbottom = core.ROBOT_CAMERA_Z
 
         pheight = cbottom - btop
 
@@ -653,8 +653,8 @@ class RoboSimApp(gfx.GlfwApp):
             m = numpy.linalg.norm([w, h])
 
             self.view = gfx.look_at(
-                eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*phys.ROOM_HEIGHT),
-                center=gfx.vec3(0.5*w, 0.5*h, 0.75*phys.ROOM_HEIGHT),
+                eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*core.ROOM_HEIGHT),
+                center=gfx.vec3(0.5*w, 0.5*h, 0.75*core.ROOM_HEIGHT),
                 up=gfx.vec3(0, 0, 1),
                 Rextra=R_mouse)
 
@@ -684,7 +684,7 @@ class RoboSimApp(gfx.GlfwApp):
 def _test_load_environment():
 
 
-    sim = phys.RoboSim()
+    sim = core.RoboSim()
     sim.load_svg('environments/first_environment.svg')
 
     app = RoboSimApp(sim)
