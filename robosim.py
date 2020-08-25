@@ -486,7 +486,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         assert self.sim.dt == 0.01
 
-        self.sim_update_callback(0.0)
+        self.sim_camera.update()
 
         self.sim.add_callback(self.sim_update_callback, 4)
 
