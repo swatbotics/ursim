@@ -381,6 +381,8 @@ def linear_angular_from_wheel_lr(wheel_lr_vel):
 
     return linear, angular
 
+######################################################################
+
 def wheel_lr_from_linear_angular(linear_angular):
 
     linear, angular = linear_angular
@@ -395,7 +397,6 @@ def wheel_lr_from_linear_angular(linear_angular):
 def clamp_abs(quantity, limit):
     return numpy.clip(quantity, -limit, limit)
     
-
 ######################################################################
 
 class Robot(SimObject):
@@ -479,9 +480,12 @@ class Robot(SimObject):
         body.ApplyLinearImpulse(lateral_impulse * current_tangent,
                                 body.position, True)
 
-        desired_wheel_velocity = wheel_lr_from_linear_angular(
-            self.desired_linear_angular_velocity
-        )
+        if self.motors_enabled:
+            desired_wheel_velocity = wheel_lr_from_linear_angular(
+                self.desired_linear_angular_velocity
+            )
+        else:
+            desired_wheel_velocity = numpy.array([0, 0], dtype=numpy.float32)
 
         self.desired_wheel_velocity_filtered += clamp_abs(
             desired_wheel_velocity - self.desired_wheel_velocity_filtered,
