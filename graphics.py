@@ -173,7 +173,7 @@ def make_shader(stype, srcs):
 
 ######################################################################
 
-def make_program(vertex_shader, fragment_shader):
+def make_program(vertex_shader, fragment_shader, bindings):
 
     if isinstance(vertex_shader, list) or isinstance(vertex_shader, str):
         vertex_shader = make_shader(gl.VERTEX_SHADER, vertex_shader)
@@ -184,6 +184,10 @@ def make_program(vertex_shader, fragment_shader):
     program = gl.CreateProgram()
     gl.AttachShader(program, vertex_shader)
     gl.AttachShader(program, fragment_shader)
+
+    for idx, name in enumerate(bindings):
+        gl.BindFragDataLocation(program, idx, name)
+    
     gl.LinkProgram(program)
 
     check_opengl_errors('linking program')
@@ -349,6 +353,9 @@ class Framebuffer:
                                 self.depth_texture, 0)
 
         gl.BindTexture(gl.TEXTURE_2D, 0)
+
+        self.aux_textures = []
+        
         check_opengl_errors('after framebuffer setup')
 
         self.deactivate()
@@ -364,6 +371,34 @@ class Framebuffer:
 
     def deactivate(self):
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+
+    def add_aux_texture(self,
+                        internal_format,
+                        gl_format,
+                        gl_type,
+                        attachment):
+
+        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+
+        aux_texture = gl.GenTextures(1)
+
+        gl.BindTexture(gl.TEXTURE_2D, aux_texture)
+
+        gl.TexImage2D(gl.TEXTURE_2D, 0, internal_format,
+                      self.width, self.height, 0,
+                      gl_format, gl_type, None)
+
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                attachment,
+                                gl.TEXTURE_2D,
+                                aux_texture, 0)
+
+        self.aux_textures.append(aux_texture)
 
 ######################################################################
 
@@ -424,12 +459,14 @@ class IndexedPrimitives:
         uniform vec3 viewPos;
         uniform vec3 lightDir;
 
+        uniform int materialID;
 
         in vec3 fragPos;
         in vec3 fragNormal;
         in vec2 fragTexCoord;
         
         out vec4 fragColor;
+        out int fragMaterialID;
 
         void main() {
 
@@ -452,15 +489,21 @@ class IndexedPrimitives:
 
             fragColor = vec4(color, 1.0);
 
+            fragMaterialID = materialID;
+
         }
         '''
 
-        cls.program, cls.uniforms = make_program(vertex_src, fragment_src)
+        bindings = ['fragColor', 'fragMaterialID']
+
+        cls.program, cls.uniforms = make_program(vertex_src, fragment_src,
+                                                 bindings)
 
         gl.UseProgram(cls.program)
         set_uniform(cls.uniforms['materialTexture'], 0)
         set_uniform(cls.uniforms['lightDir'], normalize(vec3(0.5, 0.25, 2)))
 
+        
         check_opengl_errors('IndexedPrimitives program')
 
     @classmethod
@@ -740,7 +783,8 @@ class IndexedPrimitives:
     def __init__(self, positions_normals_texcoords, mode, indices, color,
                  texture=None, model_pose=None, pre_transform=None,
                  specular_exponent=None,
-                 specular_strength=None):
+                 specular_strength=None,
+                 material_id=0):
         
         # uniform for color
 
@@ -826,6 +870,8 @@ class IndexedPrimitives:
             
         self.specular_exponent = specular_exponent
         self.specular_strength = specular_strength
+
+        self.material_id = material_id
         
     def render(self):
 
@@ -835,6 +881,7 @@ class IndexedPrimitives:
         set_uniform(self.uniforms['specularExponent'], self.specular_exponent)
         set_uniform(self.uniforms['specularStrength'], self.specular_strength)
         set_uniform(self.uniforms['model'], self.model_pose)
+        set_uniform(self.uniforms['materialID'], self.material_id)
 
         if self.texture is None:
             set_uniform(self.uniforms['useTexture'], 0)

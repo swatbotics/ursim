@@ -94,6 +94,7 @@ class PylonRenderable(SimRenderable):
 
     def render(self):
         self.static_gfx_object.color = self.sim_object.color
+        self.static_gfx_object.material_id = self.sim_object.material_id
         super().render()
 
     def destroy(self):
@@ -116,7 +117,8 @@ class BallRenderable(SimRenderable):
                 core.BALL_COLOR,
                 pre_transform=gfx.tz(core.BALL_RADIUS),
                 specular_exponent=60.0,
-                specular_strength=0.125)
+                specular_strength=0.125,
+                material_id=int(1 << 3))
         
         self.gfx_objects = [ self.static_gfx_object ]
 
@@ -389,10 +391,10 @@ class TapeStripsRenderable(SimRenderable):
 
         gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLES,
                                            indices=indices,
-                                           color=core.TAPE_COLOR)
-
-        gfx_object.specular_exponent = 100.0
-        gfx_object.specular_strength = 0.05
+                                           color=core.TAPE_COLOR,
+                                           specular_exponent = 100.0,
+                                           specular_strength = 0.05,
+                                           material_id=int(1 << 0))
 
         self.gfx_objects.append(gfx_object)
 
@@ -690,8 +692,9 @@ class RoboSimApp(gfx.GlfwApp):
         h = min(self.framebuffer_size[1], self.sim_camera.framebuffer.height)
 
         gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim_camera.framebuffer.fbo)
+
         gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
-        
+
         gl.BlitFramebuffer(0, 0, w, h,
                            0, self.framebuffer_size[1]-h//2,
                            w//2, self.framebuffer_size[1],

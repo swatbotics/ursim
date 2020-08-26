@@ -5,6 +5,8 @@ import svgelements as se
 import os
 import robosim_logging as rlog
 
+
+
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
 CARDBOARD_COLOR = gfx.vec3(0.8, 0.7, 0.6)
@@ -182,7 +184,7 @@ class Pylon(SimObject):
 
     static_gfx_object = None
 
-    def __init__(self, world, position, color):
+    def __init__(self, world, position, color, material_id):
 
         super().__init__()
         
@@ -207,6 +209,7 @@ class Pylon(SimObject):
 
         self.color = color
 
+        self.material_id = material_id
 
 ######################################################################
 
@@ -819,7 +822,8 @@ class RoboSim(B2D.b2ContactListener):
                 if cidx == 0:
                     self.objects.append(Ball(self.world, position))
                 else:
-                    self.objects.append(Pylon(self.world, position, color))
+                    self.objects.append(Pylon(self.world, position,
+                                              color, int(1 << cidx)))
                                         
             elif isinstance(item, se.SimpleLine):
 
