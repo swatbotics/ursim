@@ -24,6 +24,7 @@ from CleanGL import gl
 # DONE: object detection
 # DONE: clean up code to split into separate files with cleaner dependencies
 # DONE: logging
+# TODO: deal with slower-than-realtime
 # TODO: implement 2D rigid xform class
 # TODO: log relative pose
 # TODO: odometry (EKF?)
