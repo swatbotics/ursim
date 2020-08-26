@@ -24,11 +24,25 @@ from CleanGL import gl
 # DONE: object detection
 # DONE: clean up code to split into separate files with cleaner dependencies
 # DONE: logging
-# TODO: deal with slower-than-realtime
+# DONE: deal with slower-than-realtime
 # TODO: implement 2D rigid xform class
 # TODO: log relative pose
 # TODO: odometry (EKF?)
 # TODO: controller API
+# TODO: more sophisticated frame rate control?
+
+LOG_PROFILING_DELTA = 0
+LOG_PROFILING_PHYSICS = 1
+LOG_PROFILING_CAMERA = 2
+LOG_PROFILING_RENDERCALL = 3
+LOG_PROFILING_COUNT = 4
+
+LOG_PROFILING_NAMES = [
+    'profiling.overall',
+    'profiling.physics',
+    'profiling.camera',
+    'profiling.rendercalls'
+]
 
 ######################################################################
 
@@ -500,20 +514,18 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.sim_camera.update()
 
-        self.log_update_time = numpy.zeros(1, dtype=numpy.float32)
-        self.sim.logger.add_variables(['sim.update_time'], self.log_update_time)
+        self.log_time = numpy.zeros(LOG_PROFILING_COUNT, dtype=numpy.float32)
+        self.sim.logger.add_variables(LOG_PROFILING_NAMES, self.log_time)
 
     def update_sim(self):
 
-        now = glfw.get_time()
-        
+        start = glfw.get_time()
         self.sim_camera.update()
+        self.log_time[LOG_PROFILING_CAMERA] = (glfw.get_time() - start)/self.frame_budget
 
-        print('  camera took {} of frame budget'.format(
-            (glfw.get_time() - now)/self.frame_budget))
-        
-        # TODO: poll controller here
+        start = glfw.get_time()
         self.sim.update()
+        self.log_time[LOG_PROFILING_PHYSICS] = (glfw.get_time() - start)/self.frame_budget
 
     def set_animating(self, a):
 
@@ -616,8 +628,7 @@ class RoboSimApp(gfx.GlfwApp):
             now = glfw.get_time()
             if self.was_animating:
                 delta_t = now - self.prev_update
-                print('less than one is good:', delta_t/self.frame_budget)
-                self.log_update_time[0] = delta_t
+                self.log_time[LOG_PROFILING_DELTA] = delta_t/self.frame_budget
             self.prev_update = now
             self.was_animating = True
             self.update_sim()
@@ -647,7 +658,7 @@ class RoboSimApp(gfx.GlfwApp):
         
     def render(self):
 
-        now = glfw.get_time()
+        start = glfw.get_time()
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -703,10 +714,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
-        print('  render calls took {} of frame budget'.format(
-            (glfw.get_time() - now)/self.frame_budget))
-              
-
+        self.log_time[LOG_PROFILING_RENDERCALL] = (glfw.get_time() - start)/self.frame_budget
 
 ######################################################################
             

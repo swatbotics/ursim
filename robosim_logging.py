@@ -15,7 +15,6 @@ MAX_PLOT_COLS = 1
 
 MAX_PLOTS_PER_FIGURE = MAX_PLOT_ROWS*MAX_PLOT_COLS
 
-        
 class Logger:
 
     NUMERIC_TYPES = set('bufic')
@@ -140,7 +139,8 @@ PLOT_MERGES = [
     re.compile(r'.*\.(cmd_)?vel\..*'),
     re.compile(r'robot\.bump(\.)'),
     re.compile(r'blobfinder\.(.*\.)num_detections'),
-    re.compile(r'blobfinder\.(.*\.)max_area')
+    re.compile(r'blobfinder\.(.*\.)max_area'),
+    re.compile(r'profiling(\..*)')
 ]
 
 COLORS = dict(blue=[0, 0, 0.8],
@@ -313,5 +313,4 @@ if __name__ == '__main__':
     else:
         _, ldata = read_log(sys.argv[1])
         plot_log(ldata)
-        
         
