@@ -157,7 +157,9 @@ class SimCamera:
 
         camera_ycbcr = self.detector.convert_to_ycrcb(self.camera_rgb)
         
-        self.detector.label_image(camera_ycbcr, self.camera_labels)
+        self.detector.label_image(camera_ycbcr,
+                                  self.camera_labels,
+                                  self.scratch)
         
         self.detections = self.detector.detect_blobs(
             self.camera_labels,

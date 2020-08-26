@@ -121,7 +121,7 @@ def get_mask(bbox, image):
     
     return (greater & less)
 
-def label_image(all_bboxes, image, labels=None):
+def label_image(all_bboxes, image, labels=None, scratch=None):
 
     nlabels = len(all_bboxes)
     assert all_bboxes.shape == (nlabels, 2, 3)
@@ -131,12 +131,15 @@ def label_image(all_bboxes, image, labels=None):
 
     assert nlabels <= 8
 
-    init_mask = (1 << nlabels) - 1
+    init_mask = numpy.uint8((1 << nlabels) - 1)
 
     if labels is None:
         labels = numpy.empty((h, w), dtype=numpy.uint8)
     else:
         assert labels.shape == (h, w) and labels.dtype == numpy.uint8
+
+    if (scratch is None or scratch.dtype != numpy.uint8 or scratch.shape != (h, w)):
+        scratch = numpy.empty((h, w), dtype=numpy.uint8)
         
     labels[:] = init_mask
 
@@ -144,11 +147,16 @@ def label_image(all_bboxes, image, labels=None):
         label_mask = ~numpy.uint8(1 << label_index)
         for channel in range(3):
             ichan = image[:, :, channel]
+
             lo = all_bboxes[label_index, 0, channel]
             hi = all_bboxes[label_index, 1, channel]
-            labels[ichan < lo] &= label_mask
-            labels[ichan > hi] &= label_mask
+            
+            cv2.threshold(ichan, lo-1, label_mask, cv2.THRESH_BINARY_INV, scratch)
+            cv2.bitwise_and(labels, scratch, labels, mask=scratch)
 
+            cv2.threshold(ichan, hi, label_mask, cv2.THRESH_BINARY, scratch)
+            cv2.bitwise_and(labels, scratch, labels, mask=scratch)
+            
     return labels
 
 ######################################################################
@@ -258,8 +266,8 @@ class ColorBlobDetector:
     def convert_from_ycrcb(self, image):
         return cv2.cvtColor(image, self.from_ycrcb)
     
-    def label_image(self, image, dst=None):
-        return label_image(self.all_bboxes, image, dst)
+    def label_image(self, image, dst=None, scratch=None):
+        return label_image(self.all_bboxes, image, dst, scratch)
 
     def colorize_labels(self, labels):
         assert len(labels.shape) == 2 and labels.dtype == numpy.uint8
