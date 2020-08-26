@@ -13,8 +13,7 @@ import Box2D as B2D
 import svgelements as se
 import os
 import robosim_logging as rlog
-
-
+from transform2d import Transform2D
 
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
@@ -176,110 +175,6 @@ def b2ple(array):
 def b2xform(transform, z=0.0):
     return gfx.rigid_2d_matrix(transform.position, transform.angle, z)
 
-######################################################################
-class Transform2D:
-
-    def __init__(self, *args):
-
-        # args can be:
-        # 3 scalars (x, y, theta)
-        # a translation and rotation ((x, y), theta)
-        # another Transform2D (makes a copy)
-        # a Box2D transform object (makes a copy)
-
-        self.position = numpy.empty(2, dtype=numpy.float32)
-        self._angle = numpy.float32()
-
-        if len(args) == 3:
-            self.position[:] = args[:2]
-            self._angle = args[2]
-        elif len(args) == 2:
-            self.position[:] = args[0]
-            self._angle = args[1]
-        elif len(args) == 1:
-            self.position[:] = args[0].position
-            self._angle = args[0].angle
-        elif len(args) == 0:
-            self.position[:] = 0
-            self._angle = numpy.float32(0)
-        else:
-            raise RuntimeError('invalid arguments to Transform2D.__init__')
-        
-        self._matrix = numpy.zeros((3, 3), dtype=numpy.float32)
-
-    def rotation_matrix(self):
-        return self.matrix[:2,:2]
-
-    @property
-    def matrix(self):
-        if self._matrix[2,2] != 1:
-            x, y = self.position
-            c = numpy.cos(self._angle)
-            s = numpy.sin(self._angle)
-            self._matrix[:] = [[c, -s, x], [s, c, y], [0, 0, 1]]
-        return self._matrix
-
-    @property
-    def angle(self):
-        return self._angle
-
-    @angle.setter
-    def angle(self, value):
-        self._angle = value
-        self._matrix[2,2] = 0
-
-    def transform_fwd(self, other):
-
-        R2 = self.rotation_matrix()
-        t2 = self.position
-        
-        if isinstance(other, self.__class__):
-            
-            t1 = other.position
-            
-            return self.__class__(numpy.dot(R2, t1) + t2,
-                                  self.angle + other.angle)
-
-        else:
-            
-            return numpy.dot(R2, other) + t2
-
-
-    def transform_inv(self, other):
-
-        R2inv = self.rotation_matrix().T
-        t2 = self.position
-
-        if isinstance(other, self.__class__):
-
-            t1 = other.position
-
-            return self.__class__(numpy.dot(R2inv, t1 - t2),
-                                  other.angle - self.angle)
-
-        else:
-
-            return numpy.dot(R2inv, other - t2)
-
-    def inverse(self):
-
-        R2inv = self.rotation_matrix().T
-        pinv = numpy.dot(R2inv, -self.position)
-
-        return self.__class__(pinv, -self.angle)
-
-    def __mul__(self, other):
-
-        return self.transform_fwd(other)
-
-    def __str__(self):
-        return repr(self)
-
-    def __repr__(self):
-        return 'Transform2D(({}, {}), {})'.format(
-            repr(self.position[0]), repr(self.position[1]),
-            repr(self._angle))
-    
 
 ######################################################################
 
@@ -1103,6 +998,7 @@ class RoboSim(B2D.b2ContactListener):
         if other is not None:
             self.robot.colliders.add(other.userData)
 
+######################################################################
 
 def _test_load_environment():
 
@@ -1117,126 +1013,11 @@ def _test_load_environment():
         if sim_object.body is not None:
             print('    transform:',
                   sim_object.body.position, sim_object.body.angle)
-        
-def _test_transform_2d():
 
-    for attempt in range(100):
-
-        x0, y0 = numpy.random.random(2)*2 - 1
-        angle0 = (numpy.random.random()*2-1) * numpy.pi
-
-        T0 = Transform2D(x0, y0, angle0)
-
-        T0_alternatives = [
-            Transform2D((x0, y0), angle0),
-            Transform2D(T0.position, T0.angle),
-            Transform2D(T0),
-            Transform2D(B2D.b2Transform(B2D.b2Vec2(x0, y0), B2D.b2Rot(angle0)))
-        ]
-
-        print('T0 =', T0)
-
-        for T0_alt in T0_alternatives:
-            assert numpy.all(T0_alt.position == T0.position)
-            assert numpy.isclose(T0_alt.angle, T0.angle)
-
-        T0inv = T0.inverse()
-
-        print('T0inv =', T0inv)
-
-        T0T0inv = T0 * T0inv
-
-        print('T0T0inv =', T0T0inv)
-        assert numpy.abs(T0T0inv.position).max() < 1e-6
-        assert T0T0inv.angle == 0.0
-
-        T0invT0 = T0 * T0inv
-
-        print('T0invT0 =', T0invT0)
-        assert numpy.abs(T0invT0.position).max() < 1e-6
-        assert T0invT0.angle == 0.0
-
-        x1, y1 = numpy.random.random(2)*2 - 1
-        angle1 = (numpy.random.random()*2-1) * numpy.pi
-
-        T1 = Transform2D((x1, y1), angle1)
-        
-        x, y = numpy.random.random(2)*2 - 1
-        p = numpy.array([x, y])
-        print('p =', p)
-
-
-        T0invT0p = T0.transform_inv(T0.transform_fwd(p))
-
-        print('T0invT0p =', T0invT0p)
-
-        assert numpy.all(numpy.isclose(T0invT0p, p))
-
-        T0T0invp = T0.transform_fwd(T0.transform_inv(p))
-
-        print('T0T0invp =', T0T0invp)
-
-        assert numpy.all(numpy.isclose(T0T0invp, p, 1e-4))
-        
-
-        T1T0 = T1 * T0
-        T1T0T0inv = T1T0 * T0.inverse()
-        T1T0T0invT1inv = T1T0T0inv * T1.inverse()
-
-        print('T1 =', T1)
-        print('T1T0 =', T1T0)
-        print('T1T0T0inv =', T1T0T0inv)
-        print('T1T0T0invT1inv =', T1T0T0invT1inv)
-
-        assert numpy.all(numpy.isclose(T1T0T0inv.position, T1.position, 1e-4))
-        assert numpy.isclose(T1T0T0inv.angle, T1.angle)
-
-        assert numpy.abs(T1T0T0invT1inv.position).max() < 1e-5
-        assert numpy.abs(T1T0T0invT1inv.angle) < 1e-5
-        
-
-        print()
-
-    T = Transform2D((2, 1), numpy.pi/2)
-
-    pA = [0, 0]
-    TpA = T * pA
-    TpA_expected = [2, 1]
-
-    pB = [1, 0]
-    TpB = T * pB
-    TpB_expected = [2, 2]
-
-    pC = [0, 1]
-    TpC = T * pC
-    TpC_expected = [1, 1]
-
-    print('T =', T)
-    print('pA =', pA)
-    print('TpA = ', TpA)
-    assert numpy.all(numpy.isclose(TpA, TpA_expected))
-    assert numpy.all(numpy.isclose(T.transform_inv(TpA), pA))
- 
-    print('pB =', pB)
-    print('TpB = ', TpB)
-    assert numpy.all(numpy.isclose(TpB, TpB_expected))
-    assert numpy.all(numpy.isclose(T.transform_inv(TpB), pB))
-
-    print('pC =', pC)
-    print('TpC = ', TpC)
-    assert numpy.all(numpy.isclose(TpC, TpC_expected))
-    assert numpy.all(numpy.isclose(T.transform_inv(TpC), pC))
-
-    Tnull = Transform2D()
-
-    assert numpy.all(Tnull.position == 0)
-    assert Tnull.angle == 0
-
-    print('...transforms seem to work OK!')
+######################################################################
 
 if __name__ == '__main__':
 
-    _test_transform_2d()
-    #_test_load_environment()
+    _test_load_environment()
     
             

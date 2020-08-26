@@ -28,7 +28,9 @@ from CleanGL import gl
 # DONE: implement 2D rigid xform class
 # DONE: odometry (Euler integrator + Gaussian noise)
 # DONE: log odometry pose relative to initial position
-# TODO: controller API
+# TODO: put transform2d in its own python file with documentation
+# TODO: controller API in its own python file with documentation
+# TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
 LOG_PROFILING_DELTA = 0
