@@ -221,10 +221,6 @@ def plot_log(ldata):
     if len(poses):
         total_figures += 1
 
-    for key, value in plt.rcParams.items():
-        if key.startswith('keymap.'):
-            print(key, value)
-
     fig_idx = 1
     fig, subplots = make_figure(fig_idx, total_figures, True)
 
