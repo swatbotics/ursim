@@ -169,7 +169,7 @@ def make_figure(fig_idx, total_figures, subplots):
     else:
         return fig
         
-def plot_log(ldata):
+def plot_log(ldata, trace_names=[]):
 
     assert 'time' in ldata.keys()
 
@@ -183,6 +183,9 @@ def plot_log(ldata):
     for name, trace in ldata.items():
 
         if name == 'time':
+            continue
+
+        if len(trace_names) and not any([frag in name for frag in trace_names]):
             continue
 
         if name.endswith('.pos.x'):
@@ -248,6 +251,10 @@ def plot_log(ldata):
 
         ax.legend(loc='upper right', fontsize='xx-small')
 
+    while cur_idx < MAX_PLOTS_PER_FIGURE:
+        subplots[cur_idx].set_visible(False)
+        cur_idx += 1
+
     if len(poses):
 
         fig_idx += 1
@@ -308,5 +315,5 @@ if __name__ == '__main__':
         _test_logging()
     else:
         _, ldata = read_log(sys.argv[1])
-        plot_log(ldata)
+        plot_log(ldata, sys.argv[2:])
         
