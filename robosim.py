@@ -490,28 +490,20 @@ class RoboSimApp(gfx.GlfwApp):
                                          self.sim.logger)
 
         assert self.sim.dt == 0.01
+        assert self.sim.physics_ticks_per_update == 4
 
         self.last_update_time = None
 
         self.sim_camera.update()
 
-        self.sim.add_callback(self.sim_update_callback, 4)
-        self.sim.ticks_per_log = 4
-
         self.log_update_time = numpy.zeros(1, dtype=numpy.float32)
-
         self.sim.logger.add_variables(['sim.update_time'], self.log_update_time)
 
-    def sim_update_callback(self, time):
+    def update_sim(self):
 
         self.sim_camera.update()
-
-        now = glfw.get_time()
-
-        if self.last_update_time is not None:
-            self.log_update_time[0] = now - self.last_update_time
-            
-        self.last_update_time = now
+        # TODO: poll controller here
+        self.sim.update()
 
     def set_animating(self, a):
 
@@ -546,8 +538,7 @@ class RoboSimApp(gfx.GlfwApp):
             if self.animating:
                 self.set_animating(False)
 
-            self.sim.remaining_sim_time = 0
-            self.sim.update(self.sim.dt)
+            self.update_sim()
             self.need_render = True
 
         elif key == glfw.KEY_R:
@@ -563,7 +554,7 @@ class RoboSimApp(gfx.GlfwApp):
             for o in self.sim.objects:
                 self.renderables.append(SimRenderable.create_for_object(o))
 
-            self.sim_update_callback(0.0)
+            self.sim_camera.update()
 
             self.need_render = True
 
@@ -614,11 +605,13 @@ class RoboSimApp(gfx.GlfwApp):
         if self.animating:
             now = glfw.get_time()
             if self.was_animating:
-                since_last_update = now - self.prev_update
-                self.sim.update(since_last_update)                
-                #print('seconds per update:', seconds_per_update)
-            self.was_animating = True
+                delta_t = now - self.prev_update
+                expected_update = self.sim.dt * self.sim.physics_ticks_per_update
+                print('less than one is good:', delta_t/expected_update)
+                self.log_update_time[0] = delta_t
             self.prev_update = now
+            self.was_animating = True
+            self.update_sim()
 
         la = numpy.zeros(2)
 
@@ -684,7 +677,6 @@ class RoboSimApp(gfx.GlfwApp):
 
         for r in self.renderables:
             r.render()
-
 
         w = min(self.framebuffer_size[0], self.sim_camera.framebuffer.width)
         h = min(self.framebuffer_size[1], self.sim_camera.framebuffer.height)
