@@ -48,10 +48,12 @@ CAMERA_PERSPECTIVE = gfx.perspective_matrix(
 
 class SimCamera:
 
-    def __init__(self, robot, renderables, logger=None):
+    def __init__(self, robot, renderables, logger=None, render_labels=True):
 
         self.robot = robot
         self.renderables = renderables
+
+        self.render_labels = render_labels
 
         u = numpy.arange(CAMERA_WIDTH, dtype=numpy.float32)
         v = numpy.arange(CAMERA_HEIGHT, dtype=numpy.float32)
@@ -73,14 +75,11 @@ class SimCamera:
         self.camera_points = numpy.zeros(
             (CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=numpy.float32)
 
-        self.camera_matid = numpy.zeros(
-            (CAMERA_HEIGHT, CAMERA_WIDTH), dtype=numpy.uint8)
-
         self.scratch = numpy.empty_like(self.camera_labels)
 
         self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT)
 
-        self.framebuffer.add_aux_texture(gl.R32UI, gl.RED_INTEGER, gl.UNSIGNED_INT,
+        self.framebuffer.add_aux_texture(gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
                                          gl.COLOR_ATTACHMENT1)
 
         gl.DrawBuffers(2, [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1])
@@ -149,11 +148,13 @@ class SimCamera:
 
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[0])
 
-        matid_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RED_INTEGER, gl.UNSIGNED_INT)
-        matid_array = numpy.frombuffer(matid_buffer, dtype=numpy.uint32)
-        matid_image_flipped = matid_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
-        
-        self.camera_matid[:] = matid_image_flipped[::-1]
+        if self.render_labels:
+
+            labels_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE)
+            labels_array = numpy.frombuffer(labels_buffer, dtype=numpy.uint8)
+            labels_image_flipped = labels_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
+
+            self.camera_labels[:] = labels_image_flipped[::-1]
 
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
         
@@ -178,11 +179,13 @@ class SimCamera:
 
     def process_frame(self):
 
-        camera_ycrcb = self.detector.convert_to_ycrcb(self.camera_rgb)
-        
-        self.detector.label_image(camera_ycrcb,
-                                  self.camera_labels,
-                                  self.scratch)
+        if not self.render_labels:
+            
+            camera_ycrcb = self.detector.convert_to_ycrcb(self.camera_rgb)
+
+            self.detector.label_image(camera_ycrcb,
+                                      self.camera_labels,
+                                      self.scratch)
         
         self.detections = self.detector.detect_blobs(
             self.camera_labels,
@@ -245,8 +248,7 @@ class SimCamera:
         Image.fromarray(paletted_output).save(filenames['labels'])
         Image.fromarray(self.camera_rgb).save(filenames['rgb'])
 
-        print('unique material IDs:', numpy.unique(self.camera_matid))
-        Image.fromarray(self.camera_matid).save(filenames['matid'])
+        print('unique labels:', numpy.unique(self.camera_labels))
 
         display = self.camera_rgb[:, :, ::-1].copy()
         palette = self.detector.palette[:, ::-1]
