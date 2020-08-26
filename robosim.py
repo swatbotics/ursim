@@ -492,6 +492,8 @@ class RoboSimApp(gfx.GlfwApp):
         assert self.sim.dt == 0.01
         assert self.sim.physics_ticks_per_update == 4
 
+        self.frame_budget = self.sim.dt * self.sim.physics_ticks_per_update
+
         self.last_update_time = None
 
         self.sim_camera.update()
@@ -501,7 +503,13 @@ class RoboSimApp(gfx.GlfwApp):
 
     def update_sim(self):
 
+        now = glfw.get_time()
+        
         self.sim_camera.update()
+
+        print('  camera took {} of frame budget'.format(
+            (glfw.get_time() - now)/self.frame_budget))
+        
         # TODO: poll controller here
         self.sim.update()
 
@@ -606,8 +614,7 @@ class RoboSimApp(gfx.GlfwApp):
             now = glfw.get_time()
             if self.was_animating:
                 delta_t = now - self.prev_update
-                expected_update = self.sim.dt * self.sim.physics_ticks_per_update
-                print('less than one is good:', delta_t/expected_update)
+                print('less than one is good:', delta_t/self.frame_budget)
                 self.log_update_time[0] = delta_t
             self.prev_update = now
             self.was_animating = True
@@ -637,6 +644,8 @@ class RoboSimApp(gfx.GlfwApp):
         self.sim.robot.motors_enabled = numpy.any(la)
         
     def render(self):
+
+        now = glfw.get_time()
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -690,6 +699,10 @@ class RoboSimApp(gfx.GlfwApp):
                            gl.COLOR_BUFFER_BIT, gl.NEAREST)
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+
+        print('  render calls took {} of frame budget'.format(
+            (glfw.get_time() - now)/self.frame_budget))
+              
 
 
 ######################################################################
