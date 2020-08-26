@@ -231,8 +231,7 @@ class SimCamera:
         files = [
             ('rgb', 'png'),
             ('labels', 'png'),
-            ('detections', 'png'),
-            ('matid', 'png')
+            ('detections', 'png')
         ]
 
         while True:
