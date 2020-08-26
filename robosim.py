@@ -708,8 +708,8 @@ class RoboSimApp(gfx.GlfwApp):
         gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
 
         gl.BlitFramebuffer(0, 0, w, h,
-                           0, self.framebuffer_size[1]-h//2,
-                           w//2, self.framebuffer_size[1],
+                           0, self.framebuffer_size[1]-h//4,
+                           w//4, self.framebuffer_size[1],
                            gl.COLOR_BUFFER_BIT, gl.NEAREST)
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
