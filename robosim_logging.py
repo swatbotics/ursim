@@ -117,6 +117,16 @@ class Logger:
                                names=log_names,
                                data=written_portion)
 
+        if sys.platform != 'win32':
+            
+            if os.path.islink('log_latest.npz'):
+                os.unlink('log_latest.npz')
+
+            if not os.path.exists('log_latest.npz'):
+                os.symlink(self.current_filename,
+                           'log_latest.npz')
+
+
         print('wrote log', self.current_filename)
         
         self.current_filename = None
@@ -144,7 +154,12 @@ def read_log(filename, raw=False):
     
 PLOT_MERGES = [
     re.compile(r'.*\.(cmd_)?vel(\.[xy])'),
-    re.compile(r'.*\.(cmd_)?wheel_vel(\.[lr])'), 
+    re.compile(r'.*\.(cmd_)?wheel_vel(\.[lr])'),
+    re.compile(r'(robot|odom)\.pos.x'),
+    re.compile(r'(robot|odom)\.pos.y'),
+    re.compile(r'(robot|odom)\.pos.angle'),
+    re.compile(r'(robot|odom)\.(cmd_)?vel.forward'),
+    re.compile(r'(robot|odom)\.(cmd_)?vel.angle'),
     re.compile(r'.*\.(cmd_)?vel\..*'),
     re.compile(r'robot\.bump(\.)'),
     re.compile(r'blobfinder\.(.*\.)num_detections'),

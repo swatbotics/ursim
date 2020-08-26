@@ -26,7 +26,8 @@ from CleanGL import gl
 # DONE: logging
 # DONE: deal with slower-than-realtime
 # DONE: implement 2D rigid xform class
-# TODO: odometry (EKF?) with pose logged in absolute coords
+# DONE: odometry (Euler integrator + Gaussian noise)
+# DONE: log odometry pose relative to initial position
 # TODO: controller API
 # TODO: more sophisticated frame rate control?
 

@@ -91,6 +91,9 @@ BUMP_ANGLE_RANGES = numpy.array([
 
 BUMP_DIST = 0.005
 
+ODOM_LINEAR_VEL_STDDEV = 0.1
+ODOM_ANGULAR_VEL_STDDEV = 0.5
+
 LOG_ROBOT_POS_X =           0
 LOG_ROBOT_POS_Y =           1
 LOG_ROBOT_POS_ANGLE =       2
@@ -108,8 +111,13 @@ LOG_ROBOT_MOTORS_ENABLED  = 13
 LOG_ROBOT_BUMP_LEFT       = 14
 LOG_ROBOT_BUMP_CENTER     = 15
 LOG_ROBOT_BUMP_RIGHT      = 16
+LOG_ODOM_POS_X            = 17
+LOG_ODOM_POS_Y            = 18
+LOG_ODOM_POS_ANGLE        = 19
+LOG_ODOM_VEL_FORWARD      = 20
+LOG_ODOM_VEL_ANGLE        = 21
 
-LOG_NUM_VARS        = 17
+LOG_NUM_VARS        = 22
 
 
 LOG_NAMES = [
@@ -130,6 +138,11 @@ LOG_NAMES = [
     'robot.bump.left',
     'robot.bump.center',
     'robot.bump.right',
+    'odom.pos.x',
+    'odom.pos.y',
+    'odom.pos.angle',
+    'odom.vel.forward',
+    'odom.vel.angle'
 ]
 
 assert len(LOG_NAMES) == LOG_NUM_VARS
@@ -164,7 +177,6 @@ def b2xform(transform, z=0.0):
     return gfx.rigid_2d_matrix(transform.position, transform.angle, z)
 
 ######################################################################
-
 class Transform2D:
 
     def __init__(self, *args):
@@ -187,6 +199,11 @@ class Transform2D:
         elif len(args) == 1:
             self.position[:] = args[0].position
             self._angle = args[0].angle
+        elif len(args) == 0:
+            self.position[:] = 0
+            self._angle = numpy.float32(0)
+        else:
+            raise RuntimeError('invalid arguments to Transform2D.__init__')
         
         self._matrix = numpy.zeros((3, 3), dtype=numpy.float32)
 
@@ -208,7 +225,7 @@ class Transform2D:
 
     @angle.setter
     def angle(self, value):
-        self._angle = angle
+        self._angle = value
         self._matrix[2,2] = 0
 
     def transform_fwd(self, other):
@@ -579,6 +596,11 @@ class Robot(SimObject):
 
         self.wheel_velocity_fitler_accel = 2.0 # m/s^2
 
+        self.odom_linear_angular_velocity = numpy.zeros(2, dtype=numpy.float32)
+
+        self.odom_pose = Transform2D()
+        self.initial_pose = Transform2D()
+
         self.desired_linear_angular_velocity = numpy.zeros(2, dtype=numpy.float32)
         self.desired_wheel_velocity = numpy.zeros(2, dtype=numpy.float32)
         self.desired_wheel_velocity_filtered = numpy.zeros(2, dtype=numpy.float32)
@@ -608,6 +630,9 @@ class Robot(SimObject):
 
         if angle is None:
             angle = 0.0
+
+        self.odom_pose = Transform2D()
+        self.initial_pose = Transform2D(position, angle)
 
         self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
@@ -649,6 +674,14 @@ class Robot(SimObject):
         l[LOG_ROBOT_MOTORS_ENABLED] = self.motors_enabled
         l[LOG_ROBOT_BUMP_LEFT:LOG_ROBOT_BUMP_LEFT+3] = self.bump
 
+        rel_odom = self.initial_pose * self.odom_pose
+        
+        l[LOG_ODOM_POS_X] = rel_odom.position[0]
+        l[LOG_ODOM_POS_Y] = rel_odom.position[1]
+        l[LOG_ODOM_POS_ANGLE] = rel_odom.angle
+        l[LOG_ODOM_VEL_FORWARD] = self.odom_linear_angular_velocity[0]
+        l[LOG_ODOM_VEL_ANGLE] = self.odom_linear_angular_velocity[1]
+
     def sim_update(self, world, time, dt):
 
         body = self.body
@@ -673,6 +706,22 @@ class Robot(SimObject):
         self.desired_wheel_velocity_filtered += clamp_abs(
             self.desired_wheel_velocity - self.desired_wheel_velocity_filtered,
             self.wheel_velocity_fitler_accel * dt)
+
+        self.odom_linear_angular_velocity[:] = (
+            [ self.forward_velocity, body.angularVelocity ]
+        )
+
+        if numpy.abs(self.odom_linear_angular_velocity).max() > 1e-3:
+            self.odom_linear_angular_velocity += numpy.random.normal(
+                loc=0.0, scale=[ ODOM_LINEAR_VEL_STDDEV,
+                                 ODOM_ANGULAR_VEL_STDDEV])
+
+        odom_fwd = dt * self.odom_linear_angular_velocity[0]
+        odom_spin = dt * self.odom_linear_angular_velocity[1]
+
+        self.odom_pose.position += odom_fwd * self.odom_pose.matrix[:2, 0]
+
+        self.odom_pose.angle += odom_spin
         
         for idx, side in enumerate([1.0, -1.0]):
 
@@ -1177,6 +1226,11 @@ def _test_transform_2d():
     print('TpC = ', TpC)
     assert numpy.all(numpy.isclose(TpC, TpC_expected))
     assert numpy.all(numpy.isclose(T.transform_inv(TpC), pC))
+
+    Tnull = Transform2D()
+
+    assert numpy.all(Tnull.position == 0)
+    assert Tnull.angle == 0
 
     print('...transforms seem to work OK!')
 
