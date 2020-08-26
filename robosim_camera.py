@@ -178,9 +178,9 @@ class SimCamera:
 
     def process_frame(self):
 
-        camera_ycbcr = self.detector.convert_to_ycrcb(self.camera_rgb)
+        camera_ycrcb = self.detector.convert_to_ycrcb(self.camera_rgb)
         
-        self.detector.label_image(camera_ycbcr,
+        self.detector.label_image(camera_ycrcb,
                                   self.camera_labels,
                                   self.scratch)
         

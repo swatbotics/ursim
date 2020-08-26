@@ -703,8 +703,7 @@ class RoboSim(B2D.b2ContactListener):
         self.objects = [ self.robot ]
 
         self.dt = 0.01 # 100 HZ
-
-        self.ticks_per_log = 4 # 25 Hz
+        self.physics_ticks_per_update = 4
 
         self.logger = rlog.Logger(self.dt)
         self.robot.setup_log(self.logger)
@@ -722,8 +721,6 @@ class RoboSim(B2D.b2ContactListener):
 
         self.detections = None
 
-        self.update_callbacks = []
-        
         print('created the world!')
 
     def reload(self):
@@ -899,19 +896,10 @@ class RoboSim(B2D.b2ContactListener):
 
         self.svg_filename = os.path.abspath(svgfile)
 
-    def add_callback(self, callback, ticks_per_callback):
-        self.update_callbacks.append( (callback, ticks_per_callback) )
+    def update(self):
 
-    def update(self, time_since_last_update):
+        for i in range(self.physics_ticks_per_update):
 
-        self.remaining_sim_time += time_since_last_update
-
-        while self.remaining_sim_time >= self.dt:
-
-            for callback, ticks_per_callback in self.update_callbacks:
-                if self.sim_ticks % ticks_per_callback == 0:
-                    callback(self.sim_time)
-            
             for obj in self.objects:
                 obj.sim_update(self.world, self.sim_time, self.dt)
 
@@ -921,13 +909,12 @@ class RoboSim(B2D.b2ContactListener):
 
             self.world.ClearForces()
 
-            if self.sim_ticks % self.ticks_per_log == 0:
-                self.robot.update_log()
-                self.logger.append_log_row()
-                
             self.sim_time += self.dt
-            self.remaining_sim_time -= self.dt
             self.sim_ticks += 1
+
+        self.robot.update_log()
+        self.logger.append_log_row()
+
 
     def kick_ball(self):
 
