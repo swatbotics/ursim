@@ -269,6 +269,8 @@ def plot_log(ldata, trace_names=[]):
             for color, cvalue in COLORS.items():
                 if color in name:
                     kwargs['color'] = cvalue
+            if 'angle' in name:
+                trace = trace * 180 / numpy.pi
             ax.plot(time, trace, label=name, **kwargs)
 
         last_in_row = ((cur_idx % MAX_PLOT_ROWS) == 0 or

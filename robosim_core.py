@@ -96,7 +96,7 @@ WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 WHEEL_MAX_FORWARD_FORCE = 10.0 # N
 WHEEL_VEL_KP = 0.3 # dimensionless
 WHEEL_VEL_KI = 0.3 # 1/s - higher means more overshoot
-WHEEL_VEL_INTEGRATOR_MAX = 2.5 # m - affects both overshoot and size of steady-state error
+WHEEL_VEL_INTEGRATOR_MAX = 0.1 # m - affects both overshoot and size of steady-state error
 
 ODOM_WHEEL_VEL_STDDEV = 0.02
 
