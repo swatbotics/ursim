@@ -94,17 +94,30 @@ GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 WHEEL_MAX_FORWARD_FORCE = 10.0 # N
-WHEEL_VEL_KP = 0.95 # dimensionless
-WHEEL_VEL_KI = 4.0 # 1/s - higher means more overshoot
-WHEEL_VEL_INTEGRATOR_MAX = 0.005 # m - affects both overshoot and size of steady-state error
+WHEEL_VEL_KP = 0.3 # dimensionless
+WHEEL_VEL_KI = 0.3 # 1/s - higher means more overshoot
+WHEEL_VEL_INTEGRATOR_MAX = 2.5 # m - affects both overshoot and size of steady-state error
 
-ODOM_WHEEL_VEL_STDDEV = 0.01
+ODOM_WHEEL_VEL_STDDEV = 0.02
 
-ODOM_FILTER_A = numpy.array([-0.41421356],
-                            dtype=numpy.float64)
+# Wn = 0.005
 
-ODOM_FILTER_B = numpy.array([0.29289322, 0.29289322],
-                            dtype=numpy.float64)
+SETPOINT_FILTER_B = numpy.array([0.00779294, 0.00779294],
+                                dtype=numpy.float64)
+
+SETPOINT_FILTER_A = numpy.array([-0.98441413],
+                                dtype=numpy.float64)
+
+# Wn = 0.05
+
+SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966],
+                                dtype=numpy.float64)
+
+SETPOINT_FILTER_A = numpy.array([-0.85408069],
+                                dtype=numpy.float64)
+
+
+
 
 LOG_ROBOT_POS_X =           0
 LOG_ROBOT_POS_Y =           1
@@ -495,6 +508,23 @@ def clamp_abs(quantity, limit):
     
 ######################################################################
 
+def iir_filter(meas, inputs, outputs, B, A):
+    
+    assert len(inputs) == len(B)
+    assert len(outputs) == len(A)
+
+    inputs[1:] = inputs[:-1]
+    inputs[0] = meas
+
+    output = numpy.dot(B, inputs) - numpy.dot(A, outputs)
+
+    outputs[1:] = outputs[:-1]
+    outputs[0] = output
+
+    return output
+
+######################################################################
+
 class Robot(SimObject):
 
     def __init__(self, world):
@@ -525,7 +555,14 @@ class Robot(SimObject):
         self.odom_pose = Transform2D()
         self.initial_pose = Transform2D()
 
-        self.desired_linear_angular_vel = numpy.zeros(2, dtype=numpy.float32)
+        self.desired_linear_angular_vel = numpy.zeros(2, dtype=numpy.float64)
+        
+        self.desired_linear_angular_vel_raw = numpy.zeros((2, len(SETPOINT_FILTER_B)),
+                                                          dtype=numpy.float64)
+        
+        self.desired_linear_angular_vel_filtered = numpy.zeros((2, len(SETPOINT_FILTER_A)),
+                                                               dtype=numpy.float64)
+        
         self.desired_wheel_vel = numpy.zeros(2, dtype=numpy.float32)
         self.wheel_vel_integrator = numpy.zeros(2, dtype=numpy.float32)
 
@@ -559,6 +596,10 @@ class Robot(SimObject):
 
         self.odom_pose = Transform2D()
         self.initial_pose = Transform2D(position, angle)
+
+        self.desired_linear_angular_vel[:] = 0
+        self.desired_linear_angular_vel_raw[:] = 0
+        self.desired_linear_angular_vel_filtered[:] = 0
 
         self.odom_wheel_vel_raw[:] = 0
         self.odom_wheel_vel_filtered[:] = 0
@@ -635,14 +676,19 @@ class Robot(SimObject):
         body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
 
+        for idx in range(2):
+            iir_filter(self.desired_linear_angular_vel[idx],
+                       self.desired_linear_angular_vel_raw[idx],
+                       self.desired_linear_angular_vel_filtered[idx],
+                       SETPOINT_FILTER_B,
+                       SETPOINT_FILTER_A)
+                                                              
         self.desired_wheel_vel = wheel_lr_from_linear_angular(
-            self.desired_linear_angular_vel
+            self.desired_linear_angular_vel_filtered[:, 0]
         )
         
         wheel_noise = numpy.random.normal(size=2, scale=ODOM_WHEEL_VEL_STDDEV)
 
-        # shift past wheel velocities down one
-        self.odom_wheel_vel_raw[:, 1:] = self.odom_wheel_vel_raw[:, :-1]
 
 
         for idx, side in enumerate([1.0, -1.0]):
@@ -658,17 +704,19 @@ class Robot(SimObject):
             self.wheel_vel[idx] = wheel_fwd_vel
             
             meas_vel = wheel_fwd_vel + wheel_noise[idx]
-                                
-            self.odom_wheel_vel_raw[idx, 0] = meas_vel
-
-
-            filtered_vel = ( numpy.dot(ODOM_FILTER_B, self.odom_wheel_vel_raw[idx]) -
-                             numpy.dot(ODOM_FILTER_A, self.odom_wheel_vel_filtered[idx]) )
 
             if idx == 0:
                 print('got meas', meas_vel)
                 print('x:', self.odom_wheel_vel_raw[idx])
                 print('y:', self.odom_wheel_vel_filtered[idx])
+            
+            filtered_vel = iir_filter(meas_vel,
+                                      self.odom_wheel_vel_raw[idx],
+                                      self.odom_wheel_vel_filtered[idx],
+                                      ODOM_FILTER_B,
+                                      ODOM_FILTER_A)
+
+            if idx == 0:
                 print('output:', filtered_vel)
                 print()
             
@@ -687,7 +735,6 @@ class Robot(SimObject):
                 print('wheel_vel_error[{}] = {}'.format(
                     idx, wheel_vel_error))
                 
-
                 self.wheel_vel_integrator[idx] = clamp_abs(
                     self.wheel_vel_integrator[idx] + wheel_vel_error * dt,
                     WHEEL_VEL_INTEGRATOR_MAX)
