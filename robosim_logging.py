@@ -154,12 +154,13 @@ def read_log(filename, raw=False):
     
 PLOT_MERGES = [
     re.compile(r'.*\.(cmd_)?vel(\.[xy])'),
-    re.compile(r'.*\.(cmd_)?wheel_vel(\.[lr])'),
+    re.compile(r'(.*\.)(cmd_)?wheel_vel(\.raw|\.filtered)?\.l'),
+    re.compile(r'(.*\.)(cmd_)?wheel_vel(\.raw|\.filtered)?\.r'),
     re.compile(r'(robot|odom)\.pos.x'),
     re.compile(r'(robot|odom)\.pos.y'),
     re.compile(r'(robot|odom)\.pos.angle'),
-    re.compile(r'(robot|odom)\.(cmd_)?vel.forward'),
-    re.compile(r'(robot|odom)\.(cmd_)?vel.angle'),
+    re.compile(r'(robot|odom)\.(cmd_)?vel(\.raw|\.filtered)?\.forward'),
+    re.compile(r'(robot|odom)\.(cmd_)?vel(\.raw|\.filtered)?\.angle'),
     re.compile(r'.*\.(cmd_)?vel\..*'),
     re.compile(r'robot\.bump(\.)'),
     re.compile(r'blobfinder\.(.*\.)num_detections'),

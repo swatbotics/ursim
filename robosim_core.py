@@ -90,8 +90,21 @@ BUMP_ANGLE_RANGES = numpy.array([
 
 BUMP_DIST = 0.005
 
-ODOM_LINEAR_VEL_STDDEV = 0.1
-ODOM_ANGULAR_VEL_STDDEV = 0.5
+GRAVITY = 9.8
+
+WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
+WHEEL_MAX_FORWARD_FORCE = 10.0 # N
+WHEEL_VEL_KP = 0.95 # dimensionless
+WHEEL_VEL_KI = 4.0 # 1/s - higher means more overshoot
+WHEEL_VEL_INTEGRATOR_MAX = 0.005 # m - affects both overshoot and size of steady-state error
+
+ODOM_WHEEL_VEL_STDDEV = 0.01
+
+ODOM_FILTER_A = numpy.array([-0.41421356],
+                            dtype=numpy.float64)
+
+ODOM_FILTER_B = numpy.array([0.29289322, 0.29289322],
+                            dtype=numpy.float64)
 
 LOG_ROBOT_POS_X =           0
 LOG_ROBOT_POS_Y =           1
@@ -110,13 +123,19 @@ LOG_ROBOT_MOTORS_ENABLED  = 13
 LOG_ROBOT_BUMP_LEFT       = 14
 LOG_ROBOT_BUMP_CENTER     = 15
 LOG_ROBOT_BUMP_RIGHT      = 16
-LOG_ODOM_POS_X            = 17
-LOG_ODOM_POS_Y            = 18
-LOG_ODOM_POS_ANGLE        = 19
-LOG_ODOM_VEL_FORWARD      = 20
-LOG_ODOM_VEL_ANGLE        = 21
+LOG_ODOM_VEL_RAW_LWHEEL   = 17
+LOG_ODOM_VEL_RAW_RWHEEL   = 18
+LOG_ODOM_VEL_RAW_FORWARD  = 19
+LOG_ODOM_VEL_RAW_ANGLE    = 20
+LOG_ODOM_VEL_FILT_LWHEEL  = 21
+LOG_ODOM_VEL_FILT_RWHEEL  = 22
+LOG_ODOM_VEL_FILT_FORWARD = 23
+LOG_ODOM_VEL_FILT_ANGLE   = 24
+LOG_ODOM_POS_X            = 25
+LOG_ODOM_POS_Y            = 26
+LOG_ODOM_POS_ANGLE        = 27
 
-LOG_NUM_VARS        = 22
+LOG_NUM_VARS        = 28
 
 
 LOG_NAMES = [
@@ -137,12 +156,20 @@ LOG_NAMES = [
     'robot.bump.left',
     'robot.bump.center',
     'robot.bump.right',
+    'odom.wheel_vel.raw.l',
+    'odom.wheel_vel.raw.r',
+    'odom.vel.raw.forward',
+    'odom.vel.raw.angle',
+    'odom.wheel_vel.filtered.l',
+    'odom.wheel_vel.filtered.r',
+    'odom.vel.filtered.forward',
+    'odom.vel.filtered.angle',
     'odom.pos.x',
     'odom.pos.y',
-    'odom.pos.angle',
-    'odom.vel.forward',
-    'odom.vel.angle'
+    'odom.pos.angle'
 ]
+
+
 
 assert len(LOG_NAMES) == LOG_NUM_VARS
 
@@ -192,12 +219,12 @@ class SimObject:
 
         if self.body_linear_mu is not None:
             self.body.ApplyForceToCenter(
-                -self.body_linear_mu * self.body.linearVelocity,
+                -self.body_linear_mu * self.body.linearVelocity * self.body.mass * GRAVITY,
                 True)
 
         if self.body_angular_mu is not None:
             self.body.ApplyTorque(
-                -self.body_angular_mu * self.body.angularVelocity,
+                -self.body_angular_mu * self.body.angularVelocity * self.body.mass * GRAVITY,
                 True)
 
 ######################################################################                
@@ -227,7 +254,7 @@ class Pylon(SimObject):
         self.body.massData = B2D.b2MassData(mass=PYLON_MASS,
                                             I=PYLON_I)
 
-        self.body_linear_mu = 0.9 * PYLON_MASS * 10.0
+        self.body_linear_mu = 0.9
 
         self.color = color
 
@@ -256,7 +283,7 @@ class Ball(SimObject):
             userData = self
         )
 
-        self.body_linear_mu = 0.01 * BALL_MASS * 10.0
+        self.body_linear_mu = 0.01
         
         
 ######################################################################
@@ -310,8 +337,8 @@ class Wall(SimObject):
         mass = mx + 2*BLOCK_MASS 
         I = Ix + 2*(Ib + BLOCK_MASS*bx**2)
 
-        self.body_linear_mu = 0.9 * mass * 10.0
-        self.body_angular_mu = I * 10.0
+        self.body_linear_mu = 0.9 
+        self.body_angular_mu = I
         
         self.body.massData = B2D.b2MassData(
             mass = mass,
@@ -359,8 +386,8 @@ class Box(SimObject):
         mass = 2*(mx + my + mz)
         I = 2 * (Ix + Iy + mx * dims[0]**2/4 + my * dims[1]**2/4 + Iz)
 
-        self.body_linear_mu = 0.9 * mass * 10.0
-        self.body_angular_mu = I * 10.0
+        self.body_linear_mu = 0.9
+        self.body_angular_mu = I
         
         self.body.massData = B2D.b2MassData(
             mass = mass,
@@ -476,7 +503,6 @@ class Robot(SimObject):
 
         self.world = world
         self.body = None
-        self.initialize()
 
         # left and then right
         self.wheel_vel_cmd = numpy.array([0, 0], dtype=float)
@@ -486,25 +512,28 @@ class Robot(SimObject):
             [-ROBOT_WHEEL_OFFSET, 0]
         ], dtype=float)
         
-        self.max_lateral_impulse = 0.05 # m/(s*kg)
-        self.max_forward_impulse = 0.05 # m/(s*kg)
 
-        self.wheel_velocity_fitler_accel = 2.0 # m/s^2
-
-        self.odom_linear_angular_velocity = numpy.zeros(2, dtype=numpy.float32)
-
+        self.odom_linear_angular_vel_raw = numpy.zeros(2, dtype=numpy.float32)
+        self.odom_linear_angular_vel_filtered = numpy.zeros(2, dtype=numpy.float32)
+        
+        self.odom_wheel_vel_raw = numpy.zeros((2, len(ODOM_FILTER_B)),
+                                              dtype=numpy.float64)
+        
+        self.odom_wheel_vel_filtered = numpy.zeros((2, len(ODOM_FILTER_A)),
+                                                   dtype=numpy.float64)
+        
         self.odom_pose = Transform2D()
         self.initial_pose = Transform2D()
 
-        self.desired_linear_angular_velocity = numpy.zeros(2, dtype=numpy.float32)
-        self.desired_wheel_velocity = numpy.zeros(2, dtype=numpy.float32)
-        self.desired_wheel_velocity_filtered = numpy.zeros(2, dtype=numpy.float32)
+        self.desired_linear_angular_vel = numpy.zeros(2, dtype=numpy.float32)
+        self.desired_wheel_vel = numpy.zeros(2, dtype=numpy.float32)
+        self.wheel_vel_integrator = numpy.zeros(2, dtype=numpy.float32)
 
-        self.wheel_velocity = numpy.zeros(2, dtype=numpy.float32)
+        self.wheel_vel = numpy.zeros(2, dtype=numpy.float32)
 
-        self.forward_velocity = 0.0
+        self.forward_vel = 0.0
 
-        self.rolling_mu = 4.0
+        self.rolling_mu = 0.15
         
         self.motors_enabled = True
 
@@ -514,6 +543,8 @@ class Robot(SimObject):
 
         self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
 
+        self.initialize()
+        
     def initialize(self, position=None, angle=None):
 
         if self.body is not None:
@@ -528,6 +559,10 @@ class Robot(SimObject):
 
         self.odom_pose = Transform2D()
         self.initial_pose = Transform2D(position, angle)
+
+        self.odom_wheel_vel_raw[:] = 0
+        self.odom_wheel_vel_filtered[:] = 0
+        self.wheel_vel_integrator[:] = 0
 
         self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
@@ -559,13 +594,13 @@ class Robot(SimObject):
         l[LOG_ROBOT_VEL_X] = self.body.linearVelocity.x
         l[LOG_ROBOT_VEL_Y] = self.body.linearVelocity.y
         l[LOG_ROBOT_VEL_ANGLE] = self.body.angularVelocity
-        l[LOG_ROBOT_CMD_VEL_FORWARD] = self.desired_linear_angular_velocity[0]
-        l[LOG_ROBOT_CMD_VEL_ANGULAR] = self.desired_linear_angular_velocity[1]
-        l[LOG_ROBOT_CMD_VEL_LWHEEL] = self.desired_wheel_velocity[0]
-        l[LOG_ROBOT_CMD_VEL_RWHEEL] = self.desired_wheel_velocity[1]
-        l[LOG_ROBOT_VEL_FORWARD] = self.forward_velocity
-        l[LOG_ROBOT_VEL_LWHEEL] = self.wheel_velocity[0]
-        l[LOG_ROBOT_VEL_RWHEEL] = self.wheel_velocity[1]
+        l[LOG_ROBOT_CMD_VEL_FORWARD] = self.desired_linear_angular_vel[0]
+        l[LOG_ROBOT_CMD_VEL_ANGULAR] = self.desired_linear_angular_vel[1]
+        l[LOG_ROBOT_CMD_VEL_LWHEEL] = self.desired_wheel_vel[0]
+        l[LOG_ROBOT_CMD_VEL_RWHEEL] = self.desired_wheel_vel[1]
+        l[LOG_ROBOT_VEL_FORWARD] = self.forward_vel
+        l[LOG_ROBOT_VEL_LWHEEL] = self.wheel_vel[0]
+        l[LOG_ROBOT_VEL_RWHEEL] = self.wheel_vel[1]
         l[LOG_ROBOT_MOTORS_ENABLED] = self.motors_enabled
         l[LOG_ROBOT_BUMP_LEFT:LOG_ROBOT_BUMP_LEFT+3] = self.bump
 
@@ -574,8 +609,14 @@ class Robot(SimObject):
         l[LOG_ODOM_POS_X] = rel_odom.position[0]
         l[LOG_ODOM_POS_Y] = rel_odom.position[1]
         l[LOG_ODOM_POS_ANGLE] = rel_odom.angle
-        l[LOG_ODOM_VEL_FORWARD] = self.odom_linear_angular_velocity[0]
-        l[LOG_ODOM_VEL_ANGLE] = self.odom_linear_angular_velocity[1]
+        l[LOG_ODOM_VEL_RAW_LWHEEL] = self.odom_wheel_vel_raw[0,0]
+        l[LOG_ODOM_VEL_RAW_RWHEEL] = self.odom_wheel_vel_raw[1,0]
+        l[LOG_ODOM_VEL_RAW_FORWARD] = self.odom_linear_angular_vel_raw[0]
+        l[LOG_ODOM_VEL_RAW_ANGLE] = self.odom_linear_angular_vel_raw[1]
+        l[LOG_ODOM_VEL_FILT_LWHEEL] = self.odom_wheel_vel_filtered[0,0]
+        l[LOG_ODOM_VEL_FILT_RWHEEL] = self.odom_wheel_vel_filtered[1,0]
+        l[LOG_ODOM_VEL_FILT_FORWARD] = self.odom_linear_angular_vel_filtered[0]
+        l[LOG_ODOM_VEL_FILT_ANGLE] = self.odom_linear_angular_vel_filtered[1]
 
     def sim_update(self, world, time, dt):
 
@@ -584,70 +625,102 @@ class Robot(SimObject):
         current_tangent = body.GetWorldVector((1, 0))
         current_normal = body.GetWorldVector((0, 1))
 
-        self.forward_velocity = body.linearVelocity.dot(current_tangent)
+        self.forward_vel = body.linearVelocity.dot(current_tangent)
 
-        lateral_velocity = body.linearVelocity.dot(current_normal)
+        lateral_vel = body.linearVelocity.dot(current_normal)
 
-        lateral_impulse = clamp_abs(-body.mass * lateral_velocity,
-                                    self.max_lateral_impulse)
+        lateral_impulse = clamp_abs(-body.mass * lateral_vel,
+                                    WHEEL_MAX_LATERAL_IMPULSE)
 
         body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
 
-        self.desired_wheel_velocity = wheel_lr_from_linear_angular(
-            self.desired_linear_angular_velocity
+        self.desired_wheel_vel = wheel_lr_from_linear_angular(
+            self.desired_linear_angular_vel
         )
         
-        self.desired_wheel_velocity_filtered += clamp_abs(
-            self.desired_wheel_velocity - self.desired_wheel_velocity_filtered,
-            self.wheel_velocity_fitler_accel * dt)
+        wheel_noise = numpy.random.normal(size=2, scale=ODOM_WHEEL_VEL_STDDEV)
 
-        self.odom_linear_angular_velocity[:] = (
-            [ self.forward_velocity, body.angularVelocity ]
-        )
+        # shift past wheel velocities down one
+        self.odom_wheel_vel_raw[:, 1:] = self.odom_wheel_vel_raw[:, :-1]
 
-        if numpy.abs(self.odom_linear_angular_velocity).max() > 1e-3:
-            self.odom_linear_angular_velocity += numpy.random.normal(
-                loc=0.0, scale=[ ODOM_LINEAR_VEL_STDDEV,
-                                 ODOM_ANGULAR_VEL_STDDEV])
 
-        odom_fwd = dt * self.odom_linear_angular_velocity[0]
-        odom_spin = dt * self.odom_linear_angular_velocity[1]
-
-        self.odom_pose.position += odom_fwd * self.odom_pose.matrix[:2, 0]
-
-        self.odom_pose.angle += odom_spin
-        
         for idx, side in enumerate([1.0, -1.0]):
 
             offset = B2D.b2Vec2(0, side * ROBOT_WHEEL_OFFSET)
 
             world_point = body.GetWorldPoint(offset)
 
-            wheel_velocity = body.GetLinearVelocityFromWorldPoint(world_point)
+            wheel_vel = body.GetLinearVelocityFromWorldPoint(world_point)
 
-            wheel_fwd_velocity = wheel_velocity.dot(current_tangent)
+            wheel_fwd_vel = wheel_vel.dot(current_tangent)
 
-            self.wheel_velocity[idx] = wheel_fwd_velocity
+            self.wheel_vel[idx] = wheel_fwd_vel
+            
+            meas_vel = wheel_fwd_vel + wheel_noise[idx]
+                                
+            self.odom_wheel_vel_raw[idx, 0] = meas_vel
+
+
+            filtered_vel = ( numpy.dot(ODOM_FILTER_B, self.odom_wheel_vel_raw[idx]) -
+                             numpy.dot(ODOM_FILTER_A, self.odom_wheel_vel_filtered[idx]) )
+
+            if idx == 0:
+                print('got meas', meas_vel)
+                print('x:', self.odom_wheel_vel_raw[idx])
+                print('y:', self.odom_wheel_vel_filtered[idx])
+                print('output:', filtered_vel)
+                print()
+            
+
+            self.odom_wheel_vel_filtered[idx, 1:] = self.odom_wheel_vel_filtered[idx, :-1]
+            self.odom_wheel_vel_filtered[idx, 0] = filtered_vel
+            
+            applied_force = 0.0
             
             if self.motors_enabled:
 
-                wheel_velocity_error = (
-                    self.desired_wheel_velocity_filtered[idx] - wheel_fwd_velocity
+                wheel_vel_error = (
+                    self.desired_wheel_vel[idx] - filtered_vel
                 )
 
-                forward_impulse = clamp_abs(
-                    wheel_velocity_error * body.mass,
-                    self.max_forward_impulse)
-
-                body.ApplyLinearImpulse(0.5 * forward_impulse * current_tangent,
-                                        world_point, True)
+                print('wheel_vel_error[{}] = {}'.format(
+                    idx, wheel_vel_error))
                 
-            else:
 
-                body.ApplyForce(-self.rolling_mu*wheel_fwd_velocity * current_tangent,
-                                world_point, True)
+                self.wheel_vel_integrator[idx] = clamp_abs(
+                    self.wheel_vel_integrator[idx] + wheel_vel_error * dt,
+                    WHEEL_VEL_INTEGRATOR_MAX)
 
+                wheel_delta_vel_cmd = (WHEEL_VEL_KP * wheel_vel_error +
+                                       WHEEL_VEL_KI * self.wheel_vel_integrator[idx])
+                
+                applied_force = clamp_abs(
+                    wheel_delta_vel_cmd * body.mass / dt,
+                    WHEEL_MAX_FORWARD_FORCE)
+
+            friction_force = -self.rolling_mu * wheel_fwd_vel * body.mass * GRAVITY
+            
+            body.ApplyForce((0.5*applied_force + friction_force) * current_tangent,
+                            world_point, True)
+
+            #body.ApplyLinearImpulse((0.5*applied_force + friction_force)*dt * current_tangent,
+            #world_point, True)
+            
+        ##################################################
+
+        self.odom_linear_angular_vel_raw[:] = linear_angular_from_wheel_lr(self.odom_wheel_vel_raw[:,0])
+        self.odom_linear_angular_vel_filtered[:] = linear_angular_from_wheel_lr(self.odom_wheel_vel_filtered[:,0])
+
+        odom_fwd = dt * self.odom_linear_angular_vel_raw[0]
+        odom_spin = dt * self.odom_linear_angular_vel_raw[1]
+
+        self.odom_pose.position += odom_fwd * self.odom_pose.matrix[:2, 0]
+
+        self.odom_pose.angle += odom_spin
+
+        ##################################################
+        
         self.bump[:] = 0
 
         transformA = self.body.transform

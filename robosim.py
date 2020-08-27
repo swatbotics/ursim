@@ -28,7 +28,7 @@ from CleanGL import gl
 # DONE: implement 2D rigid xform class
 # DONE: odometry (Euler integrator + Gaussian noise)
 # DONE: log odometry pose relative to initial position
-# TODO: put transform2d in its own python file with documentation
+# DONE: put transform2d in its own python file with documentation
 # TODO: controller API in its own python file with documentation
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
@@ -655,7 +655,7 @@ class RoboSimApp(gfx.GlfwApp):
         if self.key_is_down(glfw.KEY_O): 
             la += (0.5, -1.0)
 
-        self.sim.robot.desired_linear_angular_velocity[:] = la
+        self.sim.robot.desired_linear_angular_vel[:] = la
         self.sim.robot.motors_enabled = numpy.any(la)
         
     def render(self):
