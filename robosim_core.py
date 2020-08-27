@@ -94,7 +94,7 @@ GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 WHEEL_MAX_FORWARD_FORCE = 10.0 # N
-WHEEL_VEL_KP = 0.3 # dimensionless
+WHEEL_VEL_KP = 0.5 # dimensionless
 WHEEL_VEL_KI = 0.3 # 1/s - higher means more overshoot
 WHEEL_VEL_INTEGRATOR_MAX = 0.1 # m - affects both overshoot and size of steady-state error
 
@@ -706,24 +706,11 @@ class Robot(SimObject):
             
             meas_vel = wheel_fwd_vel + wheel_noise[idx]
 
-            if idx == 0:
-                print('got meas', meas_vel)
-                print('x:', self.odom_wheel_vel_raw[idx])
-                print('y:', self.odom_wheel_vel_filtered[idx])
-            
             filtered_vel = iir_filter(meas_vel,
                                       self.odom_wheel_vel_raw[idx],
                                       self.odom_wheel_vel_filtered[idx],
                                       ODOM_FILTER_B,
                                       ODOM_FILTER_A)
-
-            if idx == 0:
-                print('output:', filtered_vel)
-                print()
-            
-
-            self.odom_wheel_vel_filtered[idx, 1:] = self.odom_wheel_vel_filtered[idx, :-1]
-            self.odom_wheel_vel_filtered[idx, 0] = filtered_vel
             
             applied_force = 0.0
             
@@ -733,9 +720,6 @@ class Robot(SimObject):
                     self.desired_wheel_vel[idx] - filtered_vel
                 )
 
-                print('wheel_vel_error[{}] = {}'.format(
-                    idx, wheel_vel_error))
-                
                 self.wheel_vel_integrator[idx] = clamp_abs(
                     self.wheel_vel_integrator[idx] + wheel_vel_error * dt,
                     WHEEL_VEL_INTEGRATOR_MAX)
