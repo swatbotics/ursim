@@ -100,6 +100,14 @@ WHEEL_VEL_INTEGRATOR_MAX = 2.5 # m - affects both overshoot and size of steady-s
 
 ODOM_WHEEL_VEL_STDDEV = 0.02
 
+# Wn = 0.05
+
+ODOM_FILTER_B = numpy.array([0.07295966, 0.07295966],
+                            dtype=numpy.float64)
+
+ODOM_FILTER_A = numpy.array([-0.8540806],
+                            dtype=numpy.float64)
+
 # Wn = 0.005
 
 SETPOINT_FILTER_B = numpy.array([0.00779294, 0.00779294],
@@ -108,13 +116,6 @@ SETPOINT_FILTER_B = numpy.array([0.00779294, 0.00779294],
 SETPOINT_FILTER_A = numpy.array([-0.98441413],
                                 dtype=numpy.float64)
 
-# Wn = 0.05
-
-SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966],
-                                dtype=numpy.float64)
-
-SETPOINT_FILTER_A = numpy.array([-0.85408069],
-                                dtype=numpy.float64)
 
 
 
