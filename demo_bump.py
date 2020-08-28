@@ -13,6 +13,11 @@ import numpy
 
 ######################################################################
 
+def rand_range(lo, hi):
+    return lo + numpy.random.random()*(hi-lo)
+
+######################################################################
+
 class BumpController(ctrl.Controller):
 
     def __init__(self):
@@ -39,17 +44,22 @@ class BumpController(ctrl.Controller):
         is_done = (self.duration is not None and
                    elapsed > self.duration - 0.5*dt)
 
-        if robot_state.bump_right:
+        if robot_state.bump_center:
+            print('BUMP CENTER')
+            self.set_state(time, 'back_left_big', 1.0)
+        elif robot_state.bump_right:
             print('BUMP RIGHT')
             self.set_state(time, 'back_left', 1.0)
         elif robot_state.bump_left or robot_state.bump_center:
-            print('BUMP LEFT OR CENTER')
+            print('BUMP LEFT')
             self.set_state(time, 'back_right', 1.0)
         elif is_done:
             if self.state == 'back_left':
-                self.set_state(time, 'left', 1.0 + numpy.random.random())
+                self.set_state(time, 'left', rand_range(1.0, 2.0))
+            elif self.state == 'back_left_big':
+                self.set_state(time, 'left', rand_range(2.5, 3.5))
             elif self.state == 'back_right':
-                self.set_state(time, 'right', 1.0 + numpy.random.random())
+                self.set_state(time, 'right', rand_range(1.0, 2.0))
             else:
                 self.set_state(time, 'straight', None)
 
@@ -59,10 +69,10 @@ class BumpController(ctrl.Controller):
         if self.state == 'straight':
             f, a = 0.6, 0.0
         elif self.state == 'left':
-            f, a = 0.0, 0.85
+            f, a = 0.0, 1.05
         elif self.state == 'right':
-            f, a = 0.0, -0.85
-        else: # back_left or back_right
+            f, a = 0.0, -1.05
+        else: # back_left or back_right or back_left_big
             f, a = -0.3, 0.0
 
         return ctrl.ControllerOutput(forward_vel=f,
@@ -77,7 +87,7 @@ if __name__ == '__main__':
     app = robosim.RoboSimApp(controller)
 
     app.sim.set_dims(3.0, 3.0)
-    app.sim.initialize_robot((1.5, 2.0), 0.1)
+    app.sim.initialize_robot((1.5, 1.5), 0.5)
     app.sim.add_box((0.5, 1.0, 0.5), (2.7, 0.6), 0.0)
     app.sim.add_wall((0.5, 2.5), (0.5, 1.75))
     app.sim.add_ball((0.5, 0.5))

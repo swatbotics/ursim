@@ -530,7 +530,7 @@ class KeyboardController(ctrl.Controller):
 
 class RoboSimApp(gfx.GlfwApp):
 
-    def __init__(self, controller=None):
+    def __init__(self, controller=None, filter_setpoints=False):
 
         super().__init__()
 
@@ -579,8 +579,10 @@ class RoboSimApp(gfx.GlfwApp):
 
         if controller is None:
             controller = KeyboardController(self)
+            filter_setpoints = True
 
         self.controller = controller
+        self.sim.robot.filter_setpoints = filter_setpoints
 
     def update_sim(self):
 

@@ -92,7 +92,7 @@ BUMP_ANGLE_RANGES = numpy.array([
     [ -70, -25 ]
 ], dtype=numpy.float32) * DEG
 
-BUMP_DIST = 0.005
+BUMP_DIST = 0.001
 
 GRAVITY = 9.8
 
@@ -632,6 +632,8 @@ class Robot(SimObject):
 
         self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
 
+        self.filter_setpoints = False
+
         self.initialize()
         
     def initialize(self, position=None, angle=None):
@@ -742,11 +744,15 @@ class Robot(SimObject):
                                 body.position, True)
 
         for idx in range(2):
+            if self.filter_setpoints:
+                b, a = SETPOINT_FILTER_B, SETPOINT_FILTER_A
+            else:
+                b = [1, 0]
+                a = [0]
             iir_filter(self.desired_linear_angular_vel[idx],
                        self.desired_linear_angular_vel_raw[idx],
                        self.desired_linear_angular_vel_filtered[idx],
-                       SETPOINT_FILTER_B,
-                       SETPOINT_FILTER_A)
+                       b, a)
                                                               
         self.desired_wheel_vel = wheel_lr_from_linear_angular(
             self.desired_linear_angular_vel_filtered[:, 0]
