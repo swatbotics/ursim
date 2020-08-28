@@ -659,19 +659,12 @@ class Robot(SimObject):
         current_tangent = body.GetWorldVector((1, 0))
         current_normal = body.GetWorldVector((0, 1))
 
-        print()
-
-        print('robot body vel:', body.linearVelocity)
-
-        
         self.forward_vel = body.linearVelocity.dot(current_tangent)
 
         lateral_vel = body.linearVelocity.dot(current_normal)
 
         lateral_impulse = clamp_abs(-body.mass * lateral_vel,
                                     WHEEL_MAX_LATERAL_IMPULSE)
-
-        print('lateral_impulse', lateral_impulse)
 
         body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
@@ -686,8 +679,6 @@ class Robot(SimObject):
         self.desired_wheel_vel = wheel_lr_from_linear_angular(
             self.desired_linear_angular_vel_filtered[:, 0]
         )
-
-        print('desired_wheel_vel', self.desired_wheel_vel)
 
         for idx, side in enumerate([1.0, -1.0]):
 
@@ -737,14 +728,9 @@ class Robot(SimObject):
 
             total_force = (0.5*applied_force + friction_force)
 
-            print('total force for wheel {}'.format(total_force))
-            
             body.ApplyForce(total_force * current_tangent,
                             world_point, True)
 
-            #body.ApplyLinearImpulse((0.5*applied_force + friction_force)*dt * current_tangent,
-            #world_point, True)
-            
         ##################################################
 
         self.odom_linear_angular_vel_raw[:] = linear_angular_from_wheel_lr(
