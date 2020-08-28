@@ -1,3 +1,12 @@
+######################################################################
+#
+# demo_square.py
+# 
+# Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
+# Copyright (C) Matt Zucker 2020
+#
+######################################################################
+
 import robosim
 import robosim_controller as ctrl
 import numpy
@@ -34,7 +43,8 @@ class SimpleSquareController(ctrl.Controller):
 
             prev_from_cur = prev_robot_from_world * world_from_cur_robot
             
-            print('done, current pose in frame of initial pose =', prev_from_cur)
+            print('done, current pose in frame of initial pose =',
+                  prev_from_cur)
             
             if self.state == 'straight':
                 new_state = 'turn'
