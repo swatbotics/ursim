@@ -26,7 +26,7 @@ class Controller:
     def initialize(self, time, odom_pose):
         pass
 
-    def update(self, time, bump, detections, odom_pose):
+    def update(self, time, dt, bump, detections, odom_pose):
         return ControllerOutput(0.0, 0.0)
     
 ######################################################################

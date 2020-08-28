@@ -952,7 +952,6 @@ class RoboSim(B2D.b2ContactListener):
         self.velocity_iterations = 6
         self.position_iterations = 2
         
-        self.remaining_sim_time = 0.0
         self.sim_time = 0.0
         self.sim_ticks = 0
 
@@ -1004,13 +1003,14 @@ class RoboSim(B2D.b2ContactListener):
             self.clear()
             self.load_svg(self.svg_filename)
         else:
+            self.sim_time = 0
+            self.sim_ticks = 0
             for obj in self.objects:
                 obj.reset()
         self.modification_counter += 1
 
     def clear(self):
 
-        self.remaining_sim_time = 0.0
         self.sim_time = 0.0
         self.sim_ticks = 0
         self.modification_counter += 1
@@ -1160,10 +1160,13 @@ class RoboSim(B2D.b2ContactListener):
         assert self.robot == self.objects[0]
         assert self.room == self.objects[1]
 
-        self.robot.initialize(robot_init_position,
+        self.initialize_robot(robot_init_position,
                               robot_init_angle)
 
         self.svg_filename = os.path.abspath(svgfile)
+
+    def initialize_robot(self, pos, angle):
+        self.robot.initialize(pos, angle)
 
     def update(self):
 

@@ -469,7 +469,7 @@ class KeyboardController(ctrl.Controller):
         super().__init__()
         self.app = app
 
-    def update(self, time, bump, detections, odom_pose):
+    def update(self, time, dt, bump, detections, odom_pose):
         
         la = numpy.zeros(2)
 
@@ -570,6 +570,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.controller_initialized = True
             
         result = self.controller.update(self.sim.sim_time,
+                                        self.frame_budget,
                                         self.sim.robot.bump,
                                         self.sim_camera.detections,
                                         self.sim.robot.odom_pose)
@@ -672,6 +673,8 @@ class RoboSimApp(gfx.GlfwApp):
     def update(self):
 
         if self.last_sim_modification != self.sim.modification_counter:
+
+            print('**** CREATING GRAPHICS OBJECTS ****')
             
             for r in self.renderables:
                 r.destroy()
