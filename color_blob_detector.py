@@ -170,6 +170,9 @@ class BlobDetection:
         self.xyz = xyz.copy()
         self.is_split = is_split
 
+    def __str__(self):
+        return('area: {}'.format(self.area))
+
     def ellipse_approx(self):
 
         mean, principal_components, evals = cv2.PCACompute2(self.xyz, mean=None)

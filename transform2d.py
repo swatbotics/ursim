@@ -60,6 +60,10 @@ class Transform2D:
         
         self._matrix = numpy.zeros((3, 3), dtype=numpy.float32)
 
+    def copy(self):
+        """Returns a duplicate of this object."""
+        return self.__class__(self.position, self.angle)
+
     def rotation_matrix(self):
         """Returns the 2x2 rotation matrix associated with this
         transformation, of the form 
@@ -318,6 +322,13 @@ def _test_transform_2d():
 
     assert numpy.all(Tnull.position == 0)
     assert Tnull.angle == 0
+
+    Tcopy = Transform2D(T)
+    assert numpy.all(Tcopy.position == (2, 1))
+
+    Tcopy.position = (1, 2)
+    assert numpy.all(Tcopy.position == (1, 2))
+    assert numpy.all(T.position == (2, 1))
 
     print('...transforms seem to work OK!')
 

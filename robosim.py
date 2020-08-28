@@ -469,7 +469,7 @@ class KeyboardController(ctrl.Controller):
         super().__init__()
         self.app = app
 
-    def update(self, time, dt, bump, detections, odom_pose):
+    def update(self, time, dt, robot_state, detections):
         
         la = numpy.zeros(2)
 
@@ -495,8 +495,8 @@ class KeyboardController(ctrl.Controller):
 
         if numpy.any(la):
             return ctrl.ControllerOutput(
-                vel_forward=la[0],
-                vel_angle=la[1])
+                forward_vel=la[0],
+                angular_vel=la[1])
         else:
             return None
             
@@ -568,12 +568,21 @@ class RoboSimApp(gfx.GlfwApp):
                                        self.sim.robot.odom_pose)
             
             self.controller_initialized = True
+
+        robot = self.sim.robot
+
+        robot_state = ctrl.RobotState(
+            robot.bump.copy(),
+            robot.odom_pose.copy(),
+            robot.odom_wheel_vel_filtered[0],
+            robot.odom_wheel_vel_filtered[1],
+            robot.odom_linear_angular_vel_filtered[0],
+            robot.odom_linear_angular_vel_filtered[1])
             
         result = self.controller.update(self.sim.sim_time,
                                         self.frame_budget,
-                                        self.sim.robot.bump,
-                                        self.sim_camera.detections,
-                                        self.sim.robot.odom_pose)
+                                        robot_state,
+                                        self.sim_camera.detections)
 
         if result is None:
             self.sim.robot.motors_enabled = False
@@ -581,7 +590,7 @@ class RoboSimApp(gfx.GlfwApp):
         else:
             self.sim.robot.motors_enabled = True
             self.sim.robot.desired_linear_angular_vel[:] = (
-                result.vel_forward, result.vel_angle)
+                result.forward_vel, result.angular_vel)
 
         start = glfw.get_time()
         self.sim.update()
@@ -732,8 +741,8 @@ class RoboSimApp(gfx.GlfwApp):
             m = numpy.linalg.norm([w, h])
 
             self.view = gfx.look_at(
-                eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.75*core.ROOM_HEIGHT),
-                center=gfx.vec3(0.5*w, 0.5*h, 0.75*core.ROOM_HEIGHT),
+                eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.25*core.ROOM_HEIGHT),
+                center=gfx.vec3(0.5*w, 0.5*h, 0.25*core.ROOM_HEIGHT),
                 up=gfx.vec3(0, 0, 1),
                 Rextra=R_mouse)
 

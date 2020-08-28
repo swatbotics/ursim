@@ -257,9 +257,7 @@ class Pylon(SimObject):
 
         super().__init__(world=world)
         
-        assert position.shape == (2,) and position.dtype == numpy.float32
         assert cname in PYLON_COLOR_NAMES
-
 
         self.body_linear_mu = 0.9
 
@@ -303,8 +301,6 @@ class Ball(SimObject):
 
         super().__init__(world=world)
         
-        assert position.shape == (2,) and position.dtype == numpy.float32
-
         self.body_linear_mu = 0.01
 
         self.initialize(position)
@@ -412,9 +408,6 @@ class Box(SimObject):
 
         super().__init__(world=world)
         
-        assert dims.shape == (3,) and dims.dtype == numpy.float32
-        assert position.shape == (2,) and position.dtype == numpy.float32
-
         self.initialize(dims, position, angle)
 
     def initialize(self, dims, position, angle):

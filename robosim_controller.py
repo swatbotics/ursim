@@ -14,7 +14,12 @@ from transform2d import Transform2D
 from collections import namedtuple
 
 ControllerOutput = namedtuple('ControllerOutput',
-                              'vel_forward, vel_angle')
+                              'forward_vel, angular_vel')
+
+RobotState = namedtuple('RobotState',
+                        'bump, odom_pose, '
+                        'wheel_vel_l, wheel_vel_r, '
+                        'forward_vel, anglular_vel')
 
 ######################################################################
 
