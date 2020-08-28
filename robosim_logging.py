@@ -284,12 +284,13 @@ def plot_log(ldata, trace_names=[]):
         fig_idx += 1
         fig = make_figure(fig_idx, total_figures, False)
 
-        for pname in poses:
+        for idx, pname in enumerate(poses):
             
             x = ldata[pname + '.x']
             y = ldata[pname + '.y']
 
-            plt.plot(x, y, label=pname)
+            handle, = plt.plot(x, y, label=pname, zorder=2)
+            color = numpy.array(matplotlib.colors.to_rgb(handle.get_color()))
             
             tname = pname + '.angle'
             if tname in ldata:
@@ -297,7 +298,9 @@ def plot_log(ldata, trace_names=[]):
                 c = numpy.cos(theta)
                 s = numpy.sin(theta)
                 plt.quiver(x[::8], y[::8], c[::8], s[::8],
-                           label=tname)
+                           label=tname, color=(0.7*color + 0.3),
+                           units='dots', width=3.0*handle.get_linewidth(),
+                           zorder=1)
 
         plt.legend(loc='upper right', fontsize='xx-small')
         plt.axis('equal')
