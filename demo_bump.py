@@ -39,10 +39,12 @@ class BumpController(ctrl.Controller):
         is_done = (self.duration is not None and
                    elapsed > self.duration - 0.5*dt)
 
-        if robot_state.bump_left or robot_state.bump_center:
-            self.set_state(time, 'back_right', 1.0)
-        elif robot_state.bump_right:
+        if robot_state.bump_right:
+            print('BUMP RIGHT')
             self.set_state(time, 'back_left', 1.0)
+        elif robot_state.bump_left or robot_state.bump_center:
+            print('BUMP LEFT OR CENTER')
+            self.set_state(time, 'back_right', 1.0)
         elif is_done:
             if self.state == 'back_left':
                 self.set_state(time, 'left', 1.0 + numpy.random.random())
@@ -57,9 +59,9 @@ class BumpController(ctrl.Controller):
         if self.state == 'straight':
             f, a = 0.6, 0.0
         elif self.state == 'left':
-            f, a = 0.0, 0.75
+            f, a = 0.0, 0.85
         elif self.state == 'right':
-            f, a = 0.0, -0.75
+            f, a = 0.0, -0.85
         else: # back_left or back_right
             f, a = -0.3, 0.0
 
@@ -75,7 +77,7 @@ if __name__ == '__main__':
     app = robosim.RoboSimApp(controller)
 
     app.sim.set_dims(3.0, 3.0)
-    app.sim.initialize_robot((1.5, 2.0), 0.0)
+    app.sim.initialize_robot((1.5, 2.0), 0.1)
     app.sim.add_box((0.5, 1.0, 0.5), (2.7, 0.6), 0.0)
     app.sim.add_wall((0.5, 2.5), (0.5, 1.75))
     app.sim.add_ball((0.5, 0.5))

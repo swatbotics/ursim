@@ -13,6 +13,7 @@ import robosim_controller as ctrl
 import robosim_core as core
 import robosim_camera as scam
 import glfw
+import time
 from CleanGL import gl
 
 # DONE: teardown graphics
@@ -731,6 +732,9 @@ class RoboSimApp(gfx.GlfwApp):
             if self.was_animating:
                 delta_t = now - self.prev_update
                 self.log_time[LOG_PROFILING_DELTA] = delta_t/self.frame_budget
+                if delta_t < self.frame_budget:
+                    extra = self.frame_budget - delta_t
+                    time.sleep(extra)
             self.prev_update = now
             self.was_animating = True
             self.update_sim()
