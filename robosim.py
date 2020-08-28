@@ -596,8 +596,10 @@ class RoboSimApp(gfx.GlfwApp):
         robot = self.sim.robot
 
         robot_state = ctrl.RobotState(
-            robot.bump.copy(),
             robot.odom_pose.copy(),
+            bool(robot.bump[0]),
+            bool(robot.bump[1]),
+            bool(robot.bump[2]),
             robot.odom_wheel_vel_filtered[0],
             robot.odom_wheel_vel_filtered[1],
             robot.odom_linear_angular_vel_filtered[0],
@@ -762,7 +764,7 @@ class RoboSimApp(gfx.GlfwApp):
             R_mouse = numpy.dot(Rx, Ry)
 
             w, h = self.sim.dims
-            m = numpy.linalg.norm([w, h])
+            m = max(numpy.linalg.norm([w, h]), 8.0)
 
             self.view = gfx.look_at(
                 eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.25*core.ROOM_HEIGHT),

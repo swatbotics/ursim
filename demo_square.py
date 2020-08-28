@@ -28,6 +28,9 @@ class SimpleSquareController(ctrl.Controller):
         self.init_odom_pose = odom_pose.copy()
 
     def update(self, time, dt, robot_state, detections):
+
+        ##################################################
+        # state transition logic
         
         elapsed = time - self.init_time
 
@@ -52,6 +55,9 @@ class SimpleSquareController(ctrl.Controller):
                 new_state = 'straight'
             self.set_state(time, new_state, robot_state.odom_pose)
 
+        ##################################################
+        # output logic
+            
         if self.state == 'straight':
 
             return ctrl.ControllerOutput(

@@ -17,7 +17,8 @@ ControllerOutput = namedtuple('ControllerOutput',
                               'forward_vel, angular_vel')
 
 RobotState = namedtuple('RobotState',
-                        'bump, odom_pose, '
+                        'odom_pose, '
+                        'bump_left, bump_center, bump_right,'
                         'wheel_vel_l, wheel_vel_r, '
                         'forward_vel, anglular_vel')
 
@@ -32,6 +33,5 @@ class Controller:
         pass
 
     def update(self, time, dt, bump, detections, odom_pose):
-        return ControllerOutput(0.0, 0.0)
+        return ControllerOutput(forward_vel=0, angular_vel=0)
     
-######################################################################

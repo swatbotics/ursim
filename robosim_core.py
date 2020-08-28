@@ -361,7 +361,7 @@ class Wall(SimObject):
         bx = 0.5*float(length) - 1.5*BLOCK_SZ
 
         shapes = [
-            B2D.b2PolygonShape(box=(b2ple(0.5*dims[:2]))),
+            B2D.b2PolygonShape(box=(b2ple(0.5*numpy.array(dims[:2])))),
             B2D.b2PolygonShape(box=(r, r, (bx, 0), 0)),
             B2D.b2PolygonShape(box=(r, r, (-bx, 0), 0)),
         ]
@@ -421,7 +421,7 @@ class Box(SimObject):
             position = b2ple(position),
             angle = float(angle),
             fixtures = B2D.b2FixtureDef(
-                shape = B2D.b2PolygonShape(box=(b2ple(0.5*dims[:2]))),
+                shape = B2D.b2PolygonShape(box=(b2ple(0.5*numpy.array(dims[:2])))),
                 density = 1.0,
                 restitution = 0.1,
                 friction = 0.6
@@ -988,7 +988,7 @@ class RoboSim(B2D.b2ContactListener):
             self.modification_counter += 1
 
     def add_wall(self, p0, p1):
-        self.add_object(Wall(self.world, p0, p1))
+        self.add_object(Wall(self.world, numpy.array(p0), numpy.array(p1)))
 
     def reset(self, reload_svg=True):
         self.logger.finish()
