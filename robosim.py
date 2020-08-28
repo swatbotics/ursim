@@ -624,7 +624,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         elif key == glfw.KEY_R:
 
-            self.sim.reload()
+            self.sim.reset(reload_svg=True)
             self.last_update_time = None
             self.need_renderables = True
             self.controller_initialized = False

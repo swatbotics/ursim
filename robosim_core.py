@@ -646,12 +646,15 @@ class Robot(SimObject):
     def initialize(self, position=None, angle=None):
 
         self.destroy()
-        
+
         if position is None:
             position = (0.0, 0.0)
 
         if angle is None:
             angle = 0.0
+
+        self.orig_position = position
+        self.orig_angle = angle
 
         self.odom_pose = Transform2D()
         self.initial_pose = Transform2D(position, angle)
@@ -682,6 +685,9 @@ class Robot(SimObject):
             mass = ROBOT_BASE_MASS,
             I = ROBOT_BASE_I
         )
+
+    def reset(self):
+        self.initialize(self.orig_position, self.orig_angle)
 
     def setup_log(self, logger):
         logger.add_variables(LOG_NAMES, self.log_vars)
@@ -946,14 +952,14 @@ class RoboSim(B2D.b2ContactListener):
 
         print('created the world!')
 
-    def reload(self):
-
+    def reset(self, reload_svg=True):
         self.logger.finish()
-
-        self.clear()
-
-        if self.svg_filename is not None:
+        if reload_svg and self.svg_filename is not None:
+            self.clear()
             self.load_svg(self.svg_filename)
+        else:
+            for obj in self.objects:
+                obj.reset()
 
     def clear(self):
 
