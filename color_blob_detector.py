@@ -277,6 +277,7 @@ class ColorBlobDetector:
                      labels,
                      min_contour_area=None,
                      xyz=None,
+                     xyz_valid=None,
                      scratch=None,
                      split_axis=None,
                      split_res=None,
@@ -321,11 +322,15 @@ class ColorBlobDetector:
                 draw_mask = scratch[:h, :w]
                 draw_mask[:] = 0
 
+
                 shifted = contour - topleft
 
                 cv2.drawContours(draw_mask, [shifted], 0,
                                  (255, 255, 255), -1)
 
+                if xyz_valid is not None:
+                    draw_mask = draw_mask & xyz_valid[y0:y0+h, x0:x0+w]
+                
                 area = numpy.count_nonzero(draw_mask)
                 if area < min_contour_area:
                     continue

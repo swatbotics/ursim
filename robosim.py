@@ -9,6 +9,7 @@
 
 import numpy
 import graphics as gfx
+import robosim_controller as ctrl
 import robosim_core as core
 import robosim_camera as scam
 import glfw
@@ -461,14 +462,51 @@ class RobotRenderable(SimRenderable):
                     specular_strength=0.75
                 )
             )
-        
-        
 
+######################################################################
+
+class KeyboardController(ctrl.Controller):
+
+    def __init__(self, app=None):
+        super().__init__()
+        self.app = app
+
+    def update(self, time, bump, detections, odom_pose):
+        
+        la = numpy.zeros(2)
+
+        app = self.app
+
+        if app.key_is_down(glfw.KEY_I):
+            la += (0.5, 0)
+            
+        if app.key_is_down(glfw.KEY_K):
+            la += (-0.5, 0)
+            
+        if app.key_is_down(glfw.KEY_J):
+            la += (0, 2.0)
+            
+        if app.key_is_down(glfw.KEY_L):
+            la += (0, -2.0)
+            
+        if app.key_is_down(glfw.KEY_U):
+            la += (0.5, 1.0)
+            
+        if app.key_is_down(glfw.KEY_O): 
+            la += (0.5, -1.0)
+
+        if numpy.any(la):
+            return ctrl.ControllerOutput(
+                vel_forward=la[0],
+                vel_angle=la[1])
+        else:
+            return None
+            
 ######################################################################
 
 class RoboSimApp(gfx.GlfwApp):
 
-    def __init__(self, sim):
+    def __init__(self, controller=None):
 
         super().__init__()
 
@@ -481,7 +519,7 @@ class RoboSimApp(gfx.GlfwApp):
         gl.Enable(gl.DEPTH_TEST)
         gl.Enable(gl.CULL_FACE)
 
-        self.sim = sim
+        self.sim = core.RoboSim()
 
         self.perspective = None
         self.view = None
@@ -498,12 +536,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.renderables = []
 
-        for obj in sim.objects:
-            r = SimRenderable.create_for_object(obj)
-            assert r is not None
-            self.renderables.append(r)
-
-        self.sim_camera = scam.SimCamera(sim.robot,
+        self.sim_camera = scam.SimCamera(self.sim.robot,
                                          self.renderables,
                                          self.sim.logger)
 
@@ -514,16 +547,42 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.last_update_time = None
 
-        self.sim_camera.update()
-
         self.log_time = numpy.zeros(LOG_PROFILING_COUNT, dtype=numpy.float32)
         self.sim.logger.add_variables(LOG_PROFILING_NAMES, self.log_time)
+
+        self.need_renderables = True
+        self.controller_initialized = False
+
+        if controller is None:
+            controller = KeyboardController(self)
+
+        self.controller = controller
 
     def update_sim(self):
 
         start = glfw.get_time()
         self.sim_camera.update()
         self.log_time[LOG_PROFILING_CAMERA] = (glfw.get_time() - start)/self.frame_budget
+
+        if not self.controller_initialized:
+            
+            self.controller.initialize(self.sim.sim_time,
+                                       self.sim.robot.odom_pose)
+            
+            self.controller_initialized = True
+            
+        result = self.controller.update(self.sim.sim_time,
+                                        self.sim.robot.bump,
+                                        self.sim_camera.detections,
+                                        self.sim.robot.odom_pose)
+
+        if result is None:
+            self.sim.robot.motors_enabled = False
+            self.sim.robot.desired_linear_angular_vel[:] = 0
+        else:
+            self.sim.robot.motors_enabled = True
+            self.sim.robot.desired_linear_angular_vel[:] = (
+                result.vel_forward, result.vel_angle)
 
         start = glfw.get_time()
         self.sim.update()
@@ -567,20 +626,10 @@ class RoboSimApp(gfx.GlfwApp):
 
         elif key == glfw.KEY_R:
 
-            for r in self.renderables:
-                r.destroy()
-
-            self.renderables[:] = []
-
             self.sim.reload()
             self.last_update_time = None
-
-            for o in self.sim.objects:
-                self.renderables.append(SimRenderable.create_for_object(o))
-
-            self.sim_camera.update()
-
-            self.need_render = True
+            self.need_renderables = True
+            self.controller_initialized = False
 
         elif key == glfw.KEY_M:
 
@@ -592,7 +641,6 @@ class RoboSimApp(gfx.GlfwApp):
 
         elif key == glfw.KEY_B:
             self.sim.kick_ball()
-
 
     def mouse(self, button_index, is_press, x, y):
         if button_index == 0 and is_press:
@@ -626,6 +674,22 @@ class RoboSimApp(gfx.GlfwApp):
         
     def update(self):
 
+        if self.need_renderables:
+            
+            for r in self.renderables:
+                r.destroy()
+
+            self.renderables[:] = []
+            
+            for o in self.sim.objects:
+                r = SimRenderable.create_for_object(o)
+                self.renderables.append(r)
+
+            self.need_renderables = False
+            self.need_render = True
+
+            self.sim_camera.update()
+        
         if self.animating:
             now = glfw.get_time()
             if self.was_animating:
@@ -634,29 +698,6 @@ class RoboSimApp(gfx.GlfwApp):
             self.prev_update = now
             self.was_animating = True
             self.update_sim()
-
-        la = numpy.zeros(2)
-
-        if self.key_is_down(glfw.KEY_I):
-            la += (0.5, 0)
-            
-        if self.key_is_down(glfw.KEY_K):
-            la += (-0.5, 0)
-            
-        if self.key_is_down(glfw.KEY_J):
-            la += (0, 2.0)
-            
-        if self.key_is_down(glfw.KEY_L):
-            la += (0, -2.0)
-            
-        if self.key_is_down(glfw.KEY_U):
-            la += (0.5, 1.0)
-            
-        if self.key_is_down(glfw.KEY_O): 
-            la += (0.5, -1.0)
-
-        self.sim.robot.desired_linear_angular_vel[:] = la
-        self.sim.robot.motors_enabled = numpy.any(la)
         
     def render(self):
 
@@ -717,19 +758,17 @@ class RoboSimApp(gfx.GlfwApp):
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
         self.log_time[LOG_PROFILING_RENDERCALL] = (glfw.get_time() - start)/self.frame_budget
-
+        
 ######################################################################
-            
-def _test_load_environment():
 
+def keyboard_demo():
+    
+    app = RoboSimApp()
 
-    sim = core.RoboSim()
-    sim.load_svg('environments/first_environment.svg')
-
-    app = RoboSimApp(sim)
+    app.sim.load_svg('environments/first_environment.svg')
 
     app.run()
 
 if __name__ == '__main__':
     
-    _test_load_environment()
+    keyboard_demo()

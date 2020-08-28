@@ -21,6 +21,8 @@ CAMERA_HEIGHT = 480
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
 CAMERA_FOV_Y = 49
 
+CAMERA_MIN_POINT_DIST = 0.3
+
 CAMERA_NEAR = 0.15
 CAMERA_FAR = 50.0
 
@@ -83,6 +85,8 @@ class SimCamera:
 
         self.camera_points = numpy.zeros(
             (CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=numpy.float32)
+
+        self.camera_points_valid = numpy.empty_like(self.camera_labels)
 
         self.scratch = numpy.empty_like(self.camera_labels)
 
@@ -173,12 +177,17 @@ class SimCamera:
 
         depth_image = depth_image_flipped[::-1]
 
+        # TODO: add noise in denominator here???
         camera_z = (CAMERA_B / (depth_image + CAMERA_A))
         
         # camera Z = robot X
         self.camera_points[:,:,0] = camera_z
 
         Z = self.camera_points[:,:,0]
+
+        self.camera_points_valid[:] = 255
+        self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
+        
 
         # camera X = negative robot Y
         self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
@@ -200,6 +209,7 @@ class SimCamera:
             self.camera_labels,
             MIN_CONTOUR_AREA,
             self.camera_points,
+            self.camera_points_valid,
             self.scratch,
             OBJECT_SPLIT_AXIS,
             OBJECT_SPLIT_RES,
@@ -253,6 +263,8 @@ class SimCamera:
                 break
 
         paletted_output = self.detector.colorize_labels(self.camera_labels)
+
+        Image.fromarray(self.camera_points_valid).save('valid.png')
         Image.fromarray(paletted_output).save(filenames['labels'])
         Image.fromarray(self.camera_rgb).save(filenames['rgb'])
 
