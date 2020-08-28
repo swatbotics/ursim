@@ -108,7 +108,6 @@ class PylonRenderable(SimRenderable):
             
         self.gfx_objects = [self.static_gfx_object]
         
-
     def render(self):
         self.static_gfx_object.color = self.sim_object.color
         self.static_gfx_object.material_id = self.sim_object.material_id
@@ -138,7 +137,6 @@ class BallRenderable(SimRenderable):
                 material_id=int(1 << 3))
         
         self.gfx_objects = [ self.static_gfx_object ]
-
 
     def destroy(self):
         self.gfx_objects = []

@@ -24,6 +24,10 @@ LINE_COLORS = [
     CARDBOARD_COLOR
 ]
 
+PYLON_COLOR_NAMES = [
+    'orange', 'green'
+]
+
 PYLON_COLORS = [
     gfx.vec3(1.0, 0.5, 0),
     gfx.vec3(0, 0.8, 0),
@@ -211,15 +215,16 @@ def b2xform(transform, z=0.0):
 
 class SimObject:
 
-    def __init__(self):
+    def __init__(self, world=None):
         
         self.gfx_objects = []
-        
+
+        self.world = world
         self.body = None
         self.body_linear_mu = None
         self.body_angular_mu = None
 
-    def sim_update(self, world, time, dt):
+    def sim_update(self, time, dt):
 
         if self.body_linear_mu is not None:
             self.body.ApplyForceToCenter(
@@ -231,20 +236,45 @@ class SimObject:
                 -self.body_angular_mu * self.body.angularVelocity * self.body.mass * GRAVITY,
                 True)
 
+    def destroy(self):
+        if self.world is not None and self.body is not None:
+            self.world.DestroyBody(self.body)
+            self.body = None
+        if self.world is None and self.body is not None:
+            raise RuntimeError(str(self) + 'has body but no world!')
+
+    def reset(self):
+        pass
+        
+            
 ######################################################################                
                 
 class Pylon(SimObject):
 
     static_gfx_object = None
 
-    def __init__(self, world, position, color, material_id):
+    def __init__(self, world, position, cname):
 
-        super().__init__()
+        super().__init__(world=world)
         
         assert position.shape == (2,) and position.dtype == numpy.float32
-        assert color.shape == (3,) and color.dtype == numpy.float32
+        assert cname in PYLON_COLOR_NAMES
 
-        self.body = world.CreateDynamicBody(
+
+        self.body_linear_mu = 0.9
+
+        cidx = PYLON_COLOR_NAMES.index(cname)
+        
+        self.color = PYLON_COLORS[cidx]
+        self.material_id = (1 << (cidx+1))
+
+        self.initialize(position)
+
+    def initialize(self, position):
+
+        self.destroy()
+
+        self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
             fixtures = B2D.b2FixtureDef(
                 shape = B2D.b2CircleShape(radius=PYLON_RADIUS),
@@ -258,11 +288,10 @@ class Pylon(SimObject):
         self.body.massData = B2D.b2MassData(mass=PYLON_MASS,
                                             I=PYLON_I)
 
-        self.body_linear_mu = 0.9
+        self.orig_position = position
 
-        self.color = color
-
-        self.material_id = material_id
+    def reset(self):
+        self.initialize(self.orig_position)
 
 ######################################################################
 
@@ -272,11 +301,21 @@ class Ball(SimObject):
 
     def __init__(self, world, position):
 
-        super().__init__()
+        super().__init__(world=world)
         
         assert position.shape == (2,) and position.dtype == numpy.float32
 
-        self.body = world.CreateDynamicBody(
+        self.body_linear_mu = 0.01
+
+        self.initialize(position)
+
+    def initialize(self, position):
+
+        self.destroy()
+        
+        self.orig_position = position
+        
+        self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
             fixtures = B2D.b2FixtureDef(
                 shape = B2D.b2CircleShape(radius=BALL_RADIUS),
@@ -287,8 +326,8 @@ class Ball(SimObject):
             userData = self
         )
 
-        self.body_linear_mu = 0.01
-        
+    def reset(self):
+        self.initialize(self.orig_position)
         
 ######################################################################
 
@@ -296,7 +335,18 @@ class Wall(SimObject):
 
     def __init__(self, world, p0, p1):
 
-        super().__init__()
+        super().__init__(world=world)
+
+        self.body_linear_mu = 0.9 
+
+        self.initialize(p0, p1)
+
+    def initialize(self, p0, p1):
+
+        self.destroy()
+        
+        self.orig_p0 = p0
+        self.orig_p1 = p1
         
         position = 0.5*(p0 + p1)
         
@@ -320,7 +370,7 @@ class Wall(SimObject):
             B2D.b2PolygonShape(box=(r, r, (-bx, 0), 0)),
         ]
             
-        self.body = world.CreateDynamicBody(
+        self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
             angle = float(theta),
             shapes = shapes,
@@ -341,8 +391,7 @@ class Wall(SimObject):
         mass = mx + 2*BLOCK_MASS 
         I = Ix + 2*(Ib + BLOCK_MASS*bx**2)
 
-        self.body_linear_mu = 0.9 
-        self.body_angular_mu = I
+        self.body_angular_mu = I-Ix
         
         self.body.massData = B2D.b2MassData(
             mass = mass,
@@ -352,7 +401,8 @@ class Wall(SimObject):
         self.bx = bx
         self.dims = dims
 
-        
+    def reset(self):
+        self.initialize(self.orig_p0, self.orig_p1)
 
 ######################################################################
 
@@ -360,12 +410,21 @@ class Box(SimObject):
 
     def __init__(self, world, dims, position, angle):
 
-        super().__init__()
+        super().__init__(world=world)
         
         assert dims.shape == (3,) and dims.dtype == numpy.float32
         assert position.shape == (2,) and position.dtype == numpy.float32
 
-        self.body = world.CreateDynamicBody(
+        self.initialize(dims, position, angle)
+
+    def initialize(self, dims, position, angle):
+
+        self.destroy()
+        
+        self.orig_position = position
+        self.orig_angle = angle
+
+        self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
             angle = float(angle),
             fixtures = B2D.b2FixtureDef(
@@ -400,13 +459,22 @@ class Box(SimObject):
 
         self.dims = dims
 
+    def reset(self):
+        self.initialize(self.dims, self.orig_position, self.orig_angle)
+
 ######################################################################
 
 class Room(SimObject):
 
     def __init__(self, world, dims):
 
-        super().__init__()
+        super().__init__(world=world)
+
+        self.initialize(dims)
+
+    def initialize(self, dims):
+
+        self.destroy()
         
         self.dims = dims
 
@@ -416,7 +484,6 @@ class Room(SimObject):
 
         w = float(dims[0])
         h = float(dims[1])
-
 
         shapes.append(
             B2D.b2PolygonShape(
@@ -454,10 +521,13 @@ class Room(SimObject):
             )
         )
         
-        self.body = world.CreateStaticBody(
+        self.body = self.world.CreateStaticBody(
             userData = self,
             shapes = shapes
         )
+
+    def reset(self):
+        self.initialize(self.dims)
 
 
 ######################################################################
@@ -465,9 +535,10 @@ class Room(SimObject):
 class TapeStrips(SimObject):
 
     def __init__(self, point_lists):
-
         super().__init__()
+        self.point_lists = point_lists
 
+    def initialize(self, point_lists):
         self.point_lists = point_lists
 
 ######################################################################
@@ -520,9 +591,8 @@ class Robot(SimObject):
 
     def __init__(self, world):
 
-        super().__init__()
+        super().__init__(world=world)
 
-        self.world = world
         self.body = None
 
         # left and then right
@@ -575,10 +645,8 @@ class Robot(SimObject):
         
     def initialize(self, position=None, angle=None):
 
-        if self.body is not None:
-            self.world.DestroyBody(self.body)
-            self.body = None
-
+        self.destroy()
+        
         if position is None:
             position = (0.0, 0.0)
 
@@ -652,7 +720,7 @@ class Robot(SimObject):
         l[LOG_ODOM_VEL_FILT_FORWARD] = self.odom_linear_angular_vel_filtered[0]
         l[LOG_ODOM_VEL_FILT_ANGLE] = self.odom_linear_angular_vel_filtered[1]
 
-    def sim_update(self, world, time, dt):
+    def sim_update(self, time, dt):
 
         body = self.body
 
@@ -896,11 +964,9 @@ class RoboSim(B2D.b2ContactListener):
         assert self.robot == self.objects[0]
 
         for obj in self.objects[1:]:
-            if obj.body is not None:
-                self.world.DestroyBody(obj.body)
+            obj.destroy()
             
-        self.objects = [self.robot]
-        
+        self.objects[:] = [self.robot]
 
     def load_svg(self, svgfile):
 
@@ -975,7 +1041,7 @@ class RoboSim(B2D.b2ContactListener):
                     self.objects.append(Ball(self.world, position))
                 else:
                     self.objects.append(Pylon(self.world, position,
-                                              color, int(1 << cidx)))
+                                              PYLON_COLOR_NAMES[cidx-1]))
                                         
             elif isinstance(item, se.SimpleLine):
 
@@ -1056,7 +1122,7 @@ class RoboSim(B2D.b2ContactListener):
         for i in range(self.physics_ticks_per_update):
 
             for obj in self.objects:
-                obj.sim_update(self.world, self.sim_time, self.dt)
+                obj.sim_update(self.sim_time, self.dt)
 
             self.world.Step(self.dt,
                             self.velocity_iterations,
