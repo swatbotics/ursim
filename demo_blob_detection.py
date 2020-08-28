@@ -57,7 +57,7 @@ class LookAtController(ctrl.Controller):
             elapsed = time - self.init_time
 
             # note comparison with rounding
-            if elapsed > 2.0 - 0.5*dt:
+            if elapsed > 3.0 - 0.5*dt:
                 
                 print('done staring!')
                 
@@ -70,7 +70,7 @@ class LookAtController(ctrl.Controller):
             angle = numpy.arctan2(blob.xyz_mean[1], blob.xyz_mean[0])
             
             if numpy.abs(angle) < 0.05:
-                print('found it!')
+                print('found blob with area', blob.area, 'at angle', angle)
                 self.set_state(time, move=False)
 
         ##################################################
