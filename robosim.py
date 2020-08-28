@@ -269,7 +269,9 @@ class TapeStripsRenderable(SimRenderable):
             segment_lengths = numpy.linalg.norm(deltas, axis=1)
             tangents = deltas / segment_lengths.reshape(-1, 1)
 
-            if numpy.linalg.norm(points[-1] - points[0]) > core.TAPE_RADIUS:
+            is_loop = (numpy.linalg.norm(points[-1] - points[0]) < core.TAPE_RADIUS)
+
+            if not is_loop:
 
                 segment_lengths[0] += core.TAPE_RADIUS
                 points[0] -= core.TAPE_RADIUS * tangents[0]
@@ -279,10 +281,16 @@ class TapeStripsRenderable(SimRenderable):
                 points[-1] += core.TAPE_RADIUS * tangents[-1]
                 deltas[-1] = points[-1] - points[-2]
 
+                desired_parity = 1
+
+            else:
+
+                desired_parity = 0
+
             total_length = segment_lengths.sum()
 
             num_dashes = int(numpy.ceil(total_length / core.TAPE_DASH_SIZE))
-            if num_dashes % 2 == 0:
+            if num_dashes % 2 != desired_parity:
                 num_dashes -= 1
 
             u = numpy.hstack(([numpy.float32(0)], numpy.cumsum(segment_lengths)))
@@ -293,6 +301,7 @@ class TapeStripsRenderable(SimRenderable):
             cur_idx = 0
             
             emit_dash = True
+
 
             for dash_idx in range(num_dashes):
 
@@ -345,11 +354,19 @@ class TapeStripsRenderable(SimRenderable):
             points_l = []
             points_r = []
 
+            # merge very close points in this
+            deltas = points[1:] - points[:-1]
+            norms = numpy.linalg.norm(deltas, axis=1)
+            keep = numpy.hstack( ([ True ], norms > 1e-3) )
+
+            points = points[keep]
+            
             for i, p0 in enumerate(points[:-1]):
 
                 p1 = points[i+1]
 
                 tangent = gfx.normalize(p1 - p0)
+                
                 normal = numpy.array([-tangent[1], tangent[0]], dtype=numpy.float32)
 
                 line = gfx.vec3(normal[0], normal[1], -numpy.dot(normal, p0))
@@ -371,8 +388,13 @@ class TapeStripsRenderable(SimRenderable):
 
                     else:
 
-                        points_l.append( gfx.line_intersect_2d(line_l, prev_line_l) )
-                        points_r.append( gfx.line_intersect_2d(line_r, prev_line_r) )
+                        linter, ldenom = gfx.line_intersect_2d(line_l, prev_line_l)
+                        rinter, rdenom = gfx.line_intersect_2d(line_r, prev_line_r)
+
+                        # TODO: parallel lines?
+
+                        points_l.append( linter )
+                        points_r.append( rinter ) 
 
                 if i == len(points) - 2:
 

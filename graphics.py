@@ -49,7 +49,7 @@ def normalize(v):
 def line_intersect_2d(l1, l2):
 
     l3 = numpy.cross(l1, l2)
-    return l3[:2] / l3[2]
+    return l3[:2] / l3[2], l3[2]
 
 ######################################################################
 
