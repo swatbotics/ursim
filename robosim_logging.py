@@ -278,9 +278,6 @@ def plot_log(ldata, trace_names=[]):
 
         ax.legend(loc='upper right', fontsize='xx-small')
 
-    while cur_idx < MAX_PLOTS_PER_FIGURE:
-        subplots[cur_idx].set_visible(False)
-        cur_idx += 1
 
     if len(poses):
 

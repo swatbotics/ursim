@@ -94,31 +94,21 @@ GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 WHEEL_MAX_FORWARD_FORCE = 10.0 # N
-WHEEL_VEL_KP = 0.5 # dimensionless
+WHEEL_VEL_KP = 0.3 # dimensionless
 WHEEL_VEL_KI = 0.3 # 1/s - higher means more overshoot
 WHEEL_VEL_INTEGRATOR_MAX = 0.1 # m - affects both overshoot and size of steady-state error
 
-ODOM_WHEEL_VEL_STDDEV = 0.02
+ODOM_FREQUENCY = 4
+
+ODOM_NOISE_STDDEV = 0.015
+
+# Wn = 0.1
+ODOM_FILTER_B = numpy.array([0.13672874, 0.13672874])
+ODOM_FILTER_A = numpy.array([-0.72654253])
 
 # Wn = 0.05
-
-ODOM_FILTER_B = numpy.array([0.07295966, 0.07295966],
-                            dtype=numpy.float64)
-
-ODOM_FILTER_A = numpy.array([-0.8540806],
-                            dtype=numpy.float64)
-
-# Wn = 0.005
-
-SETPOINT_FILTER_B = numpy.array([0.00779294, 0.00779294],
-                                dtype=numpy.float64)
-
-SETPOINT_FILTER_A = numpy.array([-0.98441413],
-                                dtype=numpy.float64)
-
-
-
-
+SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966])
+SETPOINT_FILTER_A = numpy.array([-0.85408069])
 
 LOG_ROBOT_POS_X =           0
 LOG_ROBOT_POS_Y =           1
@@ -598,6 +588,8 @@ class Robot(SimObject):
         self.odom_pose = Transform2D()
         self.initial_pose = Transform2D(position, angle)
 
+        self.odom_tick = 0
+
         self.desired_linear_angular_vel[:] = 0
         self.desired_linear_angular_vel_raw[:] = 0
         self.desired_linear_angular_vel_filtered[:] = 0
@@ -667,12 +659,19 @@ class Robot(SimObject):
         current_tangent = body.GetWorldVector((1, 0))
         current_normal = body.GetWorldVector((0, 1))
 
+        print()
+
+        print('robot body vel:', body.linearVelocity)
+
+        
         self.forward_vel = body.linearVelocity.dot(current_tangent)
 
         lateral_vel = body.linearVelocity.dot(current_normal)
 
         lateral_impulse = clamp_abs(-body.mass * lateral_vel,
                                     WHEEL_MAX_LATERAL_IMPULSE)
+
+        print('lateral_impulse', lateral_impulse)
 
         body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
@@ -687,10 +686,8 @@ class Robot(SimObject):
         self.desired_wheel_vel = wheel_lr_from_linear_angular(
             self.desired_linear_angular_vel_filtered[:, 0]
         )
-        
-        wheel_noise = numpy.random.normal(size=2, scale=ODOM_WHEEL_VEL_STDDEV)
 
-
+        print('desired_wheel_vel', self.desired_wheel_vel)
 
         for idx, side in enumerate([1.0, -1.0]):
 
@@ -702,9 +699,14 @@ class Robot(SimObject):
 
             wheel_fwd_vel = wheel_vel.dot(current_tangent)
 
+            if numpy.abs(wheel_fwd_vel) > 1e-5:
+                wheel_noise = numpy.random.normal(scale=ODOM_NOISE_STDDEV)
+            else:
+                wheel_noise = 0.0
+            
             self.wheel_vel[idx] = wheel_fwd_vel
             
-            meas_vel = wheel_fwd_vel + wheel_noise[idx]
+            meas_vel = wheel_fwd_vel + wheel_noise
 
             filtered_vel = iir_filter(meas_vel,
                                       self.odom_wheel_vel_raw[idx],
@@ -732,8 +734,12 @@ class Robot(SimObject):
                     WHEEL_MAX_FORWARD_FORCE)
 
             friction_force = -self.rolling_mu * wheel_fwd_vel * body.mass * GRAVITY
+
+            total_force = (0.5*applied_force + friction_force)
+
+            print('total force for wheel {}'.format(total_force))
             
-            body.ApplyForce((0.5*applied_force + friction_force) * current_tangent,
+            body.ApplyForce(total_force * current_tangent,
                             world_point, True)
 
             #body.ApplyLinearImpulse((0.5*applied_force + friction_force)*dt * current_tangent,
@@ -741,15 +747,22 @@ class Robot(SimObject):
             
         ##################################################
 
-        self.odom_linear_angular_vel_raw[:] = linear_angular_from_wheel_lr(self.odom_wheel_vel_raw[:,0])
-        self.odom_linear_angular_vel_filtered[:] = linear_angular_from_wheel_lr(self.odom_wheel_vel_filtered[:,0])
+        self.odom_linear_angular_vel_raw[:] = linear_angular_from_wheel_lr(
+            self.odom_wheel_vel_raw[:,0])
+        
+        self.odom_linear_angular_vel_filtered[:] = linear_angular_from_wheel_lr(
+            self.odom_wheel_vel_filtered[:,0])
 
-        odom_fwd = dt * self.odom_linear_angular_vel_raw[0]
-        odom_spin = dt * self.odom_linear_angular_vel_raw[1]
+        self.odom_tick += 1
+        
+        if self.odom_tick % ODOM_FREQUENCY == 0:
 
-        self.odom_pose.position += odom_fwd * self.odom_pose.matrix[:2, 0]
+            odt = dt * ODOM_FREQUENCY
+            odom_fwd = odt * self.odom_linear_angular_vel_raw[0]
+            odom_spin = odt * self.odom_linear_angular_vel_raw[1]
 
-        self.odom_pose.angle += odom_spin
+            self.odom_pose.position += odom_fwd * self.odom_pose.matrix[:2, 0]
+            self.odom_pose.angle += odom_spin
 
         ##################################################
         
