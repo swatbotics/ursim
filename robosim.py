@@ -30,7 +30,7 @@ from CleanGL import gl
 # DONE: odometry (Euler integrator + Gaussian noise)
 # DONE: log odometry pose relative to initial position
 # DONE: put transform2d in its own python file with documentation
-# TODO: controller API in its own python file with documentation
+# DONE: controller API in its own python file with documentation
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
