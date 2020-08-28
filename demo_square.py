@@ -25,14 +25,21 @@ class SimpleSquareController(ctrl.Controller):
         # note rounding to nearest update period
         is_done = (elapsed >= 2.0 - 0.5*dt)
 
+        world_from_cur_robot = robot_state.odom_pose
+
         if is_done:
-            rel_pose = self.init_odom_pose.transform_inv(robot_state.odom_pose)
-            print('done, rel_pose =', rel_pose)
+            
+            world_from_prev_robot = self.init_odom_pose
+            prev_robot_from_world = world_from_prev_robot.inverse()
+
+            prev_from_cur = prev_robot_from_world * world_from_cur_robot
+            
+            print('done, current pose in frame of initial pose =', prev_from_cur)
+            
             if self.state == 'straight':
                 new_state = 'turn'
             else:
                 new_state = 'straight'
-            print('I can see:', detections)
             self.set_state(time, new_state, robot_state.odom_pose)
 
         if self.state == 'straight':
@@ -54,11 +61,6 @@ if __name__ == '__main__':
     app = robosim.RoboSimApp(controller)
 
     app.sim.set_dims(5.0, 5.0)
-    app.sim.add_pylon((1.5, 1.5), 'green')
-    app.sim.add_pylon((3.5, 3.5), 'green')
-    app.sim.add_pylon((1.5, 3.5), 'orange')
-    app.sim.add_pylon((3.5, 1.5), 'orange')
-    app.sim.add_ball((2.5, 2.5))
     app.sim.initialize_robot((2.0, 2.0), 0.0)
 
     app.run()

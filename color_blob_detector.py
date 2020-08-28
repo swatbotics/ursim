@@ -168,6 +168,7 @@ class BlobDetection:
         self.contour = contour
         self.area = area
         self.xyz = xyz.copy()
+        self.xyz_mean = xyz.mean(axis=0)
         self.is_split = is_split
 
     def __str__(self):

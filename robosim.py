@@ -269,13 +269,15 @@ class TapeStripsRenderable(SimRenderable):
             segment_lengths = numpy.linalg.norm(deltas, axis=1)
             tangents = deltas / segment_lengths.reshape(-1, 1)
 
-            segment_lengths[0] += core.TAPE_RADIUS
-            points[0] -= core.TAPE_RADIUS * tangents[0]
-            deltas[0] = points[1] - points[0]
+            if numpy.linalg.norm(points[-1] - points[0]) > core.TAPE_RADIUS:
 
-            segment_lengths[-1] += core.TAPE_RADIUS
-            points[-1] += core.TAPE_RADIUS * tangents[-1]
-            deltas[-1] = points[-1] - points[-2]
+                segment_lengths[0] += core.TAPE_RADIUS
+                points[0] -= core.TAPE_RADIUS * tangents[0]
+                deltas[0] = points[1] - points[0]
+
+                segment_lengths[-1] += core.TAPE_RADIUS
+                points[-1] += core.TAPE_RADIUS * tangents[-1]
+                deltas[-1] = points[-1] - points[-2]
 
             total_length = segment_lengths.sum()
 
@@ -565,7 +567,7 @@ class RoboSimApp(gfx.GlfwApp):
         if not self.controller_initialized:
             
             self.controller.initialize(self.sim.sim_time,
-                                       self.sim.robot.odom_pose)
+                                       self.sim.robot.odom_pose.copy())
             
             self.controller_initialized = True
 

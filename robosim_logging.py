@@ -162,7 +162,7 @@ PLOT_MERGES = [
     re.compile(r'(robot|odom)\.(cmd_)?vel(\.raw|\.filtered)?\.forward'),
     re.compile(r'(robot|odom)\.(cmd_)?vel(\.raw|\.filtered)?\.angle'),
     re.compile(r'.*\.(cmd_)?vel\..*'),
-    re.compile(r'robot\.bump(\.)'),
+    re.compile(r'robot\.(bump.*|motors_enabled)'),
     re.compile(r'blobfinder\.(.*\.)num_detections'),
     re.compile(r'blobfinder\.(.*\.)max_area'),
     re.compile(r'profiling(\..*)')
