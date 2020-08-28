@@ -637,8 +637,6 @@ class Robot(SimObject):
 
         self.bump = numpy.zeros(len(BUMP_ANGLE_RANGES), dtype=numpy.uint8)
 
-        self.colliders = set()
-
         self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
 
         self.initialize()
@@ -653,6 +651,10 @@ class Robot(SimObject):
         if angle is None:
             angle = 0.0
 
+        self.colliders = set()
+
+        self.bump[:] = 0
+        
         self.orig_position = position
         self.orig_angle = angle
 
@@ -661,6 +663,8 @@ class Robot(SimObject):
 
         self.odom_tick = 0
 
+        self.forward_vel = 0.0
+
         self.desired_linear_angular_vel[:] = 0
         self.desired_linear_angular_vel_raw[:] = 0
         self.desired_linear_angular_vel_filtered[:] = 0
@@ -668,6 +672,7 @@ class Robot(SimObject):
         self.odom_wheel_vel_raw[:] = 0
         self.odom_wheel_vel_filtered[:] = 0
         self.wheel_vel_integrator[:] = 0
+        self.wheel_vel[:] = 0
 
         self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
@@ -929,7 +934,14 @@ class RoboSim(B2D.b2ContactListener):
         self.dims = numpy.array([-1, -1], dtype=numpy.float32)
 
         self.robot = Robot(self.world)
-        self.objects = [ self.robot ]
+
+        self.room = Room(self.world, [4.0, 4.0])
+
+        self.modification_counter = 0
+
+        self.tape_strips = None
+        
+        self.objects = [ self.robot, self.room ]
 
         self.dt = 0.01 # 100 HZ
         self.physics_ticks_per_update = 4
@@ -952,6 +964,40 @@ class RoboSim(B2D.b2ContactListener):
 
         print('created the world!')
 
+    def set_dims(self, room_width, room_height):
+        self.dims = numpy.array([room_width, room_height],
+                                dtype=numpy.float32)
+        self.room.initialize(self.dims)
+        self.svg_filename = None
+        self.modification_counter += 1
+
+    def add_object(self, obj):
+        self.objects.append(obj)
+        self.svg_filename = None
+        self.modification_counter += 1
+
+    def add_box(self, dims, pctr, theta):
+        self.add_object(Box(self.world, dims, pctr, theta))
+
+    def add_pylon(self, position, cname):
+        self.add_object(Pylon(self.world, position, cname))
+
+    def add_pylon(self, position, cname):
+        self.add_object(Pylon(self.world, position, cname))
+
+    def add_ball(self, position):
+        self.add_object(Ball(self.world, position))
+
+    def add_tape_strip(self, points):
+        if self.tape_strips is None:
+            self.tape_strips = self.add_object(TapeStrips([points]))
+        else:
+            self.tape_strips.point_lists.append(points)
+            self.modification_counter += 1
+
+    def add_wall(self, p0, p1):
+        self.add_object(Wall(self.world, p0, p1))
+
     def reset(self, reload_svg=True):
         self.logger.finish()
         if reload_svg and self.svg_filename is not None:
@@ -960,19 +1006,21 @@ class RoboSim(B2D.b2ContactListener):
         else:
             for obj in self.objects:
                 obj.reset()
+        self.modification_counter += 1
 
     def clear(self):
 
         self.remaining_sim_time = 0.0
         self.sim_time = 0.0
         self.sim_ticks = 0
+        self.modification_counter += 1
 
         assert self.robot == self.objects[0]
 
-        for obj in self.objects[1:]:
+        for obj in self.objects[2:]:
             obj.destroy()
             
-        self.objects[:] = [self.robot]
+        self.objects[:] = [self.robot, self.room]
 
     def load_svg(self, svgfile):
 
@@ -983,10 +1031,8 @@ class RoboSim(B2D.b2ContactListener):
         
         xform = SvgTransformer(svg.viewbox.viewbox_width,
                                svg.viewbox.viewbox_height, scl)
-        
-        self.dims = xform.dims
 
-        self.objects.append(Room(self.world, self.dims))
+        self.set_dims(*xform.dims)
 
         robot_init_position = 0.5*self.dims
         robot_init_angle = 0.0
@@ -1034,8 +1080,7 @@ class RoboSim(B2D.b2ContactListener):
 
                 else:
 
-                    self.objects.append( Box(self.world, dims,
-                                             pctr, theta) )
+                    self.add_box(dims, pctr, theta)
                 
             elif isinstance(item, se.Circle):
                 
@@ -1044,10 +1089,10 @@ class RoboSim(B2D.b2ContactListener):
                 position = xform.transform(item.cx, item.cy)
 
                 if cidx == 0:
-                    self.objects.append(Ball(self.world, position))
+                    self.add_ball(position)
                 else:
-                    self.objects.append(Pylon(self.world, position,
-                                              PYLON_COLOR_NAMES[cidx-1]))
+                    self.add_pylon(position,
+                                   PYLON_COLOR_NAMES[cidx-1])
                                         
             elif isinstance(item, se.SimpleLine):
 
@@ -1059,18 +1104,18 @@ class RoboSim(B2D.b2ContactListener):
                 if cidx == 0:
                     
                     points = numpy.array([p0, p1])
-                    tape_point_lists.append(points)
+                    self.add_tape_strip(points)
                     
                 else:
 
-                    self.objects.append( Wall(self.world, p0, p1) )
-                
+                    self.add_wall(p0, p1)
+
             elif isinstance(item, se.Polyline):
                 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
 
-                tape_point_lists.append(points)
+                self.add_tape_strip(points)
 
             elif isinstance(item, se.Polygon):
 
@@ -1112,14 +1157,11 @@ class RoboSim(B2D.b2ContactListener):
                 print('*** warning: ignoring SVG item:', item, '***')
                 continue
 
-        if len(tape_point_lists):
-            self.objects.append(TapeStrips(tape_point_lists))
-
         assert self.robot == self.objects[0]
+        assert self.room == self.objects[1]
 
         self.robot.initialize(robot_init_position,
                               robot_init_angle)
-        
 
         self.svg_filename = os.path.abspath(svgfile)
 

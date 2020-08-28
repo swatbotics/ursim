@@ -548,7 +548,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.log_time = numpy.zeros(LOG_PROFILING_COUNT, dtype=numpy.float32)
         self.sim.logger.add_variables(LOG_PROFILING_NAMES, self.log_time)
 
-        self.need_renderables = True
+        self.last_sim_modification = self.sim.modification_counter - 1
         self.controller_initialized = False
 
         if controller is None:
@@ -626,7 +626,6 @@ class RoboSimApp(gfx.GlfwApp):
 
             self.sim.reset(reload_svg=True)
             self.last_update_time = None
-            self.need_renderables = True
             self.controller_initialized = False
 
         elif key == glfw.KEY_M:
@@ -672,7 +671,7 @@ class RoboSimApp(gfx.GlfwApp):
         
     def update(self):
 
-        if self.need_renderables:
+        if self.last_sim_modification != self.sim.modification_counter:
             
             for r in self.renderables:
                 r.destroy()
@@ -683,7 +682,7 @@ class RoboSimApp(gfx.GlfwApp):
                 r = SimRenderable.create_for_object(o)
                 self.renderables.append(r)
 
-            self.need_renderables = False
+            self.last_sim_modification = self.sim.modification_counter
             self.need_render = True
 
             self.sim_camera.update()
