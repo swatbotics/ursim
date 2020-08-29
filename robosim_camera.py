@@ -65,12 +65,24 @@ SCAN_ANGLE_COUNT = 60 # 1 degree
 LOG_RENDER_TIME = 0
 LOG_GRAB_TIME = 1
 LOG_PROCESS_TIME = 2
-LOG_DETECTIONS_START = 3
+
+LOG_GRAB_RGB_IMAGE_TIME = 3
+LOG_GRAB_RGB_PROCESS_TIME = 4
+LOG_GRAB_LABELS_IMAGE_TIME = 5
+LOG_GRAB_DEPTH_IMAGE_TIME = 6
+LOG_GRAB_DEPTH_PROCESS_TIME = 7
+
+LOG_DETECTIONS_START = 8
 
 LOG_TIME_VARS = [
     'profiling.camera.render',
     'profiling.camera.grab',
-    'profiling.camera.process'
+    'profiling.camera.process',
+    'pcgrab.rgb.image',
+    'pcgrab.rgb.process',
+    'pcgrab.labels.image',
+    'pcgrab.depth.image',
+    'pcgrab.depth.process',
 ]
 
 assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
@@ -193,27 +205,35 @@ class SimCamera:
         
     def grab_frame(self):
 
+        start = glfw.get_time()
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.rgb_texture)
-        
         rgb_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE)
-        rgb_array = numpy.frombuffer(rgb_buffer, dtype=numpy.uint8)
-        rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
-        
-        self.camera_rgb[:] = rgb_image_flipped[::-1]
+        self.log_vars[LOG_GRAB_RGB_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
 
-        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[0])
+        start = glfw.get_time()
+        rgb_array = numpy.frombuffer(rgb_buffer, dtype=numpy.uint8)
+        rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)        
+        self.camera_rgb[:] = rgb_image_flipped[::-1]
+        self.log_vars[LOG_GRAB_RGB_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
+
 
         if self.render_labels:
 
+            start = glfw.get_time()
+            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[0])
             labels_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE)
+            self.log_vars[LOG_GRAB_LABELS_IMAGE_TIME] = (glfw.get_time() - start) / self.frame_budget
+
             labels_array = numpy.frombuffer(labels_buffer, dtype=numpy.uint8)
             labels_image_flipped = labels_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
-
             self.camera_labels[:] = labels_image_flipped[::-1]
 
+        start = glfw.get_time()
         gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
-        
         depth_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
+        self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
+
+        start = glfw.get_time()
         depth_array = numpy.frombuffer(depth_buffer, dtype=numpy.float32)
         depth_image_flipped = depth_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
 
@@ -234,12 +254,13 @@ class SimCamera:
         self.camera_points_valid[:] = 255
         self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
 
-
         # camera X = negative robot Y
         self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
 
         # camera Y = negative robot Z
         self.camera_points[:,:,2] = Z * self.robot_z_per_camera_z
+
+        self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
 
         # depth scan
         row = CAMERA_HEIGHT//2-1
