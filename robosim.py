@@ -547,8 +547,6 @@ class RoboSimApp(gfx.GlfwApp):
 
         gl.PointSize(5.0)
 
-        gl.Enable(gl.LINE_SMOOTH)
-
         self.sim = core.RoboSim()
 
         self.perspective = None
@@ -773,8 +771,7 @@ class RoboSimApp(gfx.GlfwApp):
         if self.scan_vertex_data is None:
             self.scan_vertex_data = numpy.zeros((len(self.tan_scan_angles)+1, 8), dtype=numpy.float32)
 
-        r = self.sim_camera.scan_ranges - 0.005
-
+        r = self.sim_camera.scan_ranges.copy()
         r[numpy.isnan(r)] = 0.0
         
         self.scan_vertex_data[1:, 0] = r
