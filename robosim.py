@@ -32,6 +32,7 @@ from CleanGL import gl
 # DONE: log odometry pose relative to initial position
 # DONE: put transform2d in its own python file with documentation
 # DONE: controller API in its own python file with documentation
+# TODO: wall checkerboard texture
 # TODO: laser scan interface
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
@@ -464,14 +465,14 @@ class RobotRenderable(SimRenderable):
                 core.ROBOT_CAMERA_DIMS,
                 core.ROBOT_BASE_COLOR,
                 pre_transform=gfx.translation_matrix(
-                    gfx.vec3(tx, 0, 0.5*core.ROBOT_CAMERA_DIMS[2] + core.ROBOT_CAMERA_Z)),
+                    gfx.vec3(tx, 0, core.ROBOT_CAMERA_LENS_Z)),
                 specular_exponent=40.0,
                 specular_strength=0.75
             )
         )
 
         btop = core.ROBOT_BASE_Z + core.ROBOT_BASE_HEIGHT
-        cbottom = core.ROBOT_CAMERA_Z
+        cbottom = core.ROBOT_CAMERA_BOTTOM_Z
 
         pheight = cbottom - btop
 
@@ -542,6 +543,11 @@ class RoboSimApp(gfx.GlfwApp):
         gl.Enable(gl.FRAMEBUFFER_SRGB)
         gl.Enable(gl.DEPTH_TEST)
         gl.Enable(gl.CULL_FACE)
+        gl.Disable(gl.PROGRAM_POINT_SIZE)
+
+        gl.PointSize(5.0)
+
+        gl.Enable(gl.LINE_SMOOTH)
 
         self.sim = core.RoboSim()
 
@@ -560,6 +566,10 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.renderables = []
 
+        self.scan_points = None
+        self.tan_scan_angles = None
+        self.scan_vertex_data = None
+
         self.sim_camera = scam.SimCamera(self.sim.robot,
                                          self.renderables,
                                          self.sim.logger)
@@ -576,6 +586,8 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.last_sim_modification = self.sim.modification_counter - 1
         self.controller_initialized = False
+        self.prev_robot_pose = None
+        self.cur_robot_pose = None
 
         if controller is None:
             controller = KeyboardController(self)
@@ -584,7 +596,14 @@ class RoboSimApp(gfx.GlfwApp):
         self.controller = controller
         self.sim.robot.filter_setpoints = filter_setpoints
 
+    def get_robot_pose(self):
+
+        return core.b2xform(self.sim.robot.body.transform,
+                            core.ROBOT_CAMERA_LENS_Z)
+
     def update_sim(self):
+
+        self.prev_robot_pose = self.get_robot_pose()
 
         start = glfw.get_time()
         self.sim_camera.update()
@@ -667,6 +686,8 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.reset(reload_svg=True)
             self.last_update_time = None
             self.controller_initialized = False
+            self.prev_robot_pose = None
+            self.cur_robot_pose = None
 
         elif key == glfw.KEY_M:
 
@@ -736,12 +757,54 @@ class RoboSimApp(gfx.GlfwApp):
                 self.log_time[LOG_PROFILING_DELTA] = delta_t/self.frame_budget
                 if delta_t < self.frame_budget:
                     extra = self.frame_budget - delta_t
-                    time.sleep(extra)
+                    time.sleep(0.8*extra)
             self.prev_update = now
             self.was_animating = True
             self.update_sim()
+
+    def render_scan_points(self):
+
+        if self.prev_robot_pose is None:
+            self.prev_robot_pose = self.get_robot_pose()
+
+        if self.tan_scan_angles is None:
+            self.tan_scan_angles = numpy.tan(self.sim_camera.scan_angles)
+
+        if self.scan_vertex_data is None:
+            self.scan_vertex_data = numpy.zeros((len(self.tan_scan_angles)+1, 8), dtype=numpy.float32)
+
+        r = self.sim_camera.scan_ranges - 0.005
+
+        r[numpy.isnan(r)] = 0.0
+        
+        self.scan_vertex_data[1:, 0] = r
+        self.scan_vertex_data[1:, 1] = r * self.tan_scan_angles
+
+
+
+        scan_indices = numpy.zeros((len(self.tan_scan_angles), 2), dtype=numpy.uint8)
+        scan_indices[:,1] = numpy.arange(len(self.tan_scan_angles))
+        scan_indices = scan_indices.flatten()
+
+
+        if self.scan_points is None:
+            print(self.tan_scan_angles)
+            self.scan_points = gfx.IndexedPrimitives(
+                self.scan_vertex_data,
+                mode=gl.LINES,
+                indices=scan_indices,
+                color=gfx.vec3(1, 0, 0),
+                enable_lighting=False,
+                draw_type=gl.DYNAMIC_DRAW)
+        else:
+            self.scan_points.update_geometry(self.scan_vertex_data)
+
+        self.scan_points.model_pose = self.prev_robot_pose
+
+        self.scan_points.render()
         
     def render(self):
+
 
         start = glfw.get_time()
 
@@ -758,7 +821,7 @@ class RoboSimApp(gfx.GlfwApp):
             aspect = w / max(h, 1)
 
             self.perspective = gfx.perspective_matrix(
-                45, aspect, 0.15, 50.0)
+                45, aspect, 0.10, 50.0)
 
             gfx.set_uniform(gfx.IndexedPrimitives.uniforms['perspective'],
                             self.perspective)
@@ -784,6 +847,8 @@ class RoboSimApp(gfx.GlfwApp):
 
         for r in self.renderables:
             r.render()
+
+        self.render_scan_points()
 
         w = min(self.framebuffer_size[0], self.sim_camera.framebuffer.width)
         h = min(self.framebuffer_size[1], self.sim_camera.framebuffer.height)

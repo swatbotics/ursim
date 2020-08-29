@@ -461,6 +461,8 @@ class IndexedPrimitives:
 
         uniform int materialID;
 
+        uniform bool enableLighting;
+
         in vec3 fragPos;
         in vec3 fragNormal;
         in vec2 fragTexCoord;
@@ -477,15 +479,18 @@ class IndexedPrimitives:
                 color *= texColor;
             }
 
-            vec3 normal = normalize(fragNormal);
+            if (enableLighting) {
 
-            float nDotL = 0.5*dot(normal, lightDir) + 0.5;
-            color *= mix(nDotL, 1, 0.05);
+                vec3 normal = normalize(fragNormal);
 
-            vec3 viewDir = normalize(viewPos - fragPos);
-            vec3 halfDir = normalize(viewDir + lightDir);
-            float specAmount = pow(max(dot(normal, halfDir), 0.0), specularExponent);
-            color = mix(color, vec3(1.0), specularStrength*specAmount);
+                float nDotL = 0.5*dot(normal, lightDir) + 0.5;
+                color *= mix(nDotL, 1, 0.05);
+
+                vec3 viewDir = normalize(viewPos - fragPos);
+                vec3 halfDir = normalize(viewDir + lightDir);
+                float specAmount = pow(max(dot(normal, halfDir), 0.0), specularExponent);
+                color = mix(color, vec3(1.0), specularStrength*specAmount);
+            }
 
             fragColor = vec4(color, 1.0);
 
@@ -502,7 +507,6 @@ class IndexedPrimitives:
         gl.UseProgram(cls.program)
         set_uniform(cls.uniforms['materialTexture'], 0)
         set_uniform(cls.uniforms['lightDir'], normalize(vec3(0.5, 0.25, 2)))
-
         
         check_opengl_errors('IndexedPrimitives program')
 
@@ -782,9 +786,11 @@ class IndexedPrimitives:
     
     def __init__(self, positions_normals_texcoords, mode, indices, color,
                  texture=None, model_pose=None, pre_transform=None,
+                 enable_lighting=True,
                  specular_exponent=None,
                  specular_strength=None,
-                 material_id=0):
+                 material_id=0,
+                 draw_type=gl.STATIC_DRAW):
         
         # uniform for color
 
@@ -820,7 +826,7 @@ class IndexedPrimitives:
 
         self.vertex_buffer = gl.GenBuffers(1)
         gl.BindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer)
-        gl.BufferData(gl.ARRAY_BUFFER, vdata, gl.STATIC_DRAW)
+        gl.BufferData(gl.ARRAY_BUFFER, vdata, draw_type)
         check_opengl_errors('IndexedPrimitives vertex buffer setup')
 
         if indices is None:
@@ -832,7 +838,7 @@ class IndexedPrimitives:
             self.element_count = indices.size
             self.element_type = self.TYPE_LOOKUP[indices.dtype]
             gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.element_buffer)
-            gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW)
+            gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, indices, draw_type)
             check_opengl_errors('IndexedPrimitives element buffer setup')
 
         self.vao = gl.GenVertexArrays(1)
@@ -862,6 +868,8 @@ class IndexedPrimitives:
         self.color = color
         self.texture = texture
 
+        self.enable_lighting = enable_lighting
+
         if specular_exponent is None:
             specular_exponent = self.DEFAULT_SPECULAR_EXPONENT
 
@@ -872,6 +880,34 @@ class IndexedPrimitives:
         self.specular_strength = specular_strength
 
         self.material_id = material_id
+
+        self.draw_type = draw_type
+
+    def update_geometry(self, vertex_data,
+                        index_data=None,
+                        draw_type=None):
+
+        if draw_type is not None:
+            self.draw_type = draw_type
+
+        if vertex_data is not None:
+            assert self.vertex_buffer is not None
+            assert vertex_data.dtype == numpy.float32
+            assert len(vertex_data.shape) == 2 and vertex_data.shape[1] == 8
+            if self.element_buffer is None:
+                self.element_count = len(vertex_data)
+            gl.BindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer)
+            gl.BufferData(gl.ARRAY_BUFFER, vertex_data, self.draw_type)
+
+        if index_data is not None:
+            assert self.element_buffer is not None
+            self.element_count = index_data.size
+            self.element_type = self.TYPE_LOOKUP[index_data.dtype]
+            gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.element_buffer)
+            gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, index_data, self.draw_type)
+
+        check_opengl_errors('IndexedPrimitives element buffer update')
+            
         
     def render(self):
 
@@ -882,6 +918,7 @@ class IndexedPrimitives:
         set_uniform(self.uniforms['specularStrength'], self.specular_strength)
         set_uniform(self.uniforms['model'], self.model_pose)
         set_uniform(self.uniforms['materialID'], self.material_id)
+        set_uniform(self.uniforms['enableLighting'], int(self.enable_lighting))
 
         if self.texture is None:
             set_uniform(self.uniforms['useTexture'], 0)

@@ -21,13 +21,16 @@ CAMERA_HEIGHT = 480
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
 CAMERA_FOV_Y = 49
 
-CAMERA_MIN_POINT_DIST = 0.3
+CAMERA_MIN_POINT_DIST = 0.35
+CAMERA_MAX_POINT_DIST = 25.0
 
 CAMERA_NEAR = 0.15
 CAMERA_FAR = 50.0
 
 CAMERA_A = CAMERA_FAR / (CAMERA_NEAR - CAMERA_FAR)
 CAMERA_B = CAMERA_FAR * CAMERA_NEAR / (CAMERA_NEAR - CAMERA_FAR)
+
+CAMERA_DEPTH_NOISE = 0.002
 
 CAMERA_F_PX = CAMERA_HEIGHT / (2*numpy.tan(CAMERA_FOV_Y*numpy.pi/360))
 
@@ -55,6 +58,9 @@ CAMERA_PERSPECTIVE = gfx.perspective_matrix(
     CAMERA_FOV_Y, CAMERA_ASPECT,
     CAMERA_NEAR, CAMERA_FAR)
 
+SCAN_ANGLE_HALF_SWEEP = 30*numpy.pi/180
+SCAN_ANGLE_COUNT = 60 # 1 degree 
+
 ######################################################################
 
 class SimCamera:
@@ -77,6 +83,27 @@ class SimCamera:
         self.robot_y_per_camera_z = -u.reshape(1, -1) / CAMERA_F_PX
         self.robot_z_per_camera_z = -v.reshape(-1, 1) / CAMERA_F_PX
 
+        robot_view_angles_x = numpy.arctan(self.robot_y_per_camera_z).flatten()
+        sorter = numpy.arange(CAMERA_WIDTH)[::-1]
+
+        self.scan_angles = numpy.linspace(SCAN_ANGLE_HALF_SWEEP,
+                                          -SCAN_ANGLE_HALF_SWEEP,
+                                          (SCAN_ANGLE_COUNT+1))
+
+        assert self.scan_angles.min() >= robot_view_angles_x.min()
+        assert self.scan_angles.max() <= robot_view_angles_x.max()
+
+        idx = numpy.searchsorted(robot_view_angles_x, self.scan_angles, sorter=sorter)
+
+        self.scan_angle_idx_hi = sorter[idx]
+        self.scan_angle_idx_lo = self.scan_angle_idx_hi + 1
+        
+        assert numpy.all(self.scan_angles <= robot_view_angles_x[self.scan_angle_idx_hi])
+        assert numpy.all(self.scan_angles > robot_view_angles_x[self.scan_angle_idx_lo])
+
+        self.scan_ranges = numpy.zeros(len(self.scan_angles),
+                                       dtype=numpy.float32)
+        
         self.camera_rgb = numpy.zeros(
             (CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=numpy.uint8)
         
@@ -132,7 +159,7 @@ class SimCamera:
         gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
         M = core.b2xform(self.robot.body.transform, 
-                         core.ROBOT_CAMERA_Z + 0.5*core.ROBOT_CAMERA_DIMS[2])
+                         core.ROBOT_CAMERA_LENS_Z)
     
         M = numpy.linalg.inv(M)
         
@@ -177,23 +204,38 @@ class SimCamera:
 
         depth_image = depth_image_flipped[::-1]
 
-        # TODO: add noise in denominator here???
-        camera_z = (CAMERA_B / (depth_image + CAMERA_A))
+        nscl = CAMERA_DEPTH_NOISE
+        depth_image_noisy = depth_image - 0.5*nscl + nscl*numpy.random.random(size=depth_image.shape)
+
+        camera_z = (CAMERA_B / (depth_image_noisy + CAMERA_A))
         
         # camera Z = robot X
         self.camera_points[:,:,0] = camera_z
 
         Z = self.camera_points[:,:,0]
+        
+        Z[Z>CAMERA_MAX_POINT_DIST] = CAMERA_MAX_POINT_DIST
 
         self.camera_points_valid[:] = 255
         self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
-        
+
 
         # camera X = negative robot Y
         self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
 
         # camera Y = negative robot Z
         self.camera_points[:,:,2] = Z * self.robot_z_per_camera_z
+
+        # depth scan
+        row = CAMERA_HEIGHT//2-1
+        zmid = Z[row:row+2].min(axis=0)
+
+        self.scan_ranges[:] = numpy.minimum(zmid[self.scan_angle_idx_lo],
+                                            zmid[self.scan_angle_idx_hi])
+
+        near = self.scan_ranges < CAMERA_MIN_POINT_DIST
+        self.scan_ranges[near] = numpy.nan
+
 
     def process_frame(self):
 
