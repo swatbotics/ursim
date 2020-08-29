@@ -17,8 +17,8 @@ import robosim_core as core
 import os
 import glfw
 
-CAMERA_WIDTH = 320
-CAMERA_HEIGHT = 240
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
 CAMERA_TOTAL_PIXELS = CAMERA_WIDTH*CAMERA_HEIGHT
 
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
@@ -148,9 +148,14 @@ class SimCamera:
         self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT)
 
         self.framebuffer.add_aux_texture(gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
+                                         gl.NEAREST, gl.NEAREST,
                                          gl.COLOR_ATTACHMENT1)
 
-        gl.DrawBuffers(2, [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1])
+        self.framebuffer.add_aux_texture(gl.RGB32F, gl.RGB, gl.FLOAT,
+                                         gl.LINEAR, gl.LINEAR,
+                                         gl.COLOR_ATTACHMENT2)
+        
+        gl.DrawBuffers(3, [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2])
 
         self.framebuffer.deactivate()
         
@@ -183,9 +188,13 @@ class SimCamera:
         
         self.framebuffer.activate()
 
-
         gl.Viewport(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT)
-        gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+        #gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+        gl.ClearBufferfv(gl.COLOR, 0, numpy.zeros(4, dtype=numpy.float32))
+        gl.ClearBufferfv(gl.DEPTH, 0, [1.0])
+        gl.ClearBufferfv(gl.COLOR, 1, [0.0, 0.0, 0.0, 0.0])
+        gl.ClearBufferfv(gl.COLOR, 2, [CAMERA_FAR, 0.0, 0.0, 0.0])
 
         M = core.b2xform(self.robot.body.transform, 
                          core.ROBOT_CAMERA_LENS_Z)
@@ -195,6 +204,8 @@ class SimCamera:
         M = numpy.dot(R_OPENGL_FROM_WORLD, M)
 
         gfx.IndexedPrimitives.set_view_matrix(M)
+
+        gfx.IndexedPrimitives.set_world_matrix(R_OPENGL_FROM_WORLD.T)
 
         gfx.IndexedPrimitives.set_perspective_matrix(CAMERA_PERSPECTIVE)
 
@@ -230,39 +241,61 @@ class SimCamera:
             labels_image_flipped = labels_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
             self.camera_labels[:] = labels_image_flipped[::-1]
 
-        start = glfw.get_time()
-        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
-        depth_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
-        self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
 
-        start = glfw.get_time()
-        depth_array = numpy.frombuffer(depth_buffer, dtype=numpy.float32)
-        depth_image_flipped = depth_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
+        if 0:
 
-        depth_image = depth_image_flipped[::-1]
+            start = glfw.get_time()
+            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
+            depth_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
+            self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
 
-        nscl = CAMERA_DEPTH_NOISE
-        depth_image_noisy = depth_image - 0.5*nscl + nscl*numpy.random.random(size=depth_image.shape)
+            start = glfw.get_time()
+            depth_array = numpy.frombuffer(depth_buffer, dtype=numpy.float32)
+            depth_image_flipped = depth_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
 
-        camera_z = (CAMERA_B / (depth_image_noisy + CAMERA_A))
-        
-        # camera Z = robot X
-        self.camera_points[:,:,0] = camera_z
+            depth_image = depth_image_flipped[::-1]
 
-        Z = self.camera_points[:,:,0]
-        
-        Z[Z>CAMERA_MAX_POINT_DIST] = CAMERA_MAX_POINT_DIST
+            nscl = CAMERA_DEPTH_NOISE
+            depth_image_noisy = depth_image - 0.5*nscl + nscl*numpy.random.random(size=depth_image.shape)
 
-        self.camera_points_valid[:] = 255
-        self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
+            camera_z = (CAMERA_B / (depth_image_noisy + CAMERA_A))
 
-        # camera X = negative robot Y
-        self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
+            # camera Z = robot X
+            self.camera_points[:,:,0] = camera_z
 
-        # camera Y = negative robot Z
-        self.camera_points[:,:,2] = Z * self.robot_z_per_camera_z
+            Z = self.camera_points[:,:,0]
 
-        self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
+            Z[Z>CAMERA_MAX_POINT_DIST] = CAMERA_MAX_POINT_DIST
+
+            self.camera_points_valid[:] = 255
+            self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
+
+            # camera X = negative robot Y
+            self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
+
+            # camera Y = negative robot Z
+            self.camera_points[:,:,2] = Z * self.robot_z_per_camera_z
+
+            self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
+
+        else:
+
+            start = glfw.get_time()
+            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[1])
+            xyz_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.FLOAT)
+            self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
+
+            start = glfw.get_time()
+            xyz_array = numpy.frombuffer(xyz_buffer, dtype=numpy.float32)
+            xyz_image_flipped = xyz_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
+            self.camera_points = xyz_image_flipped[::-1].copy()
+            
+            Z = self.camera_points[:,:,0]
+            Z[Z>CAMERA_MAX_POINT_DIST] = CAMERA_MAX_POINT_DIST
+
+            self.camera_points_valid[:] = 255
+            self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
+            self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
 
         # depth scan
         row = CAMERA_HEIGHT//2-1
@@ -273,7 +306,6 @@ class SimCamera:
 
         near = self.scan_ranges < CAMERA_MIN_POINT_DIST
         self.scan_ranges[near] = numpy.nan
-
 
     def process_frame(self):
 
@@ -384,7 +416,9 @@ class SimCamera:
             color_index = self.detector.color_names.index(color_name)
             color_dark = tuple([int(c) for c in palette[color_index] // 2])
             for detection in color_detections:
-                mean, axes, pcs = detection.ellipse_approx()
+                mean = detection.xyz_mean
+                axes = detection.axes
+                pcs = detection.principal_components
                 mean = numpy.dot(R, mean)
                 pcs = numpy.array([numpy.dot(R, pc) for pc in pcs])
                 opoints = (pcs[0].reshape(1, 3) * ctheta * axes[0] +

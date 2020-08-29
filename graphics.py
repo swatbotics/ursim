@@ -15,6 +15,8 @@ from ctypes import c_void_p
 import numpy
 import transformations as tf
 
+import sys
+
 ######################################################################
 
 ENUM_LOOKUP = dict([
@@ -376,6 +378,8 @@ class Framebuffer:
                         internal_format,
                         gl_format,
                         gl_type,
+                        min_filter,
+                        mag_filter,
                         attachment):
 
         gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -425,21 +429,26 @@ class IndexedPrimitives:
         uniform mat4 perspective;
         uniform mat4 view;
         uniform mat4 model;
+        uniform mat4 world;
 
         in vec3 vertexPosition;
         in vec3 vertexNormal;
         in vec2 vertexTexCoord;
 
         out vec3 fragPos;
+        out vec3 fragWorldPos;
         out vec3 fragNormal;
         out vec2 fragTexCoord;
 
         void main() {
 
             vec4 mPos = model * vec4(vertexPosition, 1.0);
-            gl_Position = perspective * view * mPos;
+            vec4 vPos = view * mPos;
+
+            gl_Position = perspective * vPos;
 
             fragPos = mPos.xyz;
+            fragWorldPos = (world * vPos).xyz;
             fragNormal = mat3(model) * vertexNormal;
             fragTexCoord = vertexTexCoord;
 
@@ -463,12 +472,14 @@ class IndexedPrimitives:
 
         uniform bool enableLighting;
 
+        in vec3 fragWorldPos;
         in vec3 fragPos;
         in vec3 fragNormal;
         in vec2 fragTexCoord;
         
         out vec4 fragColor;
-        out int fragMaterialID;
+        out int  fragMaterialID;
+        out vec3 fragWorldPosOut;
 
         void main() {
 
@@ -496,10 +507,12 @@ class IndexedPrimitives:
 
             fragMaterialID = materialID;
 
+            fragWorldPosOut = fragWorldPos;
+
         }
         '''
 
-        bindings = ['fragColor', 'fragMaterialID']
+        bindings = ['fragColor', 'fragMaterialID', 'fragWorldPosOut']
 
         cls.program, cls.uniforms = make_program(vertex_src, fragment_src,
                                                  bindings)
@@ -507,6 +520,7 @@ class IndexedPrimitives:
         gl.UseProgram(cls.program)
         set_uniform(cls.uniforms['materialTexture'], 0)
         set_uniform(cls.uniforms['lightDir'], normalize(vec3(0.5, 0.25, 2)))
+        set_uniform(cls.uniforms['world'], numpy.eye(4, dtype=numpy.float32))
         
         check_opengl_errors('IndexedPrimitives program')
 
@@ -782,6 +796,11 @@ class IndexedPrimitives:
         gl.UseProgram(cls.program)
         set_uniform(cls.uniforms['view'], view)
         set_uniform(cls.uniforms['viewPos'], view_pos)
+
+    @classmethod
+    def set_world_matrix(cls, world):
+        gl.UseProgram(cls.program)
+        set_uniform(cls.uniforms['world'], world)
         
     
     def __init__(self, positions_normals_texcoords, mode, indices, color,
