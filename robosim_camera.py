@@ -242,60 +242,21 @@ class SimCamera:
             self.camera_labels[:] = labels_image_flipped[::-1]
 
 
-        if 0:
+        start = glfw.get_time()
+        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[1])
+        xyz_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.FLOAT)
+        self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
 
-            start = glfw.get_time()
-            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.depth_texture)
-            depth_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, gl.FLOAT)
-            self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
+        start = glfw.get_time()
+        xyz_array = numpy.frombuffer(xyz_buffer, dtype=numpy.float32)
+        xyz_image_flipped = xyz_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
+        self.camera_points = xyz_image_flipped[::-1].copy()
 
-            start = glfw.get_time()
-            depth_array = numpy.frombuffer(depth_buffer, dtype=numpy.float32)
-            depth_image_flipped = depth_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
+        Z = self.camera_points[:,:,0]
+        numpy.minimum(Z, CAMERA_MAX_POINT_DIST, out=Z)
 
-            depth_image = depth_image_flipped[::-1]
-
-            nscl = CAMERA_DEPTH_NOISE
-            depth_image_noisy = depth_image - 0.5*nscl + nscl*numpy.random.random(size=depth_image.shape)
-
-            camera_z = (CAMERA_B / (depth_image_noisy + CAMERA_A))
-
-            # camera Z = robot X
-            self.camera_points[:,:,0] = camera_z
-
-            Z = self.camera_points[:,:,0]
-
-            Z[Z>CAMERA_MAX_POINT_DIST] = CAMERA_MAX_POINT_DIST
-
-            self.camera_points_valid[:] = 255
-            self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
-
-            # camera X = negative robot Y
-            self.camera_points[:,:,1] = Z * self.robot_y_per_camera_z
-
-            # camera Y = negative robot Z
-            self.camera_points[:,:,2] = Z * self.robot_z_per_camera_z
-
-            self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
-
-        else:
-
-            start = glfw.get_time()
-            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[1])
-            xyz_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.FLOAT)
-            self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
-
-            start = glfw.get_time()
-            xyz_array = numpy.frombuffer(xyz_buffer, dtype=numpy.float32)
-            xyz_image_flipped = xyz_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
-            self.camera_points = xyz_image_flipped[::-1].copy()
-            
-            Z = self.camera_points[:,:,0]
-            Z[Z>CAMERA_MAX_POINT_DIST] = CAMERA_MAX_POINT_DIST
-
-            self.camera_points_valid[:] = 255
-            self.camera_points_valid[Z<CAMERA_MIN_POINT_DIST] = 0
-            self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
+        self.camera_points_valid = 255*(Z>=CAMERA_MIN_POINT_DIST)
+        self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
 
         # depth scan
         row = CAMERA_HEIGHT//2-1
