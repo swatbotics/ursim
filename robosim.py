@@ -570,6 +570,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.should_render_scan = False
         self.should_render_detections = False
+        self.should_render_robocam = True
 
         self.detection_gfx_object = None
 
@@ -704,10 +705,14 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.kick_ball()
 
         elif key == glfw.KEY_1:
+            self.should_render_robocam = not self.should_render_robocam
+            self.need_render = True
+            
+        elif key == glfw.KEY_2:
             self.should_render_scan = not self.should_render_scan
             self.need_render = True
 
-        elif key == glfw.KEY_2:
+        elif key == glfw.KEY_3:
             self.should_render_detections = not self.should_render_detections
             self.need_render = True
             
@@ -866,7 +871,28 @@ class RoboSimApp(gfx.GlfwApp):
                 self.detection_gfx_object.render()
 
         gl.Enable(gl.LINE_SMOOTH)
-                
+
+    def render_robocam(self):
+
+        src_w = self.sim_camera.framebuffer.width
+        src_h = self.sim_camera.framebuffer.height
+
+        dst_h = self.framebuffer_size[1] // 8
+        dst_w = int(numpy.round(dst_h * src_w / src_h))
+
+        dst_x0 = self.framebuffer_size[0] // 2 - dst_w //2
+
+        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim_camera.framebuffer.fbo)
+
+        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
+
+        gl.BlitFramebuffer(0, 0, src_w, src_h,
+                           dst_x0, self.framebuffer_size[1]-dst_h,
+                           dst_x0 + dst_w, self.framebuffer_size[1],
+                           gl.COLOR_BUFFER_BIT, gl.LINEAR)
+
+        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+        
         
     def render(self):
 
@@ -919,19 +945,8 @@ class RoboSimApp(gfx.GlfwApp):
         if self.should_render_detections:
             self.render_detections()
 
-        w = min(self.framebuffer_size[0], self.sim_camera.framebuffer.width)
-        h = min(self.framebuffer_size[1], self.sim_camera.framebuffer.height)
-
-        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim_camera.framebuffer.fbo)
-
-        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
-
-        gl.BlitFramebuffer(0, 0, w, h,
-                           0, self.framebuffer_size[1]-h//2,
-                           w//2, self.framebuffer_size[1],
-                           gl.COLOR_BUFFER_BIT, gl.NEAREST)
-
-        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+        if self.should_render_robocam:
+            self.render_robocam()
 
         self.log_time[LOG_PROFILING_RENDERCALL] = (glfw.get_time() - start)/self.frame_budget
         
