@@ -877,7 +877,7 @@ class RoboSimApp(gfx.GlfwApp):
         src_w = self.sim_camera.framebuffer.width
         src_h = self.sim_camera.framebuffer.height
 
-        dst_h = self.framebuffer_size[1] // 8
+        dst_h = int(numpy.round(self.framebuffer_size[1] // 6))
         dst_w = int(numpy.round(dst_h * src_w / src_h))
 
         dst_x0 = self.framebuffer_size[0] // 2 - dst_w //2
