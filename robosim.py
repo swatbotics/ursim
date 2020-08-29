@@ -872,7 +872,7 @@ class RoboSimApp(gfx.GlfwApp):
                 self.detection_gfx_object.color = color
                 self.detection_gfx_object.render()
 
-        gl.Enable(gl.LINE_SMOOTH)
+        gl.Disable(gl.LINE_SMOOTH)
 
     def render_robocam(self):
 
