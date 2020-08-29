@@ -15,6 +15,7 @@ from PIL import Image
 from CleanGL import gl
 import robosim_core as core
 import os
+import glfw
 
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
@@ -59,13 +60,26 @@ CAMERA_PERSPECTIVE = gfx.perspective_matrix(
     CAMERA_NEAR, CAMERA_FAR)
 
 SCAN_ANGLE_HALF_SWEEP = 30*numpy.pi/180
-SCAN_ANGLE_COUNT = 60 # 1 degree 
+SCAN_ANGLE_COUNT = 60 # 1 degree
+
+LOG_RENDER_TIME = 0
+LOG_GRAB_TIME = 1
+LOG_PROCESS_TIME = 2
+LOG_DETECTIONS_START = 3
+
+LOG_TIME_VARS = [
+    'profiling.camera.render',
+    'profiling.camera.grab',
+    'profiling.camera.process'
+]
+
+assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 
 ######################################################################
 
 class SimCamera:
 
-    def __init__(self, robot, renderables, logger=None, render_labels=True):
+    def __init__(self, robot, renderables, logger=None, render_labels=True, frame_budget=1.0):
 
         self.robot = robot
         self.renderables = renderables
@@ -132,6 +146,7 @@ class SimCamera:
 
         self.image_file_number = 0
 
+        self.frame_budget = frame_budget
 
         if logger is None:
 
@@ -139,7 +154,7 @@ class SimCamera:
 
         else:
 
-            lvars = []
+            lvars = LOG_TIME_VARS[:]
 
             for idx, color_name in enumerate(self.detector.color_names):
                 prefix = 'blobfinder.' + color_name + '.'
@@ -259,7 +274,7 @@ class SimCamera:
 
         
         if self.log_vars is not None:
-            offset = 0
+            offset = LOG_DETECTIONS_START
             for idx, color_name in enumerate(self.detector.color_names):
                 dlist = self.detections[color_name]
                 self.log_vars[offset+0] = len(dlist)
@@ -272,11 +287,17 @@ class SimCamera:
         
     def update(self):
 
+        start = glfw.get_time()
         self.render()
+        self.log_vars[LOG_RENDER_TIME] = (glfw.get_time() - start) / self.frame_budget
         
+        start = glfw.get_time()
         self.grab_frame()
+        self.log_vars[LOG_GRAB_TIME] = (glfw.get_time() - start) / self.frame_budget
 
+        start = glfw.get_time()
         self.process_frame()
+        self.log_vars[LOG_PROCESS_TIME] = (glfw.get_time() - start) / self.frame_budget
 
     def save_images(self):
 

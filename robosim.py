@@ -574,14 +574,16 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.detection_gfx_object = None
 
-        self.sim_camera = scam.SimCamera(self.sim.robot,
-                                         self.renderables,
-                                         self.sim.logger)
 
         assert self.sim.dt == 0.01
         assert self.sim.physics_ticks_per_update == 4
 
         self.frame_budget = self.sim.dt * self.sim.physics_ticks_per_update
+        
+        self.sim_camera = scam.SimCamera(self.sim.robot,
+                                         self.renderables,
+                                         self.sim.logger,
+                                         frame_budget=self.frame_budget)
 
         self.last_update_time = None
 
