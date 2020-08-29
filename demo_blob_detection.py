@@ -67,6 +67,7 @@ class LookAtController(ctrl.Controller):
         elif len(detections[color_name]):
             
             blob = detections[color_name][0]
+            
             angle = numpy.arctan2(blob.xyz_mean[1], blob.xyz_mean[0])
             
             if numpy.abs(angle) < 0.05:

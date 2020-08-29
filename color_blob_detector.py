@@ -168,20 +168,26 @@ class BlobDetection:
         self.contour = contour
         self.area = area
         self.xyz = xyz.copy()
-        self.xyz_mean = xyz.mean(axis=0)
         self.is_split = is_split
 
-    def __str__(self):
-        return('area: {}'.format(self.area))
+        decimated = self.xyz
+        
+        if len(decimated) > 500:
+            decimated = decimated[::3]
 
-    def ellipse_approx(self):
+        mean, principal_components, evals = cv2.PCACompute2(decimated, mean=None)
 
-        mean, principal_components, evals = cv2.PCACompute2(self.xyz, mean=None)
+        evals = numpy.maximum(evals, 0)
 
         mean = mean.flatten()
         axes = 2*numpy.sqrt(evals.flatten())
 
-        return mean, axes, principal_components
+        self.xyz_mean = mean
+        self.axes = axes
+        self.principal_components = principal_components
+
+    def __str__(self):
+        return('area: {}'.format(self.area))
 
 ######################################################################
 
@@ -357,7 +363,7 @@ class ColorBlobDetector:
                 if (split_axis is None or split_res is None or split_bins is None):
 
                     detection = BlobDetection(contour, area,
-                                              xyz=xyz, is_split = False)
+                                              xyz=object_xyz, is_split = False)
 
                     color_detections.append(detection)
 

@@ -564,9 +564,14 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.renderables = []
 
-        self.scan_points = None
+        self.scan_gfx_object = None
         self.tan_scan_angles = None
         self.scan_vertex_data = None
+
+        self.should_render_scan = False
+        self.should_render_detections = False
+
+        self.detection_gfx_object = None
 
         self.sim_camera = scam.SimCamera(self.sim.robot,
                                          self.renderables,
@@ -698,6 +703,15 @@ class RoboSimApp(gfx.GlfwApp):
         elif key == glfw.KEY_B:
             self.sim.kick_ball()
 
+        elif key == glfw.KEY_1:
+            self.should_render_scan = not self.should_render_scan
+            self.need_render = True
+
+        elif key == glfw.KEY_2:
+            self.should_render_detections = not self.should_render_detections
+            self.need_render = True
+            
+
     def mouse(self, button_index, is_press, x, y):
         if button_index == 0 and is_press:
             self.handle_mouse_rot()
@@ -751,16 +765,16 @@ class RoboSimApp(gfx.GlfwApp):
         if self.animating:
             now = glfw.get_time()
             if self.was_animating:
+                deadline = self.prev_update + self.frame_budget
+                while now < deadline:
+                    now = glfw.get_time()
                 delta_t = now - self.prev_update
                 self.log_time[LOG_PROFILING_DELTA] = delta_t/self.frame_budget
-                if delta_t < self.frame_budget:
-                    extra = self.frame_budget - delta_t
-                    time.sleep(0.8*extra)
             self.prev_update = now
             self.was_animating = True
             self.update_sim()
 
-    def render_scan_points(self):
+    def render_scan(self):
 
         if self.prev_robot_pose is None:
             self.prev_robot_pose = self.get_robot_pose()
@@ -777,16 +791,12 @@ class RoboSimApp(gfx.GlfwApp):
         self.scan_vertex_data[1:, 0] = r
         self.scan_vertex_data[1:, 1] = r * self.tan_scan_angles
 
+        if self.scan_gfx_object is None:
 
-
-        scan_indices = numpy.zeros((len(self.tan_scan_angles), 2), dtype=numpy.uint8)
-        scan_indices[:,1] = numpy.arange(len(self.tan_scan_angles))
-        scan_indices = scan_indices.flatten()
-
-
-        if self.scan_points is None:
-            print(self.tan_scan_angles)
-            self.scan_points = gfx.IndexedPrimitives(
+            scan_indices = numpy.zeros(len(self.tan_scan_angles)*2, dtype=numpy.uint8)
+            scan_indices[::2] = numpy.arange(len(self.tan_scan_angles))
+            
+            self.scan_gfx_object = gfx.IndexedPrimitives(
                 self.scan_vertex_data,
                 mode=gl.LINES,
                 indices=scan_indices,
@@ -794,11 +804,69 @@ class RoboSimApp(gfx.GlfwApp):
                 enable_lighting=False,
                 draw_type=gl.DYNAMIC_DRAW)
         else:
-            self.scan_points.update_geometry(self.scan_vertex_data)
+            self.scan_gfx_object.update_geometry(self.scan_vertex_data)
 
-        self.scan_points.model_pose = self.prev_robot_pose
+        self.scan_gfx_object.model_pose = self.prev_robot_pose
 
-        self.scan_points.render()
+        self.scan_gfx_object.render()
+
+    def render_detections(self):
+
+        if self.prev_robot_pose is None:
+            self.prev_robot_pose = self.get_robot_pose()
+
+        if self.detection_gfx_object is None:
+
+            ncircle = 64
+            vertex_data = numpy.zeros((ncircle, 8), dtype=numpy.float32)
+
+            theta = numpy.linspace(0, 2*numpy.pi, ncircle, False)
+            vertex_data[:, 0] = numpy.cos(theta)
+            vertex_data[:, 1] = numpy.sin(theta)
+
+            self.detection_gfx_object = gfx.IndexedPrimitives(
+                vertex_data,
+                mode=gl.LINE_LOOP,
+                indices=None,
+                color=gfx.vec3(1, 0, 1),
+                enable_lighting=False)
+
+        detector = self.sim_camera.detector
+
+        gl.Enable(gl.LINE_SMOOTH)
+
+        for color_idx, color_name in enumerate(detector.color_names):
+
+            detections = self.sim_camera.detections[color_name]
+
+            color = detector.palette[color_idx]
+            color = color.astype(numpy.float32)/255
+            color = color*0.25
+
+            for blob in detections:
+
+                scale = numpy.eye(4, dtype=numpy.float32)
+                scale[[0,1,2],[0,1,2]] = blob.axes
+
+                rotate = numpy.eye(4, dtype=numpy.float32)
+                rotate[:3,:3] = blob.principal_components.T
+
+                mean = blob.xyz_mean
+                delta = 0.01 * blob.principal_components[2]
+                if numpy.dot(delta, mean) > 0:
+                    delta = -delta
+
+                M = self.prev_robot_pose
+                M = numpy.dot(M, gfx.translation_matrix(blob.xyz_mean + delta))
+                M = numpy.dot(M, rotate)
+                M = numpy.dot(M, scale)
+
+                self.detection_gfx_object.model_pose = M
+                self.detection_gfx_object.color = color
+                self.detection_gfx_object.render()
+
+        gl.Enable(gl.LINE_SMOOTH)
+                
         
     def render(self):
 
@@ -845,7 +913,11 @@ class RoboSimApp(gfx.GlfwApp):
         for r in self.renderables:
             r.render()
 
-        self.render_scan_points()
+        if self.should_render_scan:
+            self.render_scan()
+
+        if self.should_render_detections:
+            self.render_detections()
 
         w = min(self.framebuffer_size[0], self.sim_camera.framebuffer.width)
         h = min(self.framebuffer_size[1], self.sim_camera.framebuffer.height)
