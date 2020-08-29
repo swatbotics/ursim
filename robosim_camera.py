@@ -16,9 +16,11 @@ from CleanGL import gl
 import robosim_core as core
 import os
 import glfw
+import sys
+from collections import namedtuple
 
-CAMERA_WIDTH = 448
-CAMERA_HEIGHT = 336
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
 CAMERA_TOTAL_PIXELS = CAMERA_WIDTH*CAMERA_HEIGHT
 
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
@@ -111,11 +113,21 @@ class LogTimer:
 
 ######################################################################
 
+TextureInfo = namedtuple('TextureInfo',
+                         'texname, width, height, channels, tex_format, storage_type, data_size, pbo, ctypes_type')
+
+######################################################################
+
 class SimCamera:
 
     DATA_TYPE_SIZE = {
         gl.FLOAT: 4,
         gl.UNSIGNED_BYTE: 1
+    }
+
+    CTYPES_TYPES = {
+        gl.FLOAT: gl.float,
+        gl.UNSIGNED_BYTE: gl.ubyte
     }
 
     def create_pbo(self, channels, dtype):
@@ -128,6 +140,29 @@ class SimCamera:
 
         return pbo
 
+    def add_texture_to_grab(self, texname, tex_format, storage_type, channels):
+
+        gl.BindTexture(gl.TEXTURE_2D, texname)
+        width = gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH)
+        height = gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT)
+
+        print('texture is {}x{}x{} with format {} and storage type {}'.format(
+            width, height, channels,
+            gfx.ENUM_LOOKUP[tex_format], gfx.ENUM_LOOKUP[storage_type]))
+
+        data_size = width * height * channels * self.DATA_TYPE_SIZE[storage_type]
+
+        pbo = gl.GenBuffers(1)
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, pbo)
+        gl.BufferData(gl.PIXEL_PACK_BUFFER, data_size, gfx.c_void_p(0), gl.DYNAMIC_READ)
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+
+        ctypes_type = self.CTYPES_TYPES[storage_type]
+
+        tinfo = TextureInfo(texname, width, height, channels, tex_format, storage_type, data_size, pbo, ctypes_type)
+
+        self.grab_textures[texname] = tinfo
+        
     def __init__(self, robot, renderables, logger=None, render_labels=True, frame_budget=1.0):
 
         self.robot = robot
@@ -182,9 +217,6 @@ class SimCamera:
 
         self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT)
 
-        self.xyz_pbo = self.create_pbo(3, gl.FLOAT)
-        self.rgb_pbo = self.create_pbo(3, gl.UNSIGNED_BYTE)
-        self.labels_pbo = self.create_pbo(1, gl.UNSIGNED_BYTE)
 
         self.framebuffer.add_aux_texture(gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
                                          gl.NEAREST, gl.NEAREST,
@@ -193,7 +225,18 @@ class SimCamera:
         self.framebuffer.add_aux_texture(gl.RGB32F, gl.RGB, gl.FLOAT,
                                          gl.LINEAR, gl.LINEAR,
                                          gl.COLOR_ATTACHMENT2)
+
+        self.grab_textures = dict()
+
+        self.add_texture_to_grab(self.framebuffer.rgb_texture,
+                                 gl.RGB, gl.UNSIGNED_BYTE, 3)
         
+        self.add_texture_to_grab(self.framebuffer.aux_textures[0],
+                                 gl.RED_INTEGER, gl.UNSIGNED_BYTE, 1)
+        
+        self.add_texture_to_grab(self.framebuffer.aux_textures[1],
+                                 gl.RGB, gl.FLOAT, 3)
+
         gl.DrawBuffers(3, [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2])
 
         self.framebuffer.deactivate()
@@ -254,80 +297,55 @@ class SimCamera:
         self.framebuffer.deactivate()
 
         #gl.DrawBuffers(1, [gl.COLOR_ATTACHMENT0])
+
+    def prepare_to_grab(self, texname):
+
+        tinfo = self.grab_textures[texname]
+
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, tinfo.pbo)
+        gl.BindTexture(gl.TEXTURE_2D, texname)
+        gl.GetTexImage(gl.TEXTURE_2D, 0, tinfo.tex_format, tinfo.storage_type, gfx.c_void_p(0))
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+
+    def grab(self, texname):
+
+        tinfo = self.grab_textures[texname]
+        
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, tinfo.pbo)
+        address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
+        buffer = (tinfo.ctypes_type * (tinfo.height*tinfo.width*tinfo.channels)).from_address(address)
+        array = numpy.ctypeslib.as_array(buffer).reshape(tinfo.height, tinfo.width, tinfo.channels).squeeze()
+
+        return array
+
+    def done_grabbing(self):
+        gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
         
     def grab_frame(self):
 
         with LogTimer(self.log_vars, LOG_GRAB_RGB_IMAGE_TIME, self.frame_budget):
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.rgb_pbo)
-            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.rgb_texture)
-            gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE, gfx.c_void_p(0))
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+            self.prepare_to_grab(self.framebuffer.rgb_texture)
         
         if self.render_labels:
             with LogTimer(self.log_vars, LOG_GRAB_LABELS_IMAGE_TIME, self.frame_budget):
-                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.labels_pbo)
-                gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[0])
-                gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, gfx.c_void_p(0))
-                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+                self.prepare_to_grab(self.framebuffer.aux_textures[0])
 
         with LogTimer(self.log_vars, LOG_GRAB_DEPTH_IMAGE_TIME, self.frame_budget):
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.xyz_pbo)
-            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[1])
-            gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.FLOAT, gfx.c_void_p(0))
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+            self.prepare_to_grab(self.framebuffer.aux_textures[1])
 
         gfx.check_opengl_errors('get tex image for PBOs')
 
-        with LogTimer(self.log_vars, LOG_GRAB_RGB_PROCESS_TIME, self.frame_budget):
-
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.rgb_pbo)
-            rgb_address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
-            rgb_buffer = (gl.ubyte * (CAMERA_HEIGHT*CAMERA_WIDTH*3)).from_address(rgb_address)
-            rgb_array = numpy.ctypeslib.as_array(rgb_buffer, (CAMERA_HEIGHT, CAMERA_WIDTH, 3))
-            rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)        
-            self.camera_rgb[:] = rgb_image_flipped[::-1].copy()
-
-            gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
-
-
-        if self.render_labels:
-
-            with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
-
-                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.labels_pbo)
-
-                labels_address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
-                labels_buffer = (gl.ubyte * (CAMERA_HEIGHT*CAMERA_WIDTH)).from_address(labels_address)
-                labels_array = numpy.ctypeslib.as_array(labels_buffer, (CAMERA_HEIGHT, CAMERA_WIDTH))
-
-                labels_image_flipped = labels_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
-                self.camera_labels[:] = labels_image_flipped[::-1].copy()
-
-                gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
-                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
-
         with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
 
-
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.xyz_pbo)
-
-            xyz_address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
-            xyz_buffer = (gl.float * (CAMERA_HEIGHT*CAMERA_WIDTH*3)).from_address(xyz_address)
-            xyz_array = numpy.ctypeslib.as_array(xyz_buffer, (CAMERA_HEIGHT, CAMERA_WIDTH, 3))
-
-            xyz_array = numpy.frombuffer(xyz_buffer, dtype=numpy.float32)
-            xyz_image_flipped = xyz_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
+            xyz_image_flipped = self.grab(self.framebuffer.aux_textures[1])
             self.camera_points = xyz_image_flipped[::-1].copy()
-
-            gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
-            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+            self.done_grabbing()
 
             Z = self.camera_points[:,:,0]
             numpy.minimum(Z, CAMERA_MAX_POINT_DIST, out=Z)
 
-            self.camera_points_valid = 255*(Z>=CAMERA_MIN_POINT_DIST)
-
+            self.camera_points_valid = 255*((Z>=CAMERA_MIN_POINT_DIST).view(numpy.uint8))
 
         # depth scan
         row = CAMERA_HEIGHT//2-1
@@ -338,6 +356,20 @@ class SimCamera:
 
         near = self.scan_ranges < CAMERA_MIN_POINT_DIST
         self.scan_ranges[near] = numpy.nan
+            
+        if self.render_labels:
+
+            with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
+                labels_image_flipped = self.grab(self.framebuffer.aux_textures[0])
+                self.camera_labels[:] = labels_image_flipped[::-1].copy()
+                self.done_grabbing()
+
+        else:
+
+            rgb_image_flipped = self.grab(self.framebuffer.rgb_texture)
+            self.camera_rgb[:] = rgb_image_flipped[::-1].copy()
+            self.done_grabbing()
+
 
     def process_frame(self):
 
@@ -359,7 +391,6 @@ class SimCamera:
             OBJECT_SPLIT_RES,
             OBJECT_SPLIT_BINS)
 
-        
         if self.log_vars is not None:
             offset = LOG_DETECTIONS_START
             for idx, color_name in enumerate(self.detector.color_names):
@@ -412,6 +443,12 @@ class SimCamera:
             if not any_exists:
                 break
 
+        if self.render_labels:
+            self.prepare_to_grab(self.framebuffer.rgb_texture)
+            rgb_image_flipped = self.grab(self.framebuffer.rgb_texture)
+            self.camera_rgb[:] = rgb_image_flipped[::-1].copy()
+            self.done_grabbing()
+            
         paletted_output = self.detector.colorize_labels(self.camera_labels)
 
         Image.fromarray(self.camera_points_valid).save('valid.png')
