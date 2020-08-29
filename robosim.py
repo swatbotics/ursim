@@ -707,7 +707,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.kick_ball()
 
         elif key == glfw.KEY_1:
-            self.should_render_robocam = not self.should_render_robocam
+            self.should_render_detections = not self.should_render_detections
             self.need_render = True
             
         elif key == glfw.KEY_2:
@@ -715,7 +715,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.need_render = True
 
         elif key == glfw.KEY_3:
-            self.should_render_detections = not self.should_render_detections
+            self.should_render_robocam = not self.should_render_robocam
             self.need_render = True
             
 

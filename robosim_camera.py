@@ -71,10 +71,12 @@ LOG_PROCESS_TIME = 2
 LOG_GRAB_RGB_IMAGE_TIME = 3
 LOG_GRAB_RGB_PROCESS_TIME = 4
 LOG_GRAB_LABELS_IMAGE_TIME = 5
-LOG_GRAB_DEPTH_IMAGE_TIME = 6
-LOG_GRAB_DEPTH_PROCESS_TIME = 7
+LOG_GRAB_LABELS_PROCESS_TIME = 6
+LOG_GRAB_DEPTH_IMAGE_TIME = 7
+LOG_GRAB_DEPTH_PROCESS_TIME = 8
 
-LOG_DETECTIONS_START = 8
+
+LOG_DETECTIONS_START = 9
 
 LOG_TIME_VARS = [
     'profiling.camera.render',
@@ -83,6 +85,7 @@ LOG_TIME_VARS = [
     'pcgrab.rgb.image',
     'pcgrab.rgb.process',
     'pcgrab.labels.image',
+    'pcgrab.labels.process',
     'pcgrab.depth.image',
     'pcgrab.depth.process',
 ]
@@ -91,7 +94,39 @@ assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 
 ######################################################################
 
+class LogTimer:
+
+    def __init__(self, array, idx, denom):
+        self.array = array
+        self.idx = idx
+        self.denom = denom
+
+    def __enter__(self):
+        self.start = glfw.get_time()
+
+    def __exit__(self, type, value, traceback):
+        elapsed = glfw.get_time() - self.start
+        self.array[self.idx] = elapsed / self.denom
+        
+
+######################################################################
+
 class SimCamera:
+
+    DATA_TYPE_SIZE = {
+        gl.FLOAT: 4,
+        gl.UNSIGNED_BYTE: 1
+    }
+
+    def create_pbo(self, channels, dtype):
+        pbo = gl.GenBuffers(1)
+        data_size = CAMERA_HEIGHT * CAMERA_WIDTH * channels * self.DATA_TYPE_SIZE[dtype]
+        
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, pbo)
+        gl.BufferData(gl.PIXEL_PACK_BUFFER, data_size, gfx.c_void_p(0), gl.DYNAMIC_READ)
+        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+
+        return pbo
 
     def __init__(self, robot, renderables, logger=None, render_labels=True, frame_budget=1.0):
 
@@ -146,6 +181,10 @@ class SimCamera:
         self.scratch = numpy.empty_like(self.camera_labels)
 
         self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT)
+
+        self.xyz_pbo = self.create_pbo(3, gl.FLOAT)
+        self.rgb_pbo = self.create_pbo(3, gl.UNSIGNED_BYTE)
+        self.labels_pbo = self.create_pbo(1, gl.UNSIGNED_BYTE)
 
         self.framebuffer.add_aux_texture(gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
                                          gl.NEAREST, gl.NEAREST,
@@ -218,45 +257,77 @@ class SimCamera:
         
     def grab_frame(self):
 
-        start = glfw.get_time()
-        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.rgb_texture)
-        rgb_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE)
-        self.log_vars[LOG_GRAB_RGB_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
+        with LogTimer(self.log_vars, LOG_GRAB_RGB_IMAGE_TIME, self.frame_budget):
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.rgb_pbo)
+            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.rgb_texture)
+            gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.UNSIGNED_BYTE, gfx.c_void_p(0))
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+        
+        if self.render_labels:
+            with LogTimer(self.log_vars, LOG_GRAB_LABELS_IMAGE_TIME, self.frame_budget):
+                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.labels_pbo)
+                gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[0])
+                gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, gfx.c_void_p(0))
+                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
 
-        start = glfw.get_time()
-        rgb_array = numpy.frombuffer(rgb_buffer, dtype=numpy.uint8)
-        rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)        
-        self.camera_rgb[:] = rgb_image_flipped[::-1]
-        self.log_vars[LOG_GRAB_RGB_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
+        with LogTimer(self.log_vars, LOG_GRAB_DEPTH_IMAGE_TIME, self.frame_budget):
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.xyz_pbo)
+            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[1])
+            gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.FLOAT, gfx.c_void_p(0))
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+
+        gfx.check_opengl_errors('get tex image for PBOs')
+
+        with LogTimer(self.log_vars, LOG_GRAB_RGB_PROCESS_TIME, self.frame_budget):
+
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.rgb_pbo)
+            rgb_address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
+            rgb_buffer = (gl.ubyte * (CAMERA_HEIGHT*CAMERA_WIDTH*3)).from_address(rgb_address)
+            rgb_array = numpy.ctypeslib.as_array(rgb_buffer, (CAMERA_HEIGHT, CAMERA_WIDTH, 3))
+            rgb_image_flipped = rgb_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)        
+            self.camera_rgb[:] = rgb_image_flipped[::-1].copy()
+
+            gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
 
 
         if self.render_labels:
 
-            start = glfw.get_time()
-            gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[0])
-            labels_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE)
-            self.log_vars[LOG_GRAB_LABELS_IMAGE_TIME] = (glfw.get_time() - start) / self.frame_budget
+            with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
 
-            labels_array = numpy.frombuffer(labels_buffer, dtype=numpy.uint8)
-            labels_image_flipped = labels_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
-            self.camera_labels[:] = labels_image_flipped[::-1]
+                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.labels_pbo)
+
+                labels_address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
+                labels_buffer = (gl.ubyte * (CAMERA_HEIGHT*CAMERA_WIDTH)).from_address(labels_address)
+                labels_array = numpy.ctypeslib.as_array(labels_buffer, (CAMERA_HEIGHT, CAMERA_WIDTH))
+
+                labels_image_flipped = labels_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH)
+                self.camera_labels[:] = labels_image_flipped[::-1].copy()
+
+                gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
+                gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+
+        with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
 
 
-        start = glfw.get_time()
-        gl.BindTexture(gl.TEXTURE_2D, self.framebuffer.aux_textures[1])
-        xyz_buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGB, gl.FLOAT)
-        self.log_vars[LOG_GRAB_DEPTH_IMAGE_TIME] = (glfw.get_time() - start)/self.frame_budget
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, self.xyz_pbo)
 
-        start = glfw.get_time()
-        xyz_array = numpy.frombuffer(xyz_buffer, dtype=numpy.float32)
-        xyz_image_flipped = xyz_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
-        self.camera_points = xyz_image_flipped[::-1].copy()
+            xyz_address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
+            xyz_buffer = (gl.float * (CAMERA_HEIGHT*CAMERA_WIDTH*3)).from_address(xyz_address)
+            xyz_array = numpy.ctypeslib.as_array(xyz_buffer, (CAMERA_HEIGHT, CAMERA_WIDTH, 3))
 
-        Z = self.camera_points[:,:,0]
-        numpy.minimum(Z, CAMERA_MAX_POINT_DIST, out=Z)
+            xyz_array = numpy.frombuffer(xyz_buffer, dtype=numpy.float32)
+            xyz_image_flipped = xyz_array.reshape(CAMERA_HEIGHT, CAMERA_WIDTH, 3)
+            self.camera_points = xyz_image_flipped[::-1].copy()
 
-        self.camera_points_valid = 255*(Z>=CAMERA_MIN_POINT_DIST)
-        self.log_vars[LOG_GRAB_DEPTH_PROCESS_TIME] = (glfw.get_time() - start)/self.frame_budget
+            gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+
+            Z = self.camera_points[:,:,0]
+            numpy.minimum(Z, CAMERA_MAX_POINT_DIST, out=Z)
+
+            self.camera_points_valid = 255*(Z>=CAMERA_MIN_POINT_DIST)
+
 
         # depth scan
         row = CAMERA_HEIGHT//2-1
