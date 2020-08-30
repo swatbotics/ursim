@@ -6,6 +6,12 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Class to log data and a function to read logged data from saved
+# files. Underlying file format is the numpy compressed storage format
+# .npz.
+#
+######################################################################
 
 import sys, datetime
 from collections import namedtuple

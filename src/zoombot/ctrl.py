@@ -6,6 +6,12 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Data structures used for defining controllers for simulated robots.
+# Users of the zoombot module should be familiar with these. See the
+# demos for example usage.
+#
+######################################################################
 
 import numpy
 from .color_blob_detector import BlobDetection

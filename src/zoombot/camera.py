@@ -6,6 +6,11 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Implement a simulated Kinect-style RGBD camera with built-in object
+# detection spoofed via OpenGL.
+#
+######################################################################
 
 import os, sys
 from collections import namedtuple
@@ -101,7 +106,6 @@ class LogTimer:
         self.array[self.idx] = elapsed / self.denom
         if self.display is not None:
             print('{}: {}'.format(self.display, self.array[self.idx]))
-        
 
 ######################################################################
 
@@ -155,10 +159,10 @@ class SimCamera:
 
         self.grab_textures[texname] = tinfo
         
-    def __init__(self, robot, renderables, logger=None, render_labels=True, frame_budget=1.0):
+    def __init__(self, sim, render_labels=True):
 
-        self.robot = robot
-        self.renderables = renderables
+        self.sim = sim
+        self.robot = sim.robot
 
         self.render_labels = render_labels
 
@@ -252,6 +256,8 @@ class SimCamera:
 
         self.image_file_number = 0
 
+        frame_budget = sim.dt * sim.physics_ticks_per_update
+
         self.frame_budget = frame_budget
 
         self.last_rendered_frame = None
@@ -260,22 +266,20 @@ class SimCamera:
         #self.total_grab_time = 0
         #self.total_grabbed_frames = 0
 
-        if logger is None:
+        logger = sim.logger
 
-            self.log_vars = None
+        lvars = LOG_TIME_VARS[:]
 
-        else:
+        for idx, color_name in enumerate(self.detector.color_names):
+            prefix = 'blobfinder.' + color_name + '.'
+            lvars.append(prefix + 'num_detections')
+            lvars.append(prefix + 'max_area')
 
-            lvars = LOG_TIME_VARS[:]
+        self.log_vars = numpy.zeros(len(lvars), dtype=numpy.float32)
 
-            for idx, color_name in enumerate(self.detector.color_names):
-                prefix = 'blobfinder.' + color_name + '.'
-                lvars.append(prefix + 'num_detections')
-                lvars.append(prefix + 'max_area')
-            
-            self.log_vars = numpy.zeros(len(lvars), dtype=numpy.float32)
+        logger.add_variables(lvars, self.log_vars)
 
-            logger.add_variables(lvars, self.log_vars)
+        self.last_modification_counter = None
             
     def render(self):
 
@@ -310,8 +314,8 @@ class SimCamera:
 
         gfx.IndexedPrimitives.set_perspective_matrix(CAMERA_PERSPECTIVE)
 
-        for r in self.renderables:
-            r.render()
+        for obj in self.sim.objects:
+            obj.render()
 
         self.framebuffer.deactivate()
 
@@ -424,19 +428,23 @@ class SimCamera:
             OBJECT_SPLIT_RES,
             OBJECT_SPLIT_BINS)
 
-        if self.log_vars is not None:
-            offset = LOG_DETECTIONS_START
-            for idx, color_name in enumerate(self.detector.color_names):
-                dlist = self.detections[color_name]
-                self.log_vars[offset+0] = len(dlist)
-                if not len(dlist):
-                    self.log_vars[offset+1] = 0
-                else:
-                    biggest = dlist[0]
-                    self.log_vars[offset+1] = biggest.area
-                offset += 2
+
+        offset = LOG_DETECTIONS_START
+        for idx, color_name in enumerate(self.detector.color_names):
+            dlist = self.detections[color_name]
+            self.log_vars[offset+0] = len(dlist)
+            if not len(dlist):
+                self.log_vars[offset+1] = 0
+            else:
+                biggest = dlist[0]
+                self.log_vars[offset+1] = biggest.area
+            offset += 2
         
-    def update(self, was_reset):
+    def update(self):
+
+        mcount = self.sim.modification_counter
+        was_reset = (mcount != self.last_modification_counter)
+        self.last_modification_counter = mcount
 
         # render to 0 upon completion of 0, prepare to grab 0
         # 

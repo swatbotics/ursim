@@ -6,6 +6,11 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Defines the RoboSimApp class that users will use to interact with
+# the robot simulation.
+#
+######################################################################
 
 import os, time
 
@@ -39,6 +44,11 @@ from .clean_gl import gl
 # DONE: visual feedback for bump sensors?
 # DONE: wall checkerboard texture
 # DONE: draw nice arrow for robot
+# DONE: refactor into module/package structure
+# DONE: move Renderables back into core
+# TODO: dt, sim_time as numpy timedelta?
+# TODO: angle diff function in transform2D?
+# TODO: docs for plotter?
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
@@ -57,567 +67,9 @@ LOG_PROFILING_NAMES = [
 
 ######################################################################
 
-class SimRenderable:
-
-    factory_lookup = None
-
-    def __init__(self, sim_object):
-        
-        self.sim_object = sim_object
-        self.gfx_objects = []
-
-    def render(self):
-
-        for obj in self.gfx_objects:
-            if (self.sim_object.body is not None and
-                hasattr(obj, 'model_pose')):
-                obj.model_pose = core.b2xform(self.sim_object.body.transform)
-            obj.render()
-
-    def destroy(self):
-
-        for obj in self.gfx_objects:
-            obj.destroy()
-
-        self.gfx_objects = []
-
-    @classmethod
-    def create_for_object(cls, sim_object):
-
-        if cls.factory_lookup is None:
-            cls.factory_lookup = {
-                core.Pylon: PylonRenderable,
-                core.Ball: BallRenderable,
-                core.Wall: WallRenderable,
-                core.Box: BoxRenderable,
-                core.Room: RoomRenderable,
-                core.TapeStrips: TapeStripsRenderable,
-                core.Robot: RobotRenderable
-            }
-
-        subclass = cls.factory_lookup[type(sim_object)]
-        return subclass(sim_object)
-
-######################################################################
-
-class PylonRenderable(SimRenderable):
-
-    static_gfx_object = None
-
-    def __init__(self, sim_object):
-        
-        super().__init__(sim_object)
-
-        if self.static_gfx_object is None:
-            self.static_gfx_object = gfx.IndexedPrimitives.cylinder(
-                core.PYLON_RADIUS, core.PYLON_HEIGHT, 32, 1,
-                self.sim_object.color,
-                pre_transform=gfx.tz(0.5*core.PYLON_HEIGHT))
-            
-        self.gfx_objects = [self.static_gfx_object]
-        
-    def render(self):
-        self.static_gfx_object.color = self.sim_object.color
-        self.static_gfx_object.material_id = self.sim_object.material_id
-        super().render()
-
-    def destroy(self):
-        self.gfx_objects = []
-        
-######################################################################
-
-class BallRenderable(SimRenderable):
-
-    static_gfx_object = None
-
-    def __init__(self, sim_object):
-        
-        super().__init__(sim_object)
-    
-        if self.static_gfx_object is None:
-        
-            self.static_gfx_object = gfx.IndexedPrimitives.sphere(
-                core.BALL_RADIUS, 32, 24, 
-                core.BALL_COLOR,
-                pre_transform=gfx.tz(core.BALL_RADIUS),
-                specular_exponent=60.0,
-                specular_strength=0.125,
-                material_id=int(1 << 3))
-        
-        self.gfx_objects = [ self.static_gfx_object ]
-
-    def destroy(self):
-        self.gfx_objects = []
-        
-######################################################################
-
-class WallRenderable(SimRenderable):
-
-
-    def __init__(self, sim_object):
-
-        super().__init__(sim_object)
-
-        gfx_object = gfx.IndexedPrimitives.box(
-            sim_object.dims, core.CARDBOARD_COLOR,
-            pre_transform=gfx.tz(core.WALL_Z + 0.5*self.sim_object.dims[2]))
-
-        self.gfx_objects = [gfx_object]
-
-        for x in [-self.sim_object.bx, self.sim_object.bx]:
-
-            block = gfx.IndexedPrimitives.box(
-                gfx.vec3(core.BLOCK_SZ, core.BLOCK_SZ, core.BLOCK_SZ),
-                core.BLOCK_COLOR,
-                pre_transform=gfx.translation_matrix(
-                    gfx.vec3(x, 0, 0.5*core.BLOCK_SZ)))
-
-            self.gfx_objects.append(block)
-
-######################################################################
-
-class BoxRenderable(SimRenderable):
-
-
-    def __init__(self, sim_object):
-
-        super().__init__(sim_object)
-        
-        gfx_object = gfx.IndexedPrimitives.box(
-            sim_object.dims, core.CARDBOARD_COLOR,
-            pre_transform=gfx.tz(0.5*sim_object.dims[2]))
-
-        self.gfx_objects = [gfx_object]
-
-######################################################################
-
-class RoomRenderable(SimRenderable):
-
-    floor_texture = None
-    wall_texture = None
-
-    def __init__(self, sim_object):
-
-        super().__init__(sim_object)
-
-        if self.floor_texture is None:
-            self.floor_texture = gfx.load_texture(find_path('textures/floor_texture.png'))
-            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-
-        if self.wall_texture is None:
-            self.wall_texture = gfx.load_texture(find_path('textures/wall_texture.png'))
-            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-            
-        w, h = sim_object.dims
-
-        vdata = numpy.array([
-            [0, 0, 0, 0, 0, 1, 0, 0],
-            [w, 0, 0, 0, 0, 1, w, 0],
-            [w, h, 0, 0, 0, 1, w, h],
-            [0, h, 0, 0, 0, 1, 0, h],
-        ], dtype=numpy.float32)
-
-        mode = gl.TRIANGLES
-
-        indices = numpy.array([0, 1, 2, 0, 2, 3], dtype=numpy.uint8)
-
-        floor_obj = gfx.IndexedPrimitives(
-            vdata, mode, indices, 0.8*gfx.vec3(1, 1, 1),
-            texture=self.floor_texture,
-            specular_exponent = 40.0,
-            specular_strength = 0.5)
-
-        z = core.ROOM_HEIGHT
-
-        verts = numpy.array([
-            [ 0, 0, 0 ],
-            [ w, 0, 0 ],
-            [ 0, h, 0 ],
-            [ w, h, 0 ],
-            [ 0, 0, z ],
-            [ w, 0, z ],
-            [ 0, h, z ],
-            [ w, h, z ],
-        ], dtype=numpy.float32)
-
-        indices = numpy.array([
-            [ 0, 5, 1 ], 
-            [ 0, 4, 5 ],
-            [ 1, 7, 3 ], 
-            [ 1, 5, 7 ],
-            [ 3, 6, 2 ],
-            [ 3, 7, 6 ],
-            [ 2, 4, 0 ],
-            [ 2, 6, 4 ],
-        ], dtype=numpy.uint8)
-
-        room_obj = gfx.IndexedPrimitives.faceted_triangles(
-            verts, indices, core.ROOM_COLOR, texture=self.wall_texture)
-
-        room_obj.specular_strength = 0.25
-
-        self.gfx_objects = [ floor_obj, room_obj ]
-        
-######################################################################
-
-class TapeStripsRenderable(SimRenderable):
-
-    def __init__(self, sim_object):
-
-        super().__init__(sim_object)
-
-        r = core.TAPE_RADIUS
-        offset = gfx.vec3(0, 0, r)
-
-        self.gfx_objects = []
-
-        dashes = []
-
-        for points in sim_object.point_lists:
-
-            points = points.copy() # don't modify original points
-
-            deltas = points[1:] - points[:-1]
-            segment_lengths = numpy.linalg.norm(deltas, axis=1)
-            tangents = deltas / segment_lengths.reshape(-1, 1)
-
-            is_loop = (numpy.linalg.norm(points[-1] - points[0]) < core.TAPE_RADIUS)
-
-            if not is_loop:
-
-                segment_lengths[0] += core.TAPE_RADIUS
-                points[0] -= core.TAPE_RADIUS * tangents[0]
-                deltas[0] = points[1] - points[0]
-
-                segment_lengths[-1] += core.TAPE_RADIUS
-                points[-1] += core.TAPE_RADIUS * tangents[-1]
-                deltas[-1] = points[-1] - points[-2]
-
-                desired_parity = 1
-
-            else:
-
-                desired_parity = 0
-
-            total_length = segment_lengths.sum()
-
-            num_dashes = int(numpy.ceil(total_length / core.TAPE_DASH_SIZE))
-            if num_dashes % 2 != desired_parity:
-                num_dashes -= 1
-
-            u = numpy.hstack(([numpy.float32(0)], numpy.cumsum(segment_lengths)))
-            u /= u[-1]
-
-            cur_dash = [ points[0] ]
-            cur_u = 0.0
-            cur_idx = 0
-            
-            emit_dash = True
-
-
-            for dash_idx in range(num_dashes):
-
-                target_u = (dash_idx + 1) / num_dashes
-
-                segment_end_u = u[cur_idx+1]
-
-                while segment_end_u < target_u:
-                    cur_idx += 1
-                    cur_dash.append(points[cur_idx])
-                    segment_end_u = u[cur_idx+1]
-
-                segment_start_u = u[cur_idx]
-
-                assert segment_start_u < target_u
-                assert segment_end_u >= target_u
-                
-                segment_alpha = ( (target_u - segment_start_u) /
-                                  (segment_end_u - segment_start_u) )
-
-                cur_dash.append( gfx.mix(points[cur_idx],
-                                         points[cur_idx+1],
-                                         segment_alpha) )
-
-                if emit_dash:
-                    dashes.append(numpy.array(cur_dash, dtype=numpy.float32))
-
-                emit_dash = not emit_dash
-
-                cur_dash = [ cur_dash[-1] ]
-
-
-        npoints_total = sum([len(points) for points in dashes])
-
-        vdata = numpy.zeros((2*npoints_total, 8), dtype=numpy.float32)
-        
-        vdata[:, 2] = core.TAPE_POLYGON_OFFSET
-        vdata[:, 5]= 1
-
-        vdata_offset = 0
-
-        indices = []
-                
-
-        for points in dashes:
-
-            prev_line_l = None
-            prev_line_r = None
-
-            points_l = []
-            points_r = []
-
-            # merge very close points in this
-            deltas = points[1:] - points[:-1]
-            norms = numpy.linalg.norm(deltas, axis=1)
-            keep = numpy.hstack( ([ True ], norms > 1e-3) )
-
-            points = points[keep]
-            
-            for i, p0 in enumerate(points[:-1]):
-
-                p1 = points[i+1]
-
-                tangent = gfx.normalize(p1 - p0)
-                
-                normal = numpy.array([-tangent[1], tangent[0]], dtype=numpy.float32)
-
-                line = gfx.vec3(normal[0], normal[1], -numpy.dot(normal, p0))
-
-                line_l = line - offset
-                line_r = line + offset
-
-                if i == 0:
-
-                    points_l.append( p0 + r * (normal) )
-                    points_r.append( p0 + r * (-normal) )
-
-                else:
-
-                    if abs(numpy.dot(line_l[:2], prev_line_l[:2])) > 0.999:
-
-                        points_l.append( p0 + r * normal )
-                        points_r.append( p0 - r * normal )
-
-                    else:
-
-                        linter, ldenom = gfx.line_intersect_2d(line_l, prev_line_l)
-                        rinter, rdenom = gfx.line_intersect_2d(line_r, prev_line_r)
-
-                        # TODO: parallel lines?
-
-                        points_l.append( linter )
-                        points_r.append( rinter ) 
-
-                if i == len(points) - 2:
-
-                    points_l.append( p1 + r * (normal) )
-                    points_r.append( p1 + r * (-normal) )
-
-                prev_line_l = line_l
-                prev_line_r = line_r
-
-                
-
-            for i in range(len(points)-1):
-                a = vdata_offset+2*i
-                b = a + 1
-                c = a + 2
-                d = a + 3
-                indices.extend([a, b, c])
-                indices.extend([c, b, d])
-
-
-            points_l = numpy.array(points_l)
-            points_r = numpy.array(points_r)
-
-            next_vdata_offset = vdata_offset + 2*len(points)
-
-            vdata[vdata_offset:next_vdata_offset:2, :2] = points_l
-            vdata[vdata_offset+1:next_vdata_offset:2, :2] = points_r
-            vdata[vdata_offset:next_vdata_offset, 6:8] = vdata[vdata_offset:next_vdata_offset, 0:2]
-
-            vdata_offset = next_vdata_offset
-
-        indices = numpy.array(indices, dtype=numpy.uint32)
-
-        gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLES,
-                                           indices=indices,
-                                           color=core.TAPE_COLOR,
-                                           specular_exponent = 100.0,
-                                           specular_strength = 0.05,
-                                           material_id=int(1 << 0))
-
-        self.gfx_objects.append(gfx_object)
-
-######################################################################
-
-class RobotRenderable(SimRenderable):
-
-    def __init__(self, sim_object):
-        
-        super().__init__(sim_object)
-
-        self.gfx_objects.append(
-            gfx.IndexedPrimitives.cylinder(
-                core.ROBOT_BASE_RADIUS, core.ROBOT_BASE_HEIGHT, 64, 1,
-                core.ROBOT_BASE_COLOR,
-                pre_transform=gfx.tz(0.5*core.ROBOT_BASE_HEIGHT + core.ROBOT_BASE_Z),
-                specular_exponent=40.0,
-                specular_strength=0.75
-            )
-        )
-
-        tx = -0.5*core.ROBOT_CAMERA_DIMS[0]
-        
-        self.gfx_objects.append(
-            gfx.IndexedPrimitives.box(
-                core.ROBOT_CAMERA_DIMS,
-                core.ROBOT_BASE_COLOR,
-                pre_transform=gfx.translation_matrix(
-                    gfx.vec3(tx, 0, core.ROBOT_CAMERA_LENS_Z)),
-                specular_exponent=40.0,
-                specular_strength=0.75
-            )
-        )
-
-        btop = core.ROBOT_BASE_Z + core.ROBOT_BASE_HEIGHT
-        cbottom = core.ROBOT_CAMERA_BOTTOM_Z
-
-        pheight = cbottom - btop
-
-        for y in [-0.1, 0.1]:
-
-            self.gfx_objects.append(
-                gfx.IndexedPrimitives.cylinder(
-                    0.01, pheight, 32, 1,
-                    gfx.vec3(0.75, 0.75, 0.75),
-                    pre_transform=gfx.translation_matrix(gfx.vec3(tx, y, 0.5*pheight + btop)),
-                    specular_exponent=20.0,
-                    specular_strength=0.75
-                )
-            )
-
-            
-        vdata = numpy.zeros((8, 3), dtype=numpy.float32)
-        xy = vdata[:, :2]
-        vdata[:, 2] = btop + 0.001
-
-        a = 0.08
-        b = 0.04
-        c = -0.15
-        d = 0.025
-        cd = -0.11
-        e = 0.105
-
-        xy[0] = (c, b)
-        xy[1] = (cd, 0)
-        xy[2] = (c, -b)
-        xy[3] = (d, a)
-        xy[4] = (d, b)
-        xy[5] = (d, -b)
-        xy[6] = (d, -a)
-        xy[7] = (e, 0)
-
-        indices = [ [ 0, 1, 4 ],
-                    [ 1, 5, 4 ],
-                    [ 2, 5, 1 ],
-                    [ 3, 4, 7 ],
-                    [ 4, 5, 7 ],
-                    [ 5, 6, 7 ] ]
-
-        indices = numpy.array(indices, dtype=numpy.uint8)
-        
-        arrow = gfx.IndexedPrimitives.faceted_triangles(
-            vdata, indices, gfx.vec3(0.8, 0.7, 0.0),
-            specular_exponent=40.0,
-            specular_strength=0.75
-        )
-
-        self.gfx_objects.append(arrow)
-
-        self.bump_lites = []
-
-        for theta_deg in [ 45, 0, -45 ]:
-
-            theta_rad = theta_deg*numpy.pi/180
-            r = 0.14
-            tx = r*numpy.cos(theta_rad)
-            ty = r*numpy.sin(theta_rad)
-
-            lite = gfx.IndexedPrimitives.sphere(
-                0.011, 16, 12,
-                gfx.vec3(0.25, 0, 0),
-                pre_transform=gfx.translation_matrix(gfx.vec3(tx, ty, btop)),
-                specular_exponent=50.0,
-                specular_strength=0.25,
-                enable_lighting=True)
-
-            self.gfx_objects.append(lite)
-            self.bump_lites.append(lite)
-
-    def render(self):
-        
-        robot = self.sim_object
-        
-        for i in range(3):
-            lite = self.bump_lites[i]
-            bump = robot.bump[i]
-            if bump:
-                lite.enable_lighting = False
-                lite.color = gfx.vec3(1, 0, 0)
-            else:
-                lite.enable_lighting = True
-                lite.color = gfx.vec3(0.25, 0, 0)
-            
-        
-        super().render()
-
-######################################################################
-
-class KeyboardController(ctrl.Controller):
-
-    def __init__(self, app=None):
-        super().__init__()
-        self.app = app
-
-    def update(self, time, dt, robot_state, scan, detections):
-        
-        la = numpy.zeros(2)
-
-        app = self.app
-
-        if app.key_is_down(glfw.KEY_I):
-            la += (0.5, 0)
-            
-        if app.key_is_down(glfw.KEY_K):
-            la += (-0.5, 0)
-            
-        if app.key_is_down(glfw.KEY_J):
-            la += (0, 2.0)
-            
-        if app.key_is_down(glfw.KEY_L):
-            la += (0, -2.0)
-            
-        if app.key_is_down(glfw.KEY_U):
-            la += (0.5, 1.0)
-            
-        if app.key_is_down(glfw.KEY_O): 
-            la += (0.5, -1.0)
-
-        if numpy.any(la):
-            return ctrl.ControllerOutput(
-                forward_vel=la[0],
-                angular_vel=la[1])
-        else:
-            return None
-            
-######################################################################
-
 class RoboSimApp(gfx.GlfwApp):
 
-    def __init__(self, controller=None, filter_setpoints=False):
+    def __init__(self, controller, filter_setpoints=False):
 
         super().__init__()
 
@@ -648,8 +100,6 @@ class RoboSimApp(gfx.GlfwApp):
         self.animating = True
         self.was_animating = False
 
-        self.renderables = []
-
         self.scan_gfx_object = None
         self.tan_scan_angles = None
         self.scan_vertex_data = None
@@ -666,22 +116,14 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.frame_budget = self.sim.dt * self.sim.physics_ticks_per_update
         
-        self.sim_camera = camera.SimCamera(self.sim.robot,
-                                           self.renderables,
-                                           self.sim.logger,
-                                           frame_budget=self.frame_budget)
+        self.sim_camera = camera.SimCamera(self.sim)
 
         self.last_update_time = None
 
         self.log_time = numpy.zeros(LOG_PROFILING_COUNT, dtype=numpy.float32)
         self.sim.logger.add_variables(LOG_PROFILING_NAMES, self.log_time)
 
-        self.last_sim_modification = self.sim.modification_counter - 1
         self.controller_initialized = False
-
-        if controller is None:
-            controller = KeyboardController(self)
-            filter_setpoints = True
 
         self.controller = controller
         self.sim.robot.filter_setpoints = filter_setpoints
@@ -696,7 +138,7 @@ class RoboSimApp(gfx.GlfwApp):
         cam = self.sim_camera
 
         start = glfw.get_time()
-        self.sim_camera.update(was_reset=False)
+        self.sim_camera.update()
         self.log_time[LOG_PROFILING_CAMERA] = (glfw.get_time() - start)/self.frame_budget
 
         if not self.controller_initialized:
@@ -779,6 +221,8 @@ class RoboSimApp(gfx.GlfwApp):
         elif key == glfw.KEY_R:
 
             self.sim.reset(reload_svg=True)
+            self.need_render = True
+            self.sim_camera.update()
             self.last_update_time = None
             self.controller_initialized = False
             self.cur_robot_pose = None
@@ -806,7 +250,8 @@ class RoboSimApp(gfx.GlfwApp):
             self.should_render_robocam = not self.should_render_robocam
             self.need_render = True
             
-
+    ############################################################
+            
     def mouse(self, button_index, is_press, x, y):
         if button_index == 0 and is_press:
             self.handle_mouse_rot()
@@ -838,24 +283,6 @@ class RoboSimApp(gfx.GlfwApp):
     ############################################################
         
     def update(self):
-
-        if self.last_sim_modification != self.sim.modification_counter:
-
-            print('**** CREATING GRAPHICS OBJECTS ****')
-            
-            for r in self.renderables:
-                r.destroy()
-
-            self.renderables[:] = []
-            
-            for o in self.sim.objects:
-                r = SimRenderable.create_for_object(o)
-                self.renderables.append(r)
-
-            self.last_sim_modification = self.sim.modification_counter
-            self.need_render = True
-
-            self.sim_camera.update(was_reset=True)
         
         if self.animating:
             now = glfw.get_time()
@@ -1025,8 +452,8 @@ class RoboSimApp(gfx.GlfwApp):
         gfx.IndexedPrimitives.set_perspective_matrix(self.perspective)
         gfx.IndexedPrimitives.set_view_matrix(self.view)
 
-        for r in self.renderables:
-            r.render()
+        for obj in self.sim.objects:
+            obj.render()
 
         if self.should_render_scan:
             self.render_scan()

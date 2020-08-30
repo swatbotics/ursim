@@ -6,6 +6,11 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Useful script to empty your current directory of simulator camera
+# images and log files.
+#
+######################################################################
 
 import os, re, sys
 

@@ -6,6 +6,10 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Class and utility functions for 2D rigid transformations.
+#
+######################################################################
 
 import numpy
 

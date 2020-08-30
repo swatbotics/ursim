@@ -6,6 +6,11 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# This module implements a basic top-down 2D simulation of a modbile
+# robot similar to the Turtlebot 2.
+#
+######################################################################
 
 from .app import RoboSimApp
 

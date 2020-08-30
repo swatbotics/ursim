@@ -6,6 +6,10 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Utility functions and classes for OpenGL graphics and 3D math.
+#
+######################################################################
 
 import sys
 import numpy

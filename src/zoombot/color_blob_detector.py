@@ -6,6 +6,11 @@
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
+#
+# Detect color blobs in YCrCb colorspace, and extract moments (mean,
+# principal axes and dimensions) from point cloud data.
+#
+######################################################################
 
 import cv2
 import numpy
