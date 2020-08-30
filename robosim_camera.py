@@ -92,16 +92,19 @@ LOG_TIME_VARS = [
     'pcgrab.depth.process',
 ]
 
+USE_PBOS = True
+
 assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 
 ######################################################################
 
 class LogTimer:
 
-    def __init__(self, array, idx, denom):
+    def __init__(self, array, idx, denom, display=None):
         self.array = array
         self.idx = idx
         self.denom = denom
+        self.display = display
 
     def __enter__(self):
         self.start = glfw.get_time()
@@ -109,12 +112,16 @@ class LogTimer:
     def __exit__(self, type, value, traceback):
         elapsed = glfw.get_time() - self.start
         self.array[self.idx] = elapsed / self.denom
+        if self.display is not None:
+            print('{}: {}'.format(self.display, self.array[self.idx]))
         
 
 ######################################################################
 
 TextureInfo = namedtuple('TextureInfo',
-                         'texname, width, height, channels, tex_format, storage_type, data_size, pbo, ctypes_type')
+                         'texname, width, height, channels, '
+                         'tex_format, storage_type, data_size, '
+                         'pbo, ctypes_type, numpy_type')
 
 ######################################################################
 
@@ -130,15 +137,10 @@ class SimCamera:
         gl.UNSIGNED_BYTE: gl.ubyte
     }
 
-    def create_pbo(self, channels, dtype):
-        pbo = gl.GenBuffers(1)
-        data_size = CAMERA_HEIGHT * CAMERA_WIDTH * channels * self.DATA_TYPE_SIZE[dtype]
-        
-        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, pbo)
-        gl.BufferData(gl.PIXEL_PACK_BUFFER, data_size, gfx.c_void_p(0), gl.DYNAMIC_READ)
-        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
-
-        return pbo
+    NUMPY_TYPES = {
+        gl.FLOAT: numpy.float32,
+        gl.UNSIGNED_BYTE: numpy.uint8
+    }
 
     def add_texture_to_grab(self, texname, tex_format, storage_type, channels):
 
@@ -158,8 +160,11 @@ class SimCamera:
         gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
 
         ctypes_type = self.CTYPES_TYPES[storage_type]
+        numpy_type = self.NUMPY_TYPES[storage_type]
 
-        tinfo = TextureInfo(texname, width, height, channels, tex_format, storage_type, data_size, pbo, ctypes_type)
+        tinfo = TextureInfo(texname, width, height, channels,
+                            tex_format, storage_type, data_size,
+                            pbo, ctypes_type, numpy_type)
 
         self.grab_textures[texname] = tinfo
         
@@ -249,6 +254,9 @@ class SimCamera:
 
         self.frame_budget = frame_budget
 
+        self.total_grab_time = 0
+        self.total_grabbed_frames = 0
+
         if logger is None:
 
             self.log_vars = None
@@ -300,6 +308,9 @@ class SimCamera:
 
     def prepare_to_grab(self, texname):
 
+        if not USE_PBOS:
+            return
+
         tinfo = self.grab_textures[texname]
 
         gl.BindBuffer(gl.PIXEL_PACK_BUFFER, tinfo.pbo)
@@ -311,14 +322,26 @@ class SimCamera:
 
         tinfo = self.grab_textures[texname]
         
-        gl.BindBuffer(gl.PIXEL_PACK_BUFFER, tinfo.pbo)
-        address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
-        buffer = (tinfo.ctypes_type * (tinfo.height*tinfo.width*tinfo.channels)).from_address(address)
-        array = numpy.ctypeslib.as_array(buffer).reshape(tinfo.height, tinfo.width, tinfo.channels).squeeze()
+        if USE_PBOS:
+
+            gl.BindBuffer(gl.PIXEL_PACK_BUFFER, tinfo.pbo)
+            address = gl.MapBuffer(gl.PIXEL_PACK_BUFFER, gl.READ_ONLY)
+            buffer = (tinfo.ctypes_type * (tinfo.height*tinfo.width*tinfo.channels)).from_address(address)
+            array = numpy.ctypeslib.as_array(buffer).reshape(tinfo.height, tinfo.width, tinfo.channels).squeeze()
+
+        else:
+
+            gl.BindTexture(gl.TEXTURE_2D, texname)
+            buffer = gl.GetTexImage(gl.TEXTURE_2D, 0, tinfo.tex_format, tinfo.storage_type)
+            array = numpy.frombuffer(buffer, dtype=tinfo.numpy_type).reshape(tinfo.height, tinfo.width, tinfo.channels).squeeze()
 
         return array
-
+            
     def done_grabbing(self):
+        
+        if not USE_PBOS:
+            return
+        
         gl.UnmapBuffer(gl.PIXEL_PACK_BUFFER)
         gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
         
@@ -405,17 +428,20 @@ class SimCamera:
         
     def update(self):
 
-        start = glfw.get_time()
-        self.render()
-        self.log_vars[LOG_RENDER_TIME] = (glfw.get_time() - start) / self.frame_budget
+        with LogTimer(self.log_vars, LOG_RENDER_TIME, self.frame_budget):
+            self.render()
         
-        start = glfw.get_time()
-        self.grab_frame()
-        self.log_vars[LOG_GRAB_TIME] = (glfw.get_time() - start) / self.frame_budget
+        with LogTimer(self.log_vars, LOG_GRAB_TIME, self.frame_budget):
+            self.grab_frame()
 
-        start = glfw.get_time()
-        self.process_frame()
-        self.log_vars[LOG_PROCESS_TIME] = (glfw.get_time() - start) / self.frame_budget
+        self.total_grab_time += self.log_vars[LOG_GRAB_TIME]
+        self.total_grabbed_frames += 1
+
+        print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
+        
+
+        with LogTimer(self.log_vars, LOG_PROCESS_TIME, self.frame_budget):
+            self.process_frame()
 
     def save_images(self):
 
