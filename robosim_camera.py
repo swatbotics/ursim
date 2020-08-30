@@ -135,9 +135,9 @@ class SimCamera:
         width = gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH)
         height = gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT)
 
-        print('texture is {}x{}x{} with format {} and storage type {}'.format(
-            width, height, channels,
-            gfx.ENUM_LOOKUP[tex_format], gfx.ENUM_LOOKUP[storage_type]))
+        #print('texture is {}x{}x{} with format {} and storage type {}'.format(
+        #    width, height, channels,
+        #    gfx.ENUM_LOOKUP[tex_format], gfx.ENUM_LOOKUP[storage_type]))
 
         data_size = width * height * channels * self.DATA_TYPE_SIZE[storage_type]
 
@@ -214,7 +214,8 @@ class SimCamera:
 
         self.rendered_robot_poses = [None] * frames
 
-        self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT, frames=frames)
+        self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT,
+                                           frames=frames)
         
         self.framebuffer.add_aux_texture(gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
                                          gl.NEAREST, gl.NEAREST,
@@ -256,8 +257,8 @@ class SimCamera:
         self.last_rendered_frame = None
         self.frame_to_grab = None
 
-        self.total_grab_time = 0
-        self.total_grabbed_frames = 0
+        #self.total_grab_time = 0
+        #self.total_grabbed_frames = 0
 
         if logger is None:
 
@@ -456,10 +457,9 @@ class SimCamera:
             self.grab_frame()
 
 
-        self.total_grab_time += self.log_vars[LOG_GRAB_TIME]
-        self.total_grabbed_frames += 1
-
-        print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
+        #self.total_grab_time += self.log_vars[LOG_GRAB_TIME]
+        #self.total_grabbed_frames += 1
+        #print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
 
         with LogTimer(self.log_vars, LOG_PROCESS_TIME, self.frame_budget):
             self.process_frame()
