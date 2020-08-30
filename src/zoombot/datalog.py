@@ -35,6 +35,9 @@ class Logger:
         self.groups = []
         self.total_variables = 0
 
+        if isinstance(dt, datetime.timedelta):
+            dt = dt.total_seconds()
+
         self.dt = dt
 
         self.have_time = False

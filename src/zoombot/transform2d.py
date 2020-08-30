@@ -15,6 +15,17 @@ import numpy
 
 ######################################################################
 
+def wrap_angle(angle):
+    """Wraps a given angle to the [-PI, PI] interval."""
+    return numpy.remainder(angle + numpy.pi, 2*numpy.pi) - numpy.pi
+
+def angle_diff(b, a):
+    """Returns the smallest (magnitude) angle c such that
+       wrap_angle(a + c) = wrap_angle(b)"""
+    return wrap_angle(b-a)
+
+######################################################################
+
 class Transform2D:
 
     """Class to encapsulate a 2D rigid transformation."""
@@ -336,8 +347,46 @@ def _test_transform_2d():
 
     print('...transforms seem to work OK!')
 
+
+######################################################################
+
+def _test_angle_stuff():
+
+    def wrap_angle_naive(x):
+        while x > numpy.pi:
+            x -= 2*numpy.pi
+        while x < -numpy.pi:
+            x += 2*numpy.pi
+        return x
+
+    for i in range(100):
+        
+        x = (numpy.random.random()*2-1)*10*numpy.pi
+        a = wrap_angle(x)
+        b = wrap_angle_naive(x)
+
+        print(a, b)
+        assert numpy.abs(a) <= numpy.pi
+        assert numpy.isclose(a, b)
+
+    for i in range(100):
+        
+        x = (numpy.random.random()*2-1)*10*numpy.pi
+        y = (numpy.random.random()*2-1)*10*numpy.pi
+        z = angle_diff(y, x)
+
+        wy = wrap_angle(y)
+        wxz = wrap_angle(x+z)
+
+        print(wy, wxz)
+        
+        assert numpy.abs(z) <= numpy.pi
+        assert numpy.isclose(wy, wxz)
+
+    print('angle stuff works ok!')
+        
 ######################################################################
     
 if __name__ == '__main__':
-
+    _test_angle_stuff()
     _test_transform_2d()

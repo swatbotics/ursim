@@ -49,7 +49,7 @@ class BumpController(ctrl.Controller):
         elapsed = time - self.init_time
 
         is_done = (self.duration is not None and
-                   elapsed > self.duration - 0.5*dt)
+                   elapsed.total_seconds() >= self.duration)
 
         if self.is_virtual:
             bump_left = scan.ranges[0] < MIN_DIST

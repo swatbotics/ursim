@@ -57,8 +57,7 @@ class LookAtController(ctrl.Controller):
             
             elapsed = time - self.init_time
 
-            # note comparison with rounding
-            if elapsed > 3.0 - 0.5*dt:
+            if elapsed.total_seconds() >= 3.0:
                 
                 print('done staring!')
                 

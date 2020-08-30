@@ -12,6 +12,7 @@
 #
 ######################################################################
 
+from datetime import timedelta
 import os, time
 
 import glfw
@@ -46,9 +47,10 @@ from .clean_gl import gl
 # DONE: draw nice arrow for robot
 # DONE: refactor into module/package structure
 # DONE: move Renderables back into core
-# TODO: dt, sim_time as numpy timedelta?
-# TODO: angle diff function in transform2D?
-# TODO: docs for plotter?
+# DONE: angle diff function in transform2D?
+# DONE: dt, sim_time as numpy timedelta?
+# TODO: document Controller?
+# TODO: docs for plot_log?
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
@@ -110,11 +112,10 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.detection_gfx_object = None
 
-
-        assert self.sim.dt == 0.01
+        assert self.sim.dt == timedelta(milliseconds=10)
         assert self.sim.physics_ticks_per_update == 4
 
-        self.frame_budget = self.sim.dt * self.sim.physics_ticks_per_update
+        self.frame_budget = (self.sim.dt * self.sim.physics_ticks_per_update).total_seconds()
         
         self.sim_camera = camera.SimCamera(self.sim)
 

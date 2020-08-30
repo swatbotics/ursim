@@ -23,7 +23,7 @@ class SimpleSquareController(ctrl.Controller):
         self.set_state(time, 'straight', odom_pose)
 
     def set_state(self, time, state, odom_pose):
-        print('set state to {} at time {:.2f}'.format(state, time))
+        print('set state to {} at time {}'.format(state, time))
         self.init_time = time
         self.state = state
         self.init_odom_pose = odom_pose.copy()
@@ -35,8 +35,7 @@ class SimpleSquareController(ctrl.Controller):
         
         elapsed = time - self.init_time
 
-        # note rounding to nearest update period
-        is_done = (elapsed >= 2.0 - 0.5*dt)
+        is_done = elapsed.total_seconds() >= 2.0
 
         world_from_cur_robot = robot_state.odom_pose
 

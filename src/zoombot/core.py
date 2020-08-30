@@ -13,6 +13,7 @@
 ######################################################################
 
 import os
+from datetime import timedelta
 
 import numpy
 import Box2D as B2D
@@ -1170,6 +1171,8 @@ class Robot(SimObject):
 
     def sim_update(self, time, dt):
 
+        dt_sec = dt.total_seconds()
+
         body = self.body
 
         current_tangent = body.GetWorldVector((1, 0))
@@ -1234,14 +1237,14 @@ class Robot(SimObject):
                 )
 
                 self.wheel_vel_integrator[idx] = clamp_abs(
-                    self.wheel_vel_integrator[idx] + wheel_vel_error * dt,
+                    self.wheel_vel_integrator[idx] + wheel_vel_error * dt_sec,
                     WHEEL_VEL_INTEGRATOR_MAX)
 
                 wheel_delta_vel_cmd = (WHEEL_VEL_KP * wheel_vel_error +
                                        WHEEL_VEL_KI * self.wheel_vel_integrator[idx])
                 
                 applied_force = clamp_abs(
-                    wheel_delta_vel_cmd * body.mass / dt,
+                    wheel_delta_vel_cmd * body.mass / dt_sec,
                     WHEEL_MAX_FORWARD_FORCE)
 
             friction_force = -self.rolling_mu * wheel_fwd_vel * body.mass * GRAVITY
@@ -1263,7 +1266,7 @@ class Robot(SimObject):
         
         if self.odom_tick % ODOM_FREQUENCY == 0:
 
-            odt = dt * ODOM_FREQUENCY
+            odt = dt_sec * ODOM_FREQUENCY
             odom_fwd = odt * self.odom_linear_angular_vel_raw[0]
             odom_spin = odt * self.odom_linear_angular_vel_raw[1]
 
@@ -1398,16 +1401,17 @@ class RoboSim(B2D.b2ContactListener):
         
         self.objects = [ self.robot, self.room ]
 
-        self.dt = 0.01 # 100 HZ
+        self.dt = timedelta(milliseconds=10)
+        
         self.physics_ticks_per_update = 4
 
-        self.logger = Logger(self.dt)
+        self.logger = Logger(self.dt * self.physics_ticks_per_update)
         self.robot.setup_log(self.logger)
 
         self.velocity_iterations = 6
         self.position_iterations = 2
         
-        self.sim_time = 0.0
+        self.sim_time = timedelta()
         self.sim_ticks = 0
 
         self.svg_filename = None
@@ -1459,7 +1463,7 @@ class RoboSim(B2D.b2ContactListener):
             self.clear()
             self.load_svg(self.svg_filename)
         else:
-            self.sim_time = 0
+            self.sim_time = timedelta(0)
             self.sim_ticks = 0
             for obj in self.objects:
                 obj.reset()
@@ -1467,7 +1471,7 @@ class RoboSim(B2D.b2ContactListener):
 
     def clear(self):
 
-        self.sim_time = 0.0
+        self.sim_time = timedelta(0)
         self.sim_ticks = 0
         self.modification_counter += 1
 
@@ -1634,7 +1638,7 @@ class RoboSim(B2D.b2ContactListener):
             for obj in self.objects:
                 obj.sim_update(self.sim_time, self.dt)
 
-            self.world.Step(self.dt,
+            self.world.Step(self.dt.total_seconds(),
                             self.velocity_iterations,
                             self.position_iterations)
 

@@ -12,6 +12,7 @@
 #
 ######################################################################
 
+from datetime import timedelta
 import os, sys
 from collections import namedtuple
 
@@ -93,6 +94,8 @@ assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 class LogTimer:
 
     def __init__(self, array, idx, denom, display=None):
+        if isinstance(denom, timedelta):
+            denom = denom.total_seconds()
         self.array = array
         self.idx = idx
         self.denom = denom
