@@ -50,7 +50,7 @@ from .clean_gl import gl
 # DONE: angle diff function in transform2D?
 # DONE: dt, sim_time as numpy timedelta?
 # TODO: document Controller?
-# TODO: docs for plot_log?
+# TODO: docs for plotter?
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
