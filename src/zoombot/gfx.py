@@ -1,20 +1,21 @@
 ######################################################################
 #
-# graphics.py
+# zoombot/gfx.py
 #
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import glfw
-import OpenGL.GL
-from CleanGL import gl
-from PIL import Image
-from ctypes import c_void_p
+import sys
 import numpy
 
-import sys
+import glfw
+import OpenGL.GL
+from PIL import Image
+from ctypes import c_void_p
+
+from .clean_gl import gl
 
 ######################################################################
 
@@ -23,6 +24,8 @@ ENUM_LOOKUP = dict([
     for (name, value) in OpenGL.GL.__dict__.items()
     if isinstance(value, OpenGL.constant.IntConstant)
 ])
+
+ENUM_LOOKUP[gl.UNSIGNED_BYTE] = 'GL_UNSIGNED_BYTE'
 
 ######################################################################
 
@@ -1289,7 +1292,8 @@ class GlfwApp:
 
     ############################################################
             
-    def create_window(self, name, width, height, hints=DEFAULT_WINDOW_HINTS, units='framebuffer'):
+    def create_window(self, name, width, height,
+                      hints=DEFAULT_WINDOW_HINTS, units='framebuffer'):
 
         assert units in ['framebuffer', 'window']
 
@@ -1380,9 +1384,8 @@ def _test_rotation_from_axes():
         idx1 = (idx0 + numpy.random.randint(2) + 1) % 3
         idx2 = 3 - idx0 - idx1
         
-        R = rotation_from_axes(idx0, axis0, idx1, axis1)
+        R = rotation_from_axes(idx0, axis0, idx1, axis1, dim=3)
         detR = numpy.linalg.det(R)
-
 
         u = normalize(axis0)
         v = normalize(axis1 - u * numpy.dot(u, axis1))
@@ -1400,18 +1403,4 @@ def _test_rotation_from_axes():
         assert numpy.all(numpy.isclose(R[idx1], v, 1e-3))
 
 if __name__ == '__main__':
-
     _test_rotation_from_axes()
-
-    class DemoApp(GlfwApp):
-
-        def __init__(self):
-            super().__init__()
-            self.create_window('Demo', 800, 600)
-
-        def key(self, key, scancode, action, mods):
-            if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
-                glfw.set_window_should_close(self.window, gl.TRUE)
-            
-    app = DemoApp()
-    app.run()

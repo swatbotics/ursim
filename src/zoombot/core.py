@@ -1,19 +1,22 @@
 ######################################################################
 #
-# robosim_core.py
+# zoombot/core.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import numpy
-import graphics as gfx
-import Box2D as B2D
-import svgelements as se
 import os
-import robosim_logging as rlog
-from transform2d import Transform2D
+
+import numpy
+import Box2D as B2D
+import svgelements 
+
+from . import gfx
+from .find_path import FindPath
+from .datalog import Logger
+from .transform2d import Transform2D
 
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
@@ -947,7 +950,7 @@ class RoboSim(B2D.b2ContactListener):
         self.dt = 0.01 # 100 HZ
         self.physics_ticks_per_update = 4
 
-        self.logger = rlog.Logger(self.dt)
+        self.logger = Logger(self.dt)
         self.robot.setup_log(self.logger)
 
         self.velocity_iterations = 6
@@ -1025,7 +1028,7 @@ class RoboSim(B2D.b2ContactListener):
 
     def load_svg(self, svgfile):
 
-        svg = se.SVG.parse(svgfile, color='none')
+        svg = svgelements.SVG.parse(svgfile, color='none')
         print('parsed', svgfile)
 
         scl = 1e-2
@@ -1061,7 +1064,7 @@ class RoboSim(B2D.b2ContactListener):
             if item.stroke.value is not None:
                 scolor = vec_from_svg_color(item.stroke)
 
-            if isinstance(item, se.Rect):
+            if isinstance(item, svgelements.Rect):
 
                 w, h = xform.scale_dims(item.width, item.height)
 
@@ -1083,7 +1086,7 @@ class RoboSim(B2D.b2ContactListener):
 
                     self.add_box(dims, pctr, theta)
                 
-            elif isinstance(item, se.Circle):
+            elif isinstance(item, svgelements.Circle):
                 
                 cidx, color = match_svg_color(fcolor, CIRCLE_COLORS)
 
@@ -1095,7 +1098,7 @@ class RoboSim(B2D.b2ContactListener):
                     self.add_pylon(position,
                                    PYLON_COLOR_NAMES[cidx-1])
                                         
-            elif isinstance(item, se.SimpleLine):
+            elif isinstance(item, svgelements.SimpleLine):
 
                 p0 = xform.transform(item.x1, item.y1)
                 p1 = xform.transform(item.x2, item.y2)
@@ -1111,14 +1114,14 @@ class RoboSim(B2D.b2ContactListener):
 
                     self.add_wall(p0, p1)
 
-            elif isinstance(item, se.Polyline):
+            elif isinstance(item, svgelements.Polyline):
                 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
 
                 self.add_tape_strip(points)
 
-            elif isinstance(item, se.Polygon):
+            elif isinstance(item, svgelements.Polygon):
 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
@@ -1219,27 +1222,5 @@ class RoboSim(B2D.b2ContactListener):
 
         if other is not None:
             self.robot.colliders.add(other.userData)
-
-######################################################################
-
-def _test_load_environment():
-
-
-    sim = RoboSim()
-    sim.load_svg('environments/first_environment.svg')
-
-    print('sim objects:')
-
-    for sim_object in sim.objects:
-        print('  ' + type(sim_object).__name__)
-        if sim_object.body is not None:
-            print('    transform:',
-                  sim_object.body.position, sim_object.body.angle)
-
-######################################################################
-
-if __name__ == '__main__':
-
-    _test_load_environment()
     
             

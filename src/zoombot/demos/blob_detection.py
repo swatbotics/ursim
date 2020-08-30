@@ -1,15 +1,16 @@
 ######################################################################
 #
-# demo_blob_detection.py
+# zoombot/demos/blob_detection.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import robosim
-import robosim_controller as ctrl
 import numpy
+
+from .. import ctrl
+from ..app import RoboSimApp
 
 ######################################################################
 
@@ -90,7 +91,7 @@ if __name__ == '__main__':
 
     controller = LookAtController()
     
-    app = robosim.RoboSimApp(controller)
+    app = RoboSimApp(controller)
 
     app.sim.set_dims(5.0, 5.0)
 

@@ -1,20 +1,20 @@
 ######################################################################
 #
-# robosim.py
+# zoombot/app.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import numpy
-import graphics as gfx
-import robosim_controller as ctrl
-import robosim_core as core
-import robosim_camera as scam
+import os, time
+
 import glfw
-import time
-from CleanGL import gl
+import numpy
+
+from . import core, gfx, ctrl, camera
+from .find_path import FindPath
+from .clean_gl import gl
 
 # DONE: teardown graphics
 # DONE: teardown sim
@@ -54,6 +54,8 @@ LOG_PROFILING_NAMES = [
     'profiling.camera',
     'profiling.rendercalls'
 ]
+
+FIND_PATH = FindPath(__file__)
 
 ######################################################################
 
@@ -201,12 +203,12 @@ class RoomRenderable(SimRenderable):
         super().__init__(sim_object)
 
         if self.floor_texture is None:
-            self.floor_texture = gfx.load_texture('textures/floor_texture.png')
+            self.floor_texture = gfx.load_texture(FIND_PATH('textures/floor_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 
         if self.wall_texture is None:
-            self.wall_texture = gfx.load_texture('textures/wall_texture.png')
+            self.wall_texture = gfx.load_texture(FIND_PATH('textures/wall_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
             
@@ -666,10 +668,10 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.frame_budget = self.sim.dt * self.sim.physics_ticks_per_update
         
-        self.sim_camera = scam.SimCamera(self.sim.robot,
-                                         self.renderables,
-                                         self.sim.logger,
-                                         frame_budget=self.frame_budget)
+        self.sim_camera = camera.SimCamera(self.sim.robot,
+                                           self.renderables,
+                                           self.sim.logger,
+                                           frame_budget=self.frame_budget)
 
         self.last_update_time = None
 
@@ -1042,10 +1044,10 @@ class RoboSimApp(gfx.GlfwApp):
 ######################################################################
 
 def keyboard_demo():
-    
+
     app = RoboSimApp()
 
-    app.sim.load_svg('environments/first_environment.svg')
+    app.sim.load_svg(FIND_PATH('environments/first_environment.svg'))
 
     app.run()
 

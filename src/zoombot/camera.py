@@ -1,23 +1,23 @@
 ######################################################################
 #
-# robosim_camera.py
+# zoombot/camera.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import numpy
-import cv2
-import color_blob_detector as blob
-import graphics as gfx
-from PIL import Image
-from CleanGL import gl
-import robosim_core as core
-import os
-import glfw
-import sys
+import os, sys
 from collections import namedtuple
+
+import numpy
+from PIL import Image
+import glfw
+import cv2
+
+from . import core, gfx
+from .clean_gl import gl
+from .color_blob_detector import ColorBlobDetector
 
 CAMERA_WIDTH = 448
 CAMERA_HEIGHT = 336
@@ -168,7 +168,7 @@ class SimCamera:
         u += 0.5 - 0.5*CAMERA_WIDTH
         v += 0.5 - 0.5*CAMERA_HEIGHT
 
-        self.detector = blob.ColorBlobDetector(mode='rgb')
+        self.detector = ColorBlobDetector(mode='rgb')
 
         self.robot_y_per_camera_z = -u.reshape(1, -1) / CAMERA_F_PX
         self.robot_z_per_camera_z = -v.reshape(-1, 1) / CAMERA_F_PX
@@ -498,7 +498,6 @@ class SimCamera:
             
         paletted_output = self.detector.colorize_labels(self.camera_labels)
 
-        Image.fromarray(self.camera_points_valid).save('valid.png')
         Image.fromarray(paletted_output).save(filenames['labels'])
         Image.fromarray(self.camera_rgb).save(filenames['rgb'])
 

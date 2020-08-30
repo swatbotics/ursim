@@ -1,16 +1,17 @@
 ######################################################################
 #
-# demo_bump.py
+# zoombot/demos/bump.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import robosim
-import robosim_controller as ctrl
 import numpy
 import sys
+
+from .. import ctrl
+from ..app import RoboSimApp
 
 ######################################################################
 
@@ -109,7 +110,7 @@ if __name__ == '__main__':
 
     controller = BumpController(is_virtual)
     
-    app = robosim.RoboSimApp(controller)
+    app = RoboSimApp(controller)
 
     app.sim.set_dims(3.0, 3.0)
     app.sim.initialize_robot((1.5, 1.8), 0.1)

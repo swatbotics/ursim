@@ -1,15 +1,16 @@
 ######################################################################
 #
-# demo_square.py
+# zoombot/demos/square.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import robosim
-import robosim_controller as ctrl
 import numpy
+
+from ..app import RoboSimApp
+from .. import ctrl
 
 ######################################################################
 
@@ -74,7 +75,7 @@ if __name__ == '__main__':
 
     controller = SimpleSquareController()
     
-    app = robosim.RoboSimApp(controller)
+    app = RoboSimApp(controller)
 
     app.sim.set_dims(5.0, 5.0)
     app.sim.initialize_robot((2.0, 2.0), 0.0)

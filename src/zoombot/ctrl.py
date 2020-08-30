@@ -1,6 +1,6 @@
 ######################################################################
 #
-# robosim_controller.py
+# zoombot/ctrl.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -8,8 +8,8 @@
 ######################################################################
 
 import numpy
-from color_blob_detector import BlobDetection
-from transform2d import Transform2D
+from .color_blob_detector import BlobDetection
+from .transform2d import Transform2D
 
 from collections import namedtuple
 

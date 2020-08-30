@@ -1,17 +1,18 @@
 ######################################################################
 #
-# demo_graphics.py
+# zoombot/demos/hello_gfx.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
 #
 ######################################################################
 
-import numpy as np
-
+import numpy
 import glfw
-from CleanGL import gl
-import graphics as gfx
+
+from .. import gfx
+from ..find_path import FindPath
+from ..clean_gl import gl
 
 ######################################################################
 
@@ -28,7 +29,9 @@ class HelloWorldApp(gfx.GlfwApp):
 
         self.framebuffer = gfx.Framebuffer(512, 512)
 
-        self.texture = gfx.load_texture('textures/monalisa.jpg', 'RGB')
+        find_path = FindPath(__file__)
+
+        self.texture = gfx.load_texture(find_path('../textures/monalisa.jpg'), 'RGB')
         
         self.fsquad = gfx.FullscreenQuad(self.texture)
 
@@ -54,7 +57,7 @@ class HelloWorldApp(gfx.GlfwApp):
 
         self.box = self.objects[0]
         
-        self.mouse_pos = np.array(self.framebuffer_size/2, dtype=np.float32)
+        self.mouse_pos = numpy.array(self.framebuffer_size/2, dtype=numpy.float32)
 
         self.handle_mouse_rot()
 
@@ -82,8 +85,8 @@ class HelloWorldApp(gfx.GlfwApp):
 
         foo = (self.mouse_pos / self.framebuffer_size)
 
-        self.yrot = gfx.mix(-2*np.pi, 2*np.pi, foo[0])
-        self.xrot = gfx.mix(np.pi/2, -np.pi/4, np.clip(foo[1], 0, 1))
+        self.yrot = gfx.mix(-2*numpy.pi, 2*numpy.pi, foo[0])
+        self.xrot = gfx.mix(numpy.pi/2, -numpy.pi/4, numpy.clip(foo[1], 0, 1))
 
         self.need_render = True
         self.view = None
@@ -138,7 +141,7 @@ class HelloWorldApp(gfx.GlfwApp):
             Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
             Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
 
-            R_mouse = np.dot(Rx, Ry)
+            R_mouse = numpy.dot(Rx, Ry)
         
             self.view = gfx.look_at(eye=gfx.vec3(2, 2, 0),
                                     center=gfx.vec3(0, 0, 0),
