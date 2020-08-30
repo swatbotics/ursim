@@ -308,40 +308,27 @@ def plot_log(ldata, trace_names=[]):
             
     plt.show()
         
-def _test_logging():
-
-    import matplotlib.pyplot as plt
-
-    g1_data = numpy.zeros(3, dtype=numpy.float32)
-    g2_data = numpy.zeros(2, dtype=int)
-
-    l = Logger(dt=0.04)
-
-    l.add_variables(['robot.pos.x', 'robot.pos.y', 'robot.pos.angle'], g1_data)
-    l.add_variables(['foo.vel.x', 'foo.vel.y'], g2_data)
-
-    filename = l.begin_log()
-
-    for theta in numpy.linspace(0, 2*numpy.pi, 32):
-        x = numpy.sin(theta)
-        y = -numpy.cos(theta)
-        g1_data[:] = x, y, theta
-        g2_data[:] = numpy.random.randint(32, size=2)
-        l.append_log_row()
-
-    l.write_log()
-
-    dt, ldata = read_log(filename)
-
-    os.unlink(filename)
-
-    plot_log(ldata)
+def get_latest():
+    expr = re.compile('log_[0-9]+_[0-9]+.npz')
+    files = os.listdir()
+    files = [f for f in files if expr.match(f)]
+    files.sort()
+    latest = files[-1]
+    print('opening latest log file', latest)
+    return latest
 
 if __name__ == '__main__':
 
     if len(sys.argv) == 1:
-        _test_logging()
+        filename = get_latest()
+        extra_args = []
     else:
-        _, ldata = read_log(sys.argv[1])
-        plot_log(ldata, sys.argv[2:])
+        if sys.argv[1] == '--latest' or sys.argv[1] == '-l':
+            filename = get_latest()
+        else:
+            filename = sys.argv[1]
+        extra_args = sys.argv[2:]
+
+    _, ldata = read_log(filename)
+    plot_log(ldata, extra_args)
         
