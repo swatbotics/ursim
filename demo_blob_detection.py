@@ -45,7 +45,7 @@ class LookAtController(ctrl.Controller):
                 print('gonna stare at {} for a bit'.format(self.sequence[self.cur_idx][0]))
             self.cur_move = move
 
-    def update(self, time, dt, robot_state, detections):
+    def update(self, time, dt, robot_state, scan, detections):
 
         color_name, direction = self.sequence[self.cur_idx]
         

@@ -27,7 +27,7 @@ class SimpleSquareController(ctrl.Controller):
         self.state = state
         self.init_odom_pose = odom_pose.copy()
 
-    def update(self, time, dt, robot_state, detections):
+    def update(self, time, dt, robot_state, scan, detections):
 
         ##################################################
         # state transition logic

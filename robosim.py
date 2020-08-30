@@ -35,9 +35,10 @@ from CleanGL import gl
 # DONE: frame rate improvements on windows
 # DONE: laser scan interface
 # DONE: log reader load latest log
-# TODO: add laser scan to controller inputs
+# DONE: add laser scan to controller inputs
 # TODO: draw nice arrow for robot
 # TODO: wall checkerboard texture
+# TODO: visual feedback for bump sensors?
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
@@ -500,7 +501,7 @@ class KeyboardController(ctrl.Controller):
         super().__init__()
         self.app = app
 
-    def update(self, time, dt, robot_state, detections):
+    def update(self, time, dt, robot_state, scan, detections):
         
         la = numpy.zeros(2)
 
@@ -635,10 +636,15 @@ class RoboSimApp(gfx.GlfwApp):
             robot.odom_wheel_vel_filtered[1],
             robot.odom_linear_angular_vel_filtered[0],
             robot.odom_linear_angular_vel_filtered[1])
+
+        scan = ctrl.LaserScan(
+            angles=self.sim_camera.scan_angles.copy(),
+            ranges=self.sim_camera.scan_ranges.copy())
             
         result = self.controller.update(self.sim.sim_time,
                                         self.frame_budget,
                                         robot_state,
+                                        scan,
                                         self.sim_camera.detections)
 
         if result is None:

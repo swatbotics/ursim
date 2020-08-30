@@ -22,6 +22,9 @@ RobotState = namedtuple('RobotState',
                         'wheel_vel_l, wheel_vel_r, '
                         'forward_vel, anglular_vel')
 
+LaserScan = namedtuple('LaserScan',
+                       'angles, ranges')
+
 ######################################################################
 
 class Controller:
@@ -32,6 +35,6 @@ class Controller:
     def initialize(self, time, odom_pose):
         pass
 
-    def update(self, time, dt, bump, detections, odom_pose):
+    def update(self, time, dt, bump, detections, scan, odom_pose):
         return ControllerOutput(forward_vel=0, angular_vel=0)
     
