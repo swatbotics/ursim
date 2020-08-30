@@ -20,7 +20,15 @@ def main():
 
     img = Image.fromarray(tile)
 
-    img.save('tile.png')
+    img.save('floor.png')
+
+    tile[:] = white
+    tile[:sz//2, sz//2:] = 0xf6
+    tile = np.minimum(tile, tile.T)
+
+    img = Image.fromarray(tile)
+    
+    img.save('wall.png')
 
 
 if __name__ == '__main__':

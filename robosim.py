@@ -36,9 +36,9 @@ from CleanGL import gl
 # DONE: laser scan interface
 # DONE: log reader load latest log
 # DONE: add laser scan to controller inputs
-# TODO: draw nice arrow for robot
-# TODO: wall checkerboard texture
-# TODO: visual feedback for bump sensors?
+# DONE: visual feedback for bump sensors?
+# DONE: wall checkerboard texture
+# DONE: draw nice arrow for robot
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 
@@ -194,6 +194,7 @@ class BoxRenderable(SimRenderable):
 class RoomRenderable(SimRenderable):
 
     floor_texture = None
+    wall_texture = None
 
     def __init__(self, sim_object):
 
@@ -204,6 +205,11 @@ class RoomRenderable(SimRenderable):
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 
+        if self.wall_texture is None:
+            self.wall_texture = gfx.load_texture('textures/wall_texture.png')
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+            
         w, h = sim_object.dims
 
         vdata = numpy.array([
@@ -248,7 +254,7 @@ class RoomRenderable(SimRenderable):
         ], dtype=numpy.uint8)
 
         room_obj = gfx.IndexedPrimitives.faceted_triangles(
-            verts, indices, core.ROOM_COLOR)
+            verts, indices, core.ROOM_COLOR, texture=self.wall_texture)
 
         room_obj.specular_strength = 0.25
 
@@ -492,6 +498,81 @@ class RobotRenderable(SimRenderable):
                     specular_strength=0.75
                 )
             )
+
+            
+        vdata = numpy.zeros((8, 3), dtype=numpy.float32)
+        xy = vdata[:, :2]
+        vdata[:, 2] = btop + 0.001
+
+        a = 0.08
+        b = 0.04
+        c = -0.15
+        d = 0.025
+        cd = -0.11
+        e = 0.105
+
+        xy[0] = (c, b)
+        xy[1] = (cd, 0)
+        xy[2] = (c, -b)
+        xy[3] = (d, a)
+        xy[4] = (d, b)
+        xy[5] = (d, -b)
+        xy[6] = (d, -a)
+        xy[7] = (e, 0)
+
+        indices = [ [ 0, 1, 4 ],
+                    [ 1, 5, 4 ],
+                    [ 2, 5, 1 ],
+                    [ 3, 4, 7 ],
+                    [ 4, 5, 7 ],
+                    [ 5, 6, 7 ] ]
+
+        indices = numpy.array(indices, dtype=numpy.uint8)
+        
+        arrow = gfx.IndexedPrimitives.faceted_triangles(
+            vdata, indices, gfx.vec3(0.8, 0.7, 0.0),
+            specular_exponent=40.0,
+            specular_strength=0.75
+        )
+
+        self.gfx_objects.append(arrow)
+
+        self.bump_lites = []
+
+        for theta_deg in [ 45, 0, -45 ]:
+
+            theta_rad = theta_deg*numpy.pi/180
+            r = 0.14
+            tx = r*numpy.cos(theta_rad)
+            ty = r*numpy.sin(theta_rad)
+
+            lite = gfx.IndexedPrimitives.sphere(
+                0.011, 16, 12,
+                gfx.vec3(0.25, 0, 0),
+                pre_transform=gfx.translation_matrix(gfx.vec3(tx, ty, btop)),
+                specular_exponent=50.0,
+                specular_strength=0.25,
+                enable_lighting=True)
+
+            self.gfx_objects.append(lite)
+            self.bump_lites.append(lite)
+
+    def render(self):
+        
+        robot = self.sim_object
+        
+        for i in range(3):
+            lite = self.bump_lites[i]
+            bump = robot.bump[i]
+            if bump:
+                lite.enable_lighting = False
+                lite.color = gfx.vec3(1, 0, 0)
+            else:
+                lite.enable_lighting = True
+                lite.color = gfx.vec3(0.25, 0, 0)
+            
+        
+        super().render()
 
 ######################################################################
 
