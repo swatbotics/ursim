@@ -371,6 +371,7 @@ class Framebuffer:
             self.depth_textures.append(depth_texture)
 
         self.aux_textures = []
+        self.attachments = []
         
         check_opengl_errors('after framebuffer setup')
 
@@ -384,8 +385,27 @@ class Framebuffer:
         gl.DeleteFramebuffers(len(self.fbos), self.fbos)
 
     def activate(self, frame_index=0):
+        
         gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbos[frame_index])
+        
         gl.Viewport(0, 0, self.width, self.height)
+        
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                gl.COLOR_ATTACHMENT0,
+                                gl.TEXTURE_2D,
+                                self.rgb_textures[frame_index], 0)
+
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                gl.DEPTH_ATTACHMENT,
+                                gl.TEXTURE_2D,
+                                self.depth_textures[frame_index], 0)
+
+        for aux_idx, attachment in enumerate(self.attachments):
+            gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                    attachment,
+                                    gl.TEXTURE_2D,
+                                    self.aux_textures[aux_idx][frame_index], 0)
+        
 
     def deactivate(self):
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -427,6 +447,7 @@ class Framebuffer:
         gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 
         self.aux_textures.append(tlist)
+        self.attachments.append(attachment)
 
 ######################################################################
 

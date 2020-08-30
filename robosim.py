@@ -593,6 +593,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.last_sim_modification = self.sim.modification_counter - 1
         self.controller_initialized = False
         self.prev_robot_pose = None
+        self.pprev_robot_pose = None
         self.cur_robot_pose = None
 
         if controller is None:
@@ -609,7 +610,16 @@ class RoboSimApp(gfx.GlfwApp):
 
     def update_sim(self):
 
-        self.prev_robot_pose = self.get_robot_pose()
+        cam = self.sim_camera
+
+        cur_pose = self.get_robot_pose()
+
+        if cam.last_rendered_frame != cam.frame_to_grab:
+            self.pprev_robot_pose = self.prev_robot_pose
+            self.prev_robot_pose = cur_pose
+        else:
+            self.prev_robot_pose = cur_pose
+            self.pprev_robot_pose = cur_pose
 
         start = glfw.get_time()
         self.sim_camera.update(was_reset=False)
@@ -693,6 +703,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.last_update_time = None
             self.controller_initialized = False
             self.prev_robot_pose = None
+            self.pprev_robot_pose = None
             self.cur_robot_pose = None
 
         elif key == glfw.KEY_M:
@@ -783,8 +794,8 @@ class RoboSimApp(gfx.GlfwApp):
 
     def render_scan(self):
 
-        if self.prev_robot_pose is None:
-            self.prev_robot_pose = self.get_robot_pose()
+        if self.pprev_robot_pose is None:
+            self.pprev_robot_pose = self.get_robot_pose()
 
         if self.tan_scan_angles is None:
             self.tan_scan_angles = numpy.tan(self.sim_camera.scan_angles)
@@ -819,8 +830,8 @@ class RoboSimApp(gfx.GlfwApp):
 
     def render_detections(self):
 
-        if self.prev_robot_pose is None:
-            self.prev_robot_pose = self.get_robot_pose()
+        if self.pprev_robot_pose is None:
+            self.pprev_robot_pose = self.get_robot_pose()
 
         if self.detection_gfx_object is None:
 
@@ -863,7 +874,7 @@ class RoboSimApp(gfx.GlfwApp):
                 if numpy.dot(delta, mean) > 0:
                     delta = -delta
 
-                M = self.prev_robot_pose
+                M = self.pprev_robot_pose
                 M = numpy.dot(M, gfx.translation_matrix(blob.xyz_mean + delta))
                 M = numpy.dot(M, rotate)
                 M = numpy.dot(M, scale)
@@ -884,7 +895,10 @@ class RoboSimApp(gfx.GlfwApp):
 
         dst_x0 = self.framebuffer_size[0] // 2 - dst_w //2
 
-        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim_camera.framebuffer.fbos[self.sim_camera.last_rendered_frame])
+        cam = self.sim_camera
+
+        gl.BindFramebuffer(gl.READ_FRAMEBUFFER,
+                           cam.framebuffer.fbos[cam.frame_to_grab])
 
         gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
 

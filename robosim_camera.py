@@ -70,26 +70,12 @@ LOG_RENDER_TIME = 0
 LOG_GRAB_TIME = 1
 LOG_PROCESS_TIME = 2
 
-LOG_GRAB_RGB_IMAGE_TIME = 3
-LOG_GRAB_RGB_PROCESS_TIME = 4
-LOG_GRAB_LABELS_IMAGE_TIME = 5
-LOG_GRAB_LABELS_PROCESS_TIME = 6
-LOG_GRAB_DEPTH_IMAGE_TIME = 7
-LOG_GRAB_DEPTH_PROCESS_TIME = 8
-
-
-LOG_DETECTIONS_START = 9
+LOG_DETECTIONS_START = 3
 
 LOG_TIME_VARS = [
     'profiling.camera.render',
     'profiling.camera.grab',
     'profiling.camera.process',
-    'pcgrab.rgb.image',
-    'pcgrab.rgb.process',
-    'pcgrab.labels.image',
-    'pcgrab.labels.process',
-    'pcgrab.depth.image',
-    'pcgrab.depth.process',
 ]
 
 USE_PBOS = True
@@ -249,9 +235,11 @@ class SimCamera:
             self.add_texture_to_grab(self.framebuffer.aux_textures[1][i],
                                      gl.RGB, gl.FLOAT, 3)
 
-        self.framebuffer.activate(0)
-
-        gl.DrawBuffers(3, [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2])
+        bufs = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2]
+            
+        for frame in range(frames):
+            self.framebuffer.activate(frame)
+            gl.DrawBuffers(3, bufs)
 
         self.framebuffer.deactivate()
         
@@ -264,6 +252,7 @@ class SimCamera:
         self.frame_budget = frame_budget
 
         self.last_rendered_frame = None
+        self.frame_to_grab = None
 
         self.total_grab_time = 0
         self.total_grabbed_frames = 0
@@ -287,13 +276,11 @@ class SimCamera:
             
     def render(self):
 
-        if self.last_rendered_frame is None or not DOUBLE_BUFFER:
-            cur_frame = 0
-        else:
-            cur_frame = 1 - self.last_rendered_frame
+        if DOUBLE_BUFFER:
+            self.last_rendered_frame, self.frame_to_grab = self.frame_to_grab, self.last_rendered_frame
 
-        #print('rendering camera to frame', cur_frame)
-        self.framebuffer.activate(cur_frame)
+        #print('rendering camera to frame', self.last_rendered_frame)
+        self.framebuffer.activate(self.last_rendered_frame)
 
         gl.Viewport(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT)
         #gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -323,21 +310,17 @@ class SimCamera:
 
         ######################################################################
 
-        #print('preparing to grab textures from frame', cur_frame)
-
-        with LogTimer(self.log_vars, LOG_GRAB_RGB_IMAGE_TIME, self.frame_budget):
-            self.prepare_to_grab(self.framebuffer.rgb_textures[cur_frame])
+        #print('preparing to grab textures from frame', self.last_rendered_frame)
         
         if self.render_labels:
-            with LogTimer(self.log_vars, LOG_GRAB_LABELS_IMAGE_TIME, self.frame_budget):
-                self.prepare_to_grab(self.framebuffer.aux_textures[0][cur_frame])
+            self.prepare_to_grab(self.framebuffer.aux_textures[0][self.last_rendered_frame])
+        else:
+            self.prepare_to_grab(self.framebuffer.rgb_textures[self.last_rendered_frame])
 
-        with LogTimer(self.log_vars, LOG_GRAB_DEPTH_IMAGE_TIME, self.frame_budget):
-            self.prepare_to_grab(self.framebuffer.aux_textures[1][cur_frame])
+        self.prepare_to_grab(self.framebuffer.aux_textures[1][self.last_rendered_frame])
 
         gfx.check_opengl_errors('get tex image for PBOs')
 
-        self.last_rendered_frame = cur_frame
         
     def prepare_to_grab(self, texname):
 
@@ -380,23 +363,16 @@ class SimCamera:
         
     def grab_frame(self):
 
-        if DOUBLE_BUFFER:
-            frame_to_grab = 1 - self.last_rendered_frame
-        else:
-            frame_to_grab = self.last_rendered_frame
+        #print('grabbing frame', self.frame_to_grab)
 
-        #print('grabbing frame', frame_to_grab)
+        xyz_image_flipped = self.grab(self.framebuffer.aux_textures[1][self.frame_to_grab])
+        self.camera_points = xyz_image_flipped[::-1].copy()
+        self.done_grabbing()
 
-        with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
+        Z = self.camera_points[:,:,0]
+        numpy.minimum(Z, CAMERA_MAX_POINT_DIST, out=Z)
 
-            xyz_image_flipped = self.grab(self.framebuffer.aux_textures[1][frame_to_grab])
-            self.camera_points = xyz_image_flipped[::-1].copy()
-            self.done_grabbing()
-
-            Z = self.camera_points[:,:,0]
-            numpy.minimum(Z, CAMERA_MAX_POINT_DIST, out=Z)
-
-            self.camera_points_valid = 255*((Z>=CAMERA_MIN_POINT_DIST).view(numpy.uint8))
+        self.camera_points_valid = 255*((Z>=CAMERA_MIN_POINT_DIST).view(numpy.uint8))
 
         # depth scan
         row = CAMERA_HEIGHT//2-1
@@ -410,14 +386,13 @@ class SimCamera:
             
         if self.render_labels:
 
-            with LogTimer(self.log_vars, LOG_GRAB_LABELS_PROCESS_TIME, self.frame_budget):
-                labels_image_flipped = self.grab(self.framebuffer.aux_textures[0][frame_to_grab])
-                self.camera_labels[:] = labels_image_flipped[::-1].copy()
-                self.done_grabbing()
+            labels_image_flipped = self.grab(self.framebuffer.aux_textures[0][self.frame_to_grab])
+            self.camera_labels[:] = labels_image_flipped[::-1].copy()
+            self.done_grabbing()
 
         else:
 
-            rgb_image_flipped = self.grab(self.framebuffer.rgb_textures[frame_to_grab])
+            rgb_image_flipped = self.grab(self.framebuffer.rgb_textures[self.frame_to_grab])
             self.camera_rgb[:] = rgb_image_flipped[::-1].copy()
             self.done_grabbing()
 
@@ -460,9 +435,13 @@ class SimCamera:
         # 
         with LogTimer(self.log_vars, LOG_RENDER_TIME, self.frame_budget):
             if was_reset:
-                self.last_rendered_frame = None
-                self.render() # render 0
-                # prep grab 0
+                if DOUBLE_BUFFER:
+                    self.last_rendered_frame = 1
+                    self.frame_to_grab = 0
+                else:
+                    self.last_rendered_frame = 0
+                    self.frame_to_grab = 0
+                self.render() 
             self.render()
             # prep grab 1
         
@@ -507,12 +486,8 @@ class SimCamera:
                 break
 
         if self.render_labels:
-            if DOUBLE_BUFFER:
-                frame_to_grab = 1 - self.last_rendered_frame
-            else:
-                frame_to_grab = self.last_rendered_frame
-            self.prepare_to_grab(self.framebuffer.rgb_textures[frame_to_grab])
-            rgb_image_flipped = self.grab(self.framebuffer.rgb_texture)
+            self.prepare_to_grab(self.framebuffer.rgb_textures[self.frame_to_grab])
+            rgb_image_flipped = self.grab(self.framebuffer.rgb_textures[self.frame_to_grab])
             self.camera_rgb[:] = rgb_image_flipped[::-1].copy()
             self.done_grabbing()
             
