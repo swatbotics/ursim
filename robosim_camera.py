@@ -19,8 +19,8 @@ import glfw
 import sys
 from collections import namedtuple
 
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
+CAMERA_WIDTH = 448
+CAMERA_HEIGHT = 336
 CAMERA_TOTAL_PIXELS = CAMERA_WIDTH*CAMERA_HEIGHT
 
 CAMERA_ASPECT = CAMERA_WIDTH / CAMERA_HEIGHT
@@ -92,7 +92,7 @@ LOG_TIME_VARS = [
     'pcgrab.depth.process',
 ]
 
-USE_PBOS = True
+USE_PBOS = False
 
 assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 
