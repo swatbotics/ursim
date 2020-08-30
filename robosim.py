@@ -592,9 +592,6 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.last_sim_modification = self.sim.modification_counter - 1
         self.controller_initialized = False
-        self.prev_robot_pose = None
-        self.pprev_robot_pose = None
-        self.cur_robot_pose = None
 
         if controller is None:
             controller = KeyboardController(self)
@@ -611,15 +608,6 @@ class RoboSimApp(gfx.GlfwApp):
     def update_sim(self):
 
         cam = self.sim_camera
-
-        cur_pose = self.get_robot_pose()
-
-        if cam.last_rendered_frame != cam.frame_to_grab:
-            self.pprev_robot_pose = self.prev_robot_pose
-            self.prev_robot_pose = cur_pose
-        else:
-            self.prev_robot_pose = cur_pose
-            self.pprev_robot_pose = cur_pose
 
         start = glfw.get_time()
         self.sim_camera.update(was_reset=False)
@@ -702,8 +690,6 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.reset(reload_svg=True)
             self.last_update_time = None
             self.controller_initialized = False
-            self.prev_robot_pose = None
-            self.pprev_robot_pose = None
             self.cur_robot_pose = None
 
         elif key == glfw.KEY_M:
@@ -794,9 +780,6 @@ class RoboSimApp(gfx.GlfwApp):
 
     def render_scan(self):
 
-        if self.pprev_robot_pose is None:
-            self.pprev_robot_pose = self.get_robot_pose()
-
         if self.tan_scan_angles is None:
             self.tan_scan_angles = numpy.tan(self.sim_camera.scan_angles)
 
@@ -824,14 +807,12 @@ class RoboSimApp(gfx.GlfwApp):
         else:
             self.scan_gfx_object.update_geometry(self.scan_vertex_data)
 
-        self.scan_gfx_object.model_pose = self.prev_robot_pose
+        cam = self.sim_camera
+        self.scan_gfx_object.model_pose = cam.rendered_robot_poses[cam.frame_to_grab]
 
         self.scan_gfx_object.render()
 
     def render_detections(self):
-
-        if self.pprev_robot_pose is None:
-            self.pprev_robot_pose = self.get_robot_pose()
 
         if self.detection_gfx_object is None:
 
@@ -849,7 +830,8 @@ class RoboSimApp(gfx.GlfwApp):
                 color=gfx.vec3(1, 0, 1),
                 enable_lighting=False)
 
-        detector = self.sim_camera.detector
+        cam = self.sim_camera
+        detector = cam.detector
 
         gl.Enable(gl.LINE_SMOOTH)
 
@@ -874,7 +856,7 @@ class RoboSimApp(gfx.GlfwApp):
                 if numpy.dot(delta, mean) > 0:
                     delta = -delta
 
-                M = self.pprev_robot_pose
+                M = cam.rendered_robot_poses[cam.frame_to_grab]
                 M = numpy.dot(M, gfx.translation_matrix(blob.xyz_mean + delta))
                 M = numpy.dot(M, rotate)
                 M = numpy.dot(M, scale)

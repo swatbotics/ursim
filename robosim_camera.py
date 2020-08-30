@@ -79,7 +79,7 @@ LOG_TIME_VARS = [
 ]
 
 USE_PBOS = True
-DOUBLE_BUFFER = True
+DOUBLE_BUFFER = False
 
 assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 
@@ -212,6 +212,8 @@ class SimCamera:
         else:
             frames = 1
 
+        self.rendered_robot_poses = [None] * frames
+
         self.framebuffer = gfx.Framebuffer(CAMERA_WIDTH, CAMERA_HEIGHT, frames=frames)
         
         self.framebuffer.add_aux_texture(gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
@@ -279,6 +281,8 @@ class SimCamera:
         if DOUBLE_BUFFER:
             self.last_rendered_frame, self.frame_to_grab = self.frame_to_grab, self.last_rendered_frame
 
+        
+
         #print('rendering camera to frame', self.last_rendered_frame)
         self.framebuffer.activate(self.last_rendered_frame)
 
@@ -292,7 +296,9 @@ class SimCamera:
 
         M = core.b2xform(self.robot.body.transform, 
                          core.ROBOT_CAMERA_LENS_Z)
-    
+
+        self.rendered_robot_poses[self.last_rendered_frame] = M
+        
         M = numpy.linalg.inv(M)
         
         M = numpy.dot(R_OPENGL_FROM_WORLD, M)
