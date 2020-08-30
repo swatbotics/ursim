@@ -1,9 +1,7 @@
-glfw ~= 1.12
-numpy ~= 1.19.0
-PyOpenGL ~= 3.1.5 
-Pillow ~= 7.2.0
-Box2D ~= 2.3.10
-transformations ~= 2020.1.1
-svgelements ~= 1.2.0
-matplotlib ~= 3.3.1
+glfw >= 1.12
+PyOpenGL >= 3.1.5 
+Box2D >= 2.3.10
+svgelements >= 1.2.0
+matplotlib >= 3.0.0
 opencv-python ~= 4.4.0
+Pillow >= 7.0.0

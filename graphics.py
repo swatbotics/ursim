@@ -13,7 +13,6 @@ from CleanGL import gl
 from PIL import Image
 from ctypes import c_void_p
 import numpy
-import transformations as tf
 
 import sys
 
@@ -93,13 +92,34 @@ def rotation_from_axes(idx0, axis0, idx1, axis1_suggestion, dim=4):
 
 ######################################################################
 
-def rotation_matrix(angle, axis, point=None):
-    return tf.rotation_matrix(angle, axis, point).astype(numpy.float32)
+def rotation_matrix(angle, axis):
+
+    axis = normalize(axis)
+    ca = numpy.cos(angle)
+    sa = numpy.sin(angle)
+
+    M = numpy.eye(4, dtype=numpy.float32)
+
+    Mupper = M[:3, :3]
+
+    K = numpy.array([
+        [0, -axis[2], axis[1]],
+        [axis[2], 0, -axis[0]],
+        [-axis[1], axis[0], 0]], dtype=numpy.float32)
+
+    Mupper[:] += sa * K + (1 - ca) * numpy.dot(K, K)
+
+    return M
 
 ######################################################################
 
 def translation_matrix(direction):
-    return tf.translation_matrix(direction).astype(numpy.float32)
+
+    M = numpy.eye(4, dtype=numpy.float32)
+
+    M[:3, 3] = direction
+
+    return M
 
 ######################################################################
 
