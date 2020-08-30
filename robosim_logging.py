@@ -313,6 +313,9 @@ def get_latest():
     files = os.listdir()
     files = [f for f in files if expr.match(f)]
     files.sort()
+    if not len(files):
+        print('no log files found!')
+        sys.exit(1)
     latest = files[-1]
     print('opening latest log file', latest)
     return latest
