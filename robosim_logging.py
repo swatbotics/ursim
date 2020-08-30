@@ -156,7 +156,6 @@ PLOT_MERGES = [
     re.compile(r'blobfinder\.(.*\.)num_detections'),
     re.compile(r'blobfinder\.(.*\.)max_area'),
     re.compile(r'profiling(\..*)'),
-    re.compile(r'pcgrab(\..*)')
 ]
 
 COLORS = dict(blue=[0, 0, 0.8],
