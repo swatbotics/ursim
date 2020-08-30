@@ -20,10 +20,95 @@ import sys
 
 from .find_path import find_path
 
-#SQRT22 = 0.5*numpy.sqrt(2)
+######################################################################
+
+class BlobDetection:
+
+    """A BlobDetection represents a single contiguous group of
+    similarly-colored pixels in a camera image, which is useful for
+    recognizing brightly-colored objects in scenes. 
+
+    A BlobDetection object contains the following fields:
+
+      * self.contour: The pixel coordinates of the 2D contour from the
+        original camera image, expressed as a n-by-1-by-2 numpy array
+        of integers.
+
+      * self.area: The fraction of the camera image covered by this
+        object. E.g. a 6000-pixel-squared box in an 800x600 camera image
+        would have an area of 6000/(800*600) = 0.0125
+
+      * self.xyz: The robot-frame 3D points from the RGBD image. The
+        coordinate frame has X forward, Y left, Z up, and it is
+        centered at the lens of the camera. May be None if 3D points
+        were not available. Expressed as a numpy array of shape
+        n-by-3.
+
+      * self.is_split: If the originally-detected blob had a large
+        depth (robot X) gap, it will be split into multiple sub-blobs
+        to attempt to accommodate occlusions. This can happen when
+        multiple objects of the same color overlap each other in the
+        camera's view. This member field is a boolean indicating whether
+        this detection stems from an original that was subdivided.
+
+      * self.xyz_mean: mean XYZ value expressed as flat numpy array of
+        size 3, if xyz data available, or None if not.
+
+      * self.axes: rough object dimensions along principal components,
+        computed from available xyz data, or None if not
+        available. Expressed as flat numpy array of size 3.
+
+      * self.principal_components: If xyz data is available, this is
+        an orthogonal 3-by-3 numpy array where each row is a direction
+        of variance. The first row is the robot-frame direction along
+        which xyz data varies the most, and the last row is the
+        robot-frame direction along which the xyz data varies the
+        least.
+
+    You can think of xyz_mean, axes, and principal_components as
+    specifying a 3D ellipsoid that roughly corresponds to the shape of
+    the detected object. The ellipsoid is centered at self.xyz_mean,
+    its respective axis lengths are specified by self.axes, and its
+    orientation is specified by self.principal_components.
+    """
+
+    def __init__(self, contour, area, xyz, is_split):
+
+        self.contour = contour
+        self.area = area
+        self.xyz = xyz.copy()
+        self.is_split = is_split
+
+        decimated = self.xyz
+        
+        if len(decimated) > 500:
+            decimated = decimated[::3]
+
+        if self.xyz is None:
+
+            self.xyz_mean = None
+            self.axes = None
+            self.principal_components = None
+
+        else:
+
+            mean, principal_components, evals = cv2.PCACompute2(decimated, mean=None)
+
+            evals = numpy.maximum(evals, 0)
+
+            mean = mean.flatten()
+            axes = 2*numpy.sqrt(evals.flatten())
+
+            self.xyz_mean = mean
+            self.axes = axes
+            self.principal_components = principal_components
+
+######################################################################
 
 def numpy_from_list(l):
     return numpy.array(l, dtype=numpy.uint8)
+
+######################################################################
 
 def list_from_numpy(a):
     if len(a.shape) > 1:
@@ -31,6 +116,8 @@ def list_from_numpy(a):
     else:
         return [ int(ai) for ai in a ]
 
+######################################################################
+    
 def replace_recursive(d, cls, fn):
 
     if isinstance(d, cls):
@@ -54,11 +141,17 @@ def replace_recursive(d, cls, fn):
     else:
         return d
 
+######################################################################
+
 def numpy_from_json(d):
     return replace_recursive(d, list, numpy_from_list)
 
+######################################################################
+
 def json_from_numpy(d):
     return replace_recursive(d, numpy.ndarray, list_from_numpy)
+
+######################################################################
 
 def union(boxa, boxb):
     if boxa is None:
@@ -71,6 +164,7 @@ def union(boxa, boxb):
             numpy.maximum(boxa[1], boxb[1])
         ], dtype=boxa.dtype)
 
+######################################################################
 
 def intersection(boxa, boxb):
     if boxa is None:
@@ -87,6 +181,8 @@ def intersection(boxa, boxb):
         else:
             return a
 
+######################################################################
+        
 def json_encode(obj, indent=0):
     istr = '  ' * indent
     iistr = istr + '  '
@@ -118,6 +214,7 @@ def json_encode(obj, indent=0):
     else:
         raise RuntimeError('nope')
 
+######################################################################
 
 def get_mask(bbox, image):
  
@@ -127,6 +224,8 @@ def get_mask(bbox, image):
     less = (image <= smax).min(axis=2)
     
     return (greater & less)
+
+######################################################################
 
 def label_image(all_bboxes, image, labels=None, scratch=None):
 
@@ -165,36 +264,6 @@ def label_image(all_bboxes, image, labels=None, scratch=None):
             cv2.bitwise_and(labels, scratch, labels, mask=scratch)
             
     return labels
-
-######################################################################
-
-class BlobDetection:
-
-    def __init__(self, contour, area, xyz, is_split):
-
-        self.contour = contour
-        self.area = area
-        self.xyz = xyz.copy()
-        self.is_split = is_split
-
-        decimated = self.xyz
-        
-        if len(decimated) > 500:
-            decimated = decimated[::3]
-
-        mean, principal_components, evals = cv2.PCACompute2(decimated, mean=None)
-
-        evals = numpy.maximum(evals, 0)
-
-        mean = mean.flatten()
-        axes = 2*numpy.sqrt(evals.flatten())
-
-        self.xyz_mean = mean
-        self.axes = axes
-        self.principal_components = principal_components
-
-    def __str__(self):
-        return('area fraction: {}'.format(self.area))
 
 ######################################################################
 

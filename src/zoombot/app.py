@@ -49,7 +49,9 @@ from .clean_gl import gl
 # DONE: move Renderables back into core
 # DONE: angle diff function in transform2D?
 # DONE: dt, sim_time as numpy timedelta?
-# TODO: document Controller?
+# DONE: document Controller?
+# DONE: document BlobDetection
+# TODO: friction model to muck up odometry without adding quite so much noise?
 # TODO: docs for plotter?
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
@@ -155,8 +157,6 @@ class RoboSimApp(gfx.GlfwApp):
             bool(robot.bump[0]),
             bool(robot.bump[1]),
             bool(robot.bump[2]),
-            robot.odom_wheel_vel_filtered[0],
-            robot.odom_wheel_vel_filtered[1],
             robot.odom_linear_angular_vel_filtered[0],
             robot.odom_linear_angular_vel_filtered[1])
 
