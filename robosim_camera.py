@@ -456,7 +456,6 @@ class SimCamera:
             # grab 0
             self.grab_frame()
 
-
         #self.total_grab_time += self.log_vars[LOG_GRAB_TIME]
         #self.total_grabbed_frames += 1
         #print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
