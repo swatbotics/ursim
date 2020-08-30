@@ -14,7 +14,6 @@ import Box2D as B2D
 import svgelements 
 
 from . import gfx
-from .find_path import FindPath
 from .datalog import Logger
 from .transform2d import Transform2D
 

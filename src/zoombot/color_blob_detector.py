@@ -13,6 +13,8 @@ import os
 import json
 import sys
 
+from .find_path import find_path
+
 #SQRT22 = 0.5*numpy.sqrt(2)
 
 def numpy_from_list(l):
@@ -209,7 +211,7 @@ class ColorBlobDetector:
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         
         if config_filename is None:
-            self.json_filename = os.path.join(self.script_dir, 'color_definitions.json')
+            self.json_filename = find_path('color_definitions.json')
         else:
             self.json_filename = config_filename
 

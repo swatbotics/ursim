@@ -11,7 +11,7 @@ import numpy
 import glfw
 
 from .. import gfx
-from ..find_path import FindPath
+from ..find_path import find_path
 from ..clean_gl import gl
 
 ######################################################################
@@ -29,9 +29,7 @@ class HelloWorldApp(gfx.GlfwApp):
 
         self.framebuffer = gfx.Framebuffer(512, 512)
 
-        find_path = FindPath(__file__)
-
-        self.texture = gfx.load_texture(find_path('../textures/monalisa.jpg'), 'RGB')
+        self.texture = gfx.load_texture(find_path('textures/monalisa.jpg'), 'RGB')
         
         self.fsquad = gfx.FullscreenQuad(self.texture)
 

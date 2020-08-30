@@ -9,12 +9,9 @@
 
 import os
 
-class FindPath:
+SELF_DIR = os.path.abspath(os.path.dirname(__file__))
 
-    def __init__(self, fileA):
-        self.dirname = os.path.abspath(os.path.dirname(fileA))
-
-    def __call__(self, fileB):
-        return os.path.join(self.dirname, fileB)
+def find_path(fileB):
+    return os.path.join(SELF_DIR, fileB)
 
     

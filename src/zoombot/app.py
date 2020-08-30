@@ -13,7 +13,7 @@ import glfw
 import numpy
 
 from . import core, gfx, ctrl, camera
-from .find_path import FindPath
+from .find_path import find_path
 from .clean_gl import gl
 
 # DONE: teardown graphics
@@ -54,8 +54,6 @@ LOG_PROFILING_NAMES = [
     'profiling.camera',
     'profiling.rendercalls'
 ]
-
-FIND_PATH = FindPath(__file__)
 
 ######################################################################
 
@@ -203,12 +201,12 @@ class RoomRenderable(SimRenderable):
         super().__init__(sim_object)
 
         if self.floor_texture is None:
-            self.floor_texture = gfx.load_texture(FIND_PATH('textures/floor_texture.png'))
+            self.floor_texture = gfx.load_texture(find_path('textures/floor_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 
         if self.wall_texture is None:
-            self.wall_texture = gfx.load_texture(FIND_PATH('textures/wall_texture.png'))
+            self.wall_texture = gfx.load_texture(find_path('textures/wall_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
             
@@ -1043,14 +1041,3 @@ class RoboSimApp(gfx.GlfwApp):
         
 ######################################################################
 
-def keyboard_demo():
-
-    app = RoboSimApp()
-
-    app.sim.load_svg(FIND_PATH('environments/first_environment.svg'))
-
-    app.run()
-
-if __name__ == '__main__':
-    
-    keyboard_demo()
