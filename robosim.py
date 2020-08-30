@@ -32,8 +32,12 @@ from CleanGL import gl
 # DONE: log odometry pose relative to initial position
 # DONE: put transform2d in its own python file with documentation
 # DONE: controller API in its own python file with documentation
+# DONE: frame rate improvements on windows
+# DONE: laser scan interface
+# DONE: log reader load latest log
+# TODO: add laser scan to controller inputs
+# TODO: draw nice arrow for robot
 # TODO: wall checkerboard texture
-# TODO: laser scan interface
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
 

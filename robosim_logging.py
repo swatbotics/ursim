@@ -117,16 +117,6 @@ class Logger:
                                names=log_names,
                                data=written_portion)
 
-        if sys.platform != 'win32':
-            
-            if os.path.islink('log_latest.npz'):
-                os.unlink('log_latest.npz')
-
-            if not os.path.exists('log_latest.npz'):
-                os.symlink(self.current_filename,
-                           'log_latest.npz')
-
-
         print('wrote log', self.current_filename)
         
         self.current_filename = None
