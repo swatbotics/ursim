@@ -612,7 +612,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.prev_robot_pose = self.get_robot_pose()
 
         start = glfw.get_time()
-        self.sim_camera.update()
+        self.sim_camera.update(was_reset=False)
         self.log_time[LOG_PROFILING_CAMERA] = (glfw.get_time() - start)/self.frame_budget
 
         if not self.controller_initialized:
@@ -767,7 +767,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.last_sim_modification = self.sim.modification_counter
             self.need_render = True
 
-            self.sim_camera.update()
+            self.sim_camera.update(was_reset=True)
         
         if self.animating:
             now = glfw.get_time()
@@ -884,7 +884,7 @@ class RoboSimApp(gfx.GlfwApp):
 
         dst_x0 = self.framebuffer_size[0] // 2 - dst_w //2
 
-        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim_camera.framebuffer.fbo)
+        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, self.sim_camera.framebuffer.fbos[self.sim_camera.last_rendered_frame])
 
         gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
 

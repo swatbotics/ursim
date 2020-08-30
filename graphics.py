@@ -175,7 +175,7 @@ def make_shader(stype, srcs):
 
 ######################################################################
 
-def make_program(vertex_shader, fragment_shader, bindings):
+def make_program(vertex_shader, fragment_shader, bindings=None):
 
     if isinstance(vertex_shader, list) or isinstance(vertex_shader, str):
         vertex_shader = make_shader(gl.VERTEX_SHADER, vertex_shader)
@@ -187,8 +187,9 @@ def make_program(vertex_shader, fragment_shader, bindings):
     gl.AttachShader(program, vertex_shader)
     gl.AttachShader(program, fragment_shader)
 
-    for idx, name in enumerate(bindings):
-        gl.BindFragDataLocation(program, idx, name)
+    if bindings is not None:
+        for idx, name in enumerate(bindings):
+            gl.BindFragDataLocation(program, idx, name)
     
     gl.LinkProgram(program)
 
@@ -311,50 +312,63 @@ def load_texture(filename, mode='RGB'):
 
 class Framebuffer:
 
-    def __init__(self, width, height):
+    def __init__(self, width, height, frames=1):
 
         self.width = width
         self.height = height
 
-        self.fbo = gl.GenFramebuffers(1)
-
-        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
-
-        self.rgb_texture = gl.GenTextures(1)
-
-        gl.BindTexture(gl.TEXTURE_2D, self.rgb_texture)
+        self.fbos = []
         
-        gl.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB, width, height, 0,
-                      gl.RGB, gl.UNSIGNED_BYTE, None)
+        self.rgb_textures = []
+        self.depth_textures = []
+        
+        self.aux_textures = []
 
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        self.frames = frames
+        
+        for dup in range(frames):
 
-        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
-                                gl.COLOR_ATTACHMENT0,
-                                gl.TEXTURE_2D,
-                                self.rgb_texture, 0)
+            fbo = gl.GenFramebuffers(1)
+            gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
 
-        self.depth_texture = gl.GenTextures(1)
+            rgb_texture = gl.GenTextures(1)
+            gl.BindTexture(gl.TEXTURE_2D, rgb_texture)
+        
+            gl.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB, width, height, 0,
+                          gl.RGB, gl.UNSIGNED_BYTE, None)
 
-        gl.BindTexture(gl.TEXTURE_2D, self.depth_texture)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 
-        gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0,
-                      gl.DEPTH_COMPONENT, gl.FLOAT, None)
+            gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                    gl.COLOR_ATTACHMENT0,
+                                    gl.TEXTURE_2D,
+                                    rgb_texture, 0)
 
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+            depth_texture = gl.GenTextures(1)
 
-        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
-                                gl.DEPTH_ATTACHMENT,
-                                gl.TEXTURE_2D,
-                                self.depth_texture, 0)
+            gl.BindTexture(gl.TEXTURE_2D, depth_texture)
 
-        gl.BindTexture(gl.TEXTURE_2D, 0)
+            gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, width, height, 0,
+                          gl.DEPTH_COMPONENT, gl.FLOAT, None)
+
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+            gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                    gl.DEPTH_ATTACHMENT,
+                                    gl.TEXTURE_2D,
+                                    depth_texture, 0)
+
+            gl.BindTexture(gl.TEXTURE_2D, 0)
+
+            self.fbos.append(fbo)
+            self.rgb_textures.append(rgb_texture)
+            self.depth_textures.append(depth_texture)
 
         self.aux_textures = []
         
@@ -363,12 +377,14 @@ class Framebuffer:
         self.deactivate()
 
     def destroy(self):
-        gl.DeleteTextures(1, [self.rgb_texture])
-        gl.DeleteTextures(1, [self.depth_texture])
-        gl.DeleteFramebuffers(1, [self.fbo])
+        gl.DeleteTextures(len(self.rgb_textures), self.rgb_textures)
+        gl.DeleteTextures(len(self.depth_textures), self.depth_textures)
+        for tlist in self.aux_textures:
+            gl.DeleteTextures(len(tlist), tlist)
+        gl.DeleteFramebuffers(len(self.fbos), self.fbos)
 
-    def activate(self):
-        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+    def activate(self, frame_index=0):
+        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbos[frame_index])
         gl.Viewport(0, 0, self.width, self.height)
 
     def deactivate(self):
@@ -382,27 +398,35 @@ class Framebuffer:
                         mag_filter,
                         attachment):
 
-        gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+        tlist = []
 
-        aux_texture = gl.GenTextures(1)
+        for frame in range(self.frames):
 
-        gl.BindTexture(gl.TEXTURE_2D, aux_texture)
+            gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbos[frame])
 
-        gl.TexImage2D(gl.TEXTURE_2D, 0, internal_format,
-                      self.width, self.height, 0,
-                      gl_format, gl_type, None)
+            aux_texture = gl.GenTextures(1)
 
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-        gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-        
-        gl.FramebufferTexture2D(gl.FRAMEBUFFER,
-                                attachment,
-                                gl.TEXTURE_2D,
-                                aux_texture, 0)
+            gl.BindTexture(gl.TEXTURE_2D, aux_texture)
 
-        self.aux_textures.append(aux_texture)
+            gl.TexImage2D(gl.TEXTURE_2D, 0, internal_format,
+                          self.width, self.height, 0,
+                          gl_format, gl_type, None)
+
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, mag_filter)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min_filter)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+            gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+            gl.FramebufferTexture2D(gl.FRAMEBUFFER,
+                                    attachment,
+                                    gl.TEXTURE_2D,
+                                    aux_texture, 0)
+
+            tlist.append(aux_texture)
+
+        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+
+        self.aux_textures.append(tlist)
 
 ######################################################################
 

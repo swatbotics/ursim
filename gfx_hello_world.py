@@ -111,7 +111,7 @@ class HelloWorldApp(gfx.GlfwApp):
                    self.framebuffer_size[0],
                    self.framebuffer_size[1])
 
-        self.box.texture = self.framebuffer.rgb_texture
+        self.box.texture = self.framebuffer.rgb_textures[0]
         
         self.render_step()
 
