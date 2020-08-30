@@ -44,7 +44,7 @@ CAMERA_K = numpy.array([
     [ 0, CAMERA_F_PX, 0.5*CAMERA_HEIGHT ],
     [ 0, 0, 1 ]], dtype=numpy.float32)
 
-MIN_CONTOUR_AREA_FRACTION = 50/(640*480)
+MIN_CONTOUR_AREA = 50/(640*480)
 
 OBJECT_SPLIT_AXIS = 0
 
@@ -415,7 +415,7 @@ class SimCamera:
         
         self.detections = self.detector.detect_blobs(
             self.camera_labels,
-            MIN_CONTOUR_AREA_FRACTION,
+            MIN_CONTOUR_AREA,
             self.camera_points,
             self.camera_points_valid,
             self.scratch,
@@ -432,7 +432,7 @@ class SimCamera:
                     self.log_vars[offset+1] = 0
                 else:
                     biggest = dlist[0]
-                    self.log_vars[offset+1] = biggest.area_fraction
+                    self.log_vars[offset+1] = biggest.area
                 offset += 2
         
     def update(self, was_reset):

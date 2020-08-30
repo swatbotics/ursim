@@ -163,10 +163,10 @@ def label_image(all_bboxes, image, labels=None, scratch=None):
 
 class BlobDetection:
 
-    def __init__(self, contour, area_fraction, xyz, is_split):
+    def __init__(self, contour, area, xyz, is_split):
 
         self.contour = contour
-        self.area_fraction = area_fraction
+        self.area = area
         self.xyz = xyz.copy()
         self.is_split = is_split
 
@@ -187,7 +187,7 @@ class BlobDetection:
         self.principal_components = principal_components
 
     def __str__(self):
-        return('area fraction: {}'.format(self.area_fraction))
+        return('area fraction: {}'.format(self.area))
 
 ######################################################################
 
@@ -285,7 +285,7 @@ class ColorBlobDetector:
 
     def detect_blobs(self,
                      labels,
-                     min_contour_area_fraction=None,
+                     min_contour_area=None,
                      xyz=None,
                      xyz_valid=None,
                      scratch=None,
@@ -293,8 +293,8 @@ class ColorBlobDetector:
                      split_res=None,
                      split_bins=None):
 
-        if min_contour_area_fraction is None:
-            min_contour_area_fraction = 0
+        if min_contour_area is None:
+            min_contour_area = 0
 
         area_scl = 1.0 / numpy.prod(labels.shape)
 
@@ -326,7 +326,7 @@ class ColorBlobDetector:
 
                 x0, y0, w, h = cv2.boundingRect(contour)
                 
-                if w*h*area_scl < min_contour_area_fraction:
+                if w*h*area_scl < min_contour_area:
                     continue
 
                 topleft = (x0, y0)
@@ -343,13 +343,13 @@ class ColorBlobDetector:
                 if xyz_valid is not None:
                     draw_mask = draw_mask & xyz_valid[y0:y0+h, x0:x0+w]
                 
-                area_fraction = numpy.count_nonzero(draw_mask)*area_scl
-                if area_fraction < min_contour_area_fraction:
+                area = numpy.count_nonzero(draw_mask)*area_scl
+                if area < min_contour_area:
                     continue
 
                 if xyz is None:
                     
-                    detection = BlobDetection(contour, area_fraction,
+                    detection = BlobDetection(contour, area,
                                               xyz=None, is_split=False)
                     
                     color_detections.append(detection)
@@ -364,7 +364,7 @@ class ColorBlobDetector:
 
                 if (split_axis is None or split_res is None or split_bins is None):
 
-                    detection = BlobDetection(contour, area_fraction,
+                    detection = BlobDetection(contour, area,
                                               xyz=object_xyz, is_split = False)
 
                     color_detections.append(detection)
@@ -384,7 +384,7 @@ class ColorBlobDetector:
 
                 if not numpy.any(toobig):
                     
-                    detection = BlobDetection(contour, area_fraction,
+                    detection = BlobDetection(contour, area,
                                               object_xyz, is_split=False)
                     
                     color_detections.append(detection)
@@ -406,9 +406,9 @@ class ColorBlobDetector:
                         xidx, = numpy.nonzero((bin_idx >= first_ok_bin) &
                                               (bin_idx <= last_ok_bin))
 
-                        area_fraction = len(xidx)*area_scl
+                        area = len(xidx)*area_scl
 
-                        if area_fraction >= min_contour_area_fraction:
+                        if area >= min_contour_area:
                         
                             xi = mask_i[xidx]
                             xj = mask_j[xidx]
@@ -416,7 +416,7 @@ class ColorBlobDetector:
                             draw_mask[:] = 0
                             draw_mask[xi, xj] = 255
 
-                            detection = BlobDetection(contour, area_fraction,
+                            detection = BlobDetection(contour, area,
                                                       xyz_subrect[xi, xj],
                                                       is_split=True)
 
@@ -424,7 +424,7 @@ class ColorBlobDetector:
 
                         uidx0 = uidx1 + 1
 
-            color_detections.sort(key=lambda d: (-d.area_fraction, -d.contour[0,0,1]))
+            color_detections.sort(key=lambda d: (-d.area, -d.contour[0,0,1]))
 
             detections[color_name] = color_detections
 
