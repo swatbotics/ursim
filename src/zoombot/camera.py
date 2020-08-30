@@ -91,27 +91,6 @@ assert len(LOG_TIME_VARS) == LOG_DETECTIONS_START
 
 ######################################################################
 
-class LogTimer:
-
-    def __init__(self, array, idx, denom, display=None):
-        if isinstance(denom, timedelta):
-            denom = denom.total_seconds()
-        self.array = array
-        self.idx = idx
-        self.denom = denom
-        self.display = display
-
-    def __enter__(self):
-        self.start = glfw.get_time()
-
-    def __exit__(self, type, value, traceback):
-        elapsed = glfw.get_time() - self.start
-        self.array[self.idx] = elapsed / self.denom
-        if self.display is not None:
-            print('{}: {}'.format(self.display, self.array[self.idx]))
-
-######################################################################
-
 TextureInfo = namedtuple('TextureInfo',
                          'texname, width, height, channels, '
                          'tex_format, storage_type, data_size, '
@@ -449,9 +428,11 @@ class SimCamera:
         was_reset = (mcount != self.last_modification_counter)
         self.last_modification_counter = mcount
 
+        logger = self.sim.logger
+
         # render to 0 upon completion of 0, prepare to grab 0
         # 
-        with LogTimer(self.log_vars, LOG_RENDER_TIME, self.frame_budget):
+        with logger.timer('profiling.camera.render', self.frame_budget):
             if was_reset:
                 if DOUBLE_BUFFER:
                     self.last_rendered_frame = 1
@@ -463,7 +444,7 @@ class SimCamera:
             self.render()
             # prep grab 1
         
-        with LogTimer(self.log_vars, LOG_GRAB_TIME, self.frame_budget):
+        with logger.timer('profiling.camera.grab', self.frame_budget):
             # grab 0
             self.grab_frame()
 
@@ -471,7 +452,7 @@ class SimCamera:
         #self.total_grabbed_frames += 1
         #print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
 
-        with LogTimer(self.log_vars, LOG_PROCESS_TIME, self.frame_budget):
+        with logger.timer('profiling.camera.process', self.frame_budget):
             self.process_frame()
 
               

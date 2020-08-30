@@ -138,9 +138,8 @@ class RoboSimApp(gfx.GlfwApp):
 
         cam = self.sim_camera
 
-        start = glfw.get_time()
-        self.sim_camera.update()
-        self.log_time[LOG_PROFILING_CAMERA] = (glfw.get_time() - start)/self.frame_budget
+        with self.sim.logger.timer('profiling.camera', self.frame_budget):
+            self.sim_camera.update()
 
         if not self.controller_initialized:
             
@@ -179,9 +178,8 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.robot.desired_linear_angular_vel[:] = (
                 result.forward_vel, result.angular_vel)
 
-        start = glfw.get_time()
-        self.sim.update()
-        self.log_time[LOG_PROFILING_PHYSICS] = (glfw.get_time() - start)/self.frame_budget
+        with self.sim.logger.timer('profiling.physics', self.frame_budget):
+            self.sim.update()
 
     def set_animating(self, a):
 
@@ -414,58 +412,56 @@ class RoboSimApp(gfx.GlfwApp):
     def render(self):
 
 
-        start = glfw.get_time()
+        with self.sim.logger.timer('profiling.rendercalls', self.frame_budget):
 
-        gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-        gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+            gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+            gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-        gl.Viewport(0, 0,
-                   self.framebuffer_size[0],
-                   self.framebuffer_size[1])
-        
-        if self.perspective is None:
-            
-            w, h = self.framebuffer_size
-            aspect = w / max(h, 1)
+            gl.Viewport(0, 0,
+                       self.framebuffer_size[0],
+                       self.framebuffer_size[1])
 
-            self.perspective = gfx.perspective_matrix(
-                45, aspect, 0.10, 50.0)
+            if self.perspective is None:
 
-            gfx.set_uniform(gfx.IndexedPrimitives.uniforms['perspective'],
-                            self.perspective)
+                w, h = self.framebuffer_size
+                aspect = w / max(h, 1)
 
-        if self.view is None:
+                self.perspective = gfx.perspective_matrix(
+                    45, aspect, 0.10, 50.0)
 
-            Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
-            Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
+                gfx.set_uniform(gfx.IndexedPrimitives.uniforms['perspective'],
+                                self.perspective)
 
-            R_mouse = numpy.dot(Rx, Ry)
+            if self.view is None:
 
-            w, h = self.sim.dims
-            m = max(numpy.linalg.norm([w, h]), 8.0)
+                Rx = gfx.rotation_matrix(self.xrot, gfx.vec3(1, 0, 0))
+                Ry = gfx.rotation_matrix(self.yrot, gfx.vec3(0, 1, 0))
 
-            self.view = gfx.look_at(
-                eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.25*core.ROOM_HEIGHT),
-                center=gfx.vec3(0.5*w, 0.5*h, 0.25*core.ROOM_HEIGHT),
-                up=gfx.vec3(0, 0, 1),
-                Rextra=R_mouse)
+                R_mouse = numpy.dot(Rx, Ry)
 
-        gfx.IndexedPrimitives.set_perspective_matrix(self.perspective)
-        gfx.IndexedPrimitives.set_view_matrix(self.view)
+                w, h = self.sim.dims
+                m = max(numpy.linalg.norm([w, h]), 8.0)
 
-        for obj in self.sim.objects:
-            obj.render()
+                self.view = gfx.look_at(
+                    eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.25*core.ROOM_HEIGHT),
+                    center=gfx.vec3(0.5*w, 0.5*h, 0.25*core.ROOM_HEIGHT),
+                    up=gfx.vec3(0, 0, 1),
+                    Rextra=R_mouse)
 
-        if self.should_render_scan:
-            self.render_scan()
+            gfx.IndexedPrimitives.set_perspective_matrix(self.perspective)
+            gfx.IndexedPrimitives.set_view_matrix(self.view)
 
-        if self.should_render_detections:
-            self.render_detections()
+            for obj in self.sim.objects:
+                obj.render()
 
-        if self.should_render_robocam:
-            self.render_robocam()
+            if self.should_render_scan:
+                self.render_scan()
 
-        self.log_time[LOG_PROFILING_RENDERCALL] = (glfw.get_time() - start)/self.frame_budget
+            if self.should_render_detections:
+                self.render_detections()
+
+            if self.should_render_robocam:
+                self.render_robocam()
         
 ######################################################################
 

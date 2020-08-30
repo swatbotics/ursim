@@ -17,11 +17,34 @@ import sys, datetime
 from collections import namedtuple
 
 import numpy
+import glfw
 
 ######################################################################
 
 LoggerGroup = namedtuple('LoggerGroup',
                          'names, array, idx0, idx1')
+
+######################################################################
+
+class LogTimer:
+
+    def __init__(self, array, idx, denom, display=None):
+        assert idx < len(array) 
+        if isinstance(denom, datetime.timedelta):
+            denom = denom.total_seconds()
+        self.array = array
+        self.idx = idx
+        self.denom = denom
+        self.display = display
+
+    def __enter__(self):
+        self.start = glfw.get_time()
+
+    def __exit__(self, type, value, traceback):
+        elapsed = glfw.get_time() - self.start
+        self.array[self.idx] = elapsed / self.denom
+        if self.display is not None:
+            print('{}: {}'.format(self.display, self.array[self.idx]))
 
 ######################################################################
 
@@ -34,6 +57,8 @@ class Logger:
 
         self.groups = []
         self.total_variables = 0
+
+        self.variables = dict()
 
         if isinstance(dt, datetime.timedelta):
             dt = dt.total_seconds()
@@ -55,11 +80,17 @@ class Logger:
         assert array.dtype.kind in self.NUMERIC_TYPES
         assert len(array.shape) == 1
         assert len(names) == array.size
-
+        assert not any([(name in self.variables) for name in names])
+        
         nvars = len(names)
         
         idx0 = self.total_variables
         idx1 = idx0 + nvars
+
+        group_idx = len(self.groups)
+
+        for var_idx, name in enumerate(names):
+            self.variables[name] = (group_idx, var_idx)
         
         self.groups.append(LoggerGroup(names, array, idx0, idx1))
 
@@ -135,6 +166,14 @@ class Logger:
     def finish(self):
         if self.current_log is not None:
             self.write_log()
+
+    def lookup_variable(self, name):
+        return self.variables[name]
+
+    def timer(self, name, denom=1.0, display=None):
+        group_idx, var_idx = self.lookup_variable(name)
+        group = self.groups[group_idx]
+        return LogTimer(group.array, var_idx, denom, display)
 
 ######################################################################            
         
