@@ -51,6 +51,7 @@ from .clean_gl import gl
 # DONE: dt, sim_time as numpy timedelta?
 # DONE: document Controller?
 # DONE: document BlobDetection
+# TODO: implement dynamic motor model from http://ctms.engin.umich.edu/CTMS/index.php?example=MotorSpeed&section=SystemModeling
 # TODO: friction model to muck up odometry without adding quite so much noise?
 # TODO: docs for plotter?
 # TODO: nicer GUI/camera interface?
