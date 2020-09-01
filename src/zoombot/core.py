@@ -111,8 +111,9 @@ GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 
-MOTOR_VEL_KP = 50 # V per m/s
+MOTOR_VEL_KP = 100 # V per m/s
 MOTOR_VEL_KI = 200 # V per m
+
 MOTOR_VEL_INT_MAX = 0.05 # m/s * s = m
 
 # 2.5 gave plenty of issues with teleop
