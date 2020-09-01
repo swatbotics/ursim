@@ -13,6 +13,7 @@
 
 import numpy
 import glfw
+import sys, os
 
 from .. import ctrl
 from ..app import RoboSimApp
@@ -61,13 +62,18 @@ class KeyboardController(ctrl.Controller):
 
 def main():
 
+    svg_file = find_path('environments/first_environment.svg')
+    
+    if len(sys.argv) == 2 and os.path.exists(sys.argv[1]):
+        svg_file = sys.argv[1]
+
     kbctrl = KeyboardController()
 
-    app = RoboSimApp(kbctrl, filter_setpoints=False)
+    app = RoboSimApp(kbctrl, filter_setpoints=True)
     
     kbctrl.app = app
     
-    app.sim.load_svg(find_path('environments/first_environment.svg'))
+    app.sim.load_svg(svg_file)
     
     app.run()
 

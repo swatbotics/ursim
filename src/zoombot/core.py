@@ -26,14 +26,19 @@ from .datalog import Logger
 from .transform2d import Transform2D
 from .motor import Motor
 
-TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
+TAPE_COLORS = [
+    gfx.vec3(0.3, 0.3, 0.9),
+    gfx.vec3(0.6, 0.6, 0.6)
+]
+
+TAPE_COLOR_NAMES = [
+    'blue', 'silver'
+]
 
 CARDBOARD_COLOR = gfx.vec3(0.8, 0.7, 0.6)
 
-LINE_COLORS = [
-    TAPE_COLOR,
-    CARDBOARD_COLOR
-]
+LINE_COLORS = TAPE_COLORS + [ CARDBOARD_COLOR ]
+
 
 PYLON_COLOR_NAMES = [
     'orange', 'green'
@@ -43,6 +48,7 @@ PYLON_COLORS = [
     gfx.vec3(1.0, 0.5, 0),
     gfx.vec3(0, 0.8, 0),
 ]
+
 
 BALL_COLOR = gfx.vec3(0.5, 0, 1)
 
@@ -670,12 +676,26 @@ class Room(SimObject):
 
 class TapeStrips(SimObject):
 
-    def __init__(self, point_lists):
+    SPECULAR_EXPONENTS = dict(blue=100.0, silver=30.0)
+    SPECULAR_STRENGTHS = dict(blue=0.05, silver=0.7)
+
+    def __init__(self, point_lists, cname):
         super().__init__()
         self.point_lists = point_lists
+
+        self.specular_exponent = self.SPECULAR_EXPONENTS[cname]
+        self.specular_strength = self.SPECULAR_STRENGTHS[cname]
+
+        self.is_dashed = (cname == 'blue')
+        self.material_id = int(cname == 'blue')
+
+        cidx = TAPE_COLOR_NAMES.index(cname)
+        self.color = TAPE_COLORS[cidx]
         self._rendered_point_lists = []
 
     def initialize(self, point_lists):
+
+        self.destroy()
         
         self.point_lists = point_lists
 
@@ -712,52 +732,57 @@ class TapeStrips(SimObject):
 
                 desired_parity = 0
 
-            total_length = segment_lengths.sum()
+            if not self.is_dashed:
 
-            num_dashes = int(numpy.ceil(total_length / TAPE_DASH_SIZE))
-            if num_dashes % 2 != desired_parity:
-                num_dashes -= 1
+                dashes.append(points)
 
-            u = numpy.hstack(([numpy.float32(0)], numpy.cumsum(segment_lengths)))
-            u /= u[-1]
+            else:
 
-            cur_dash = [ points[0] ]
-            cur_u = 0.0
-            cur_idx = 0
-            
-            emit_dash = True
+                total_length = segment_lengths.sum()
+
+                num_dashes = int(numpy.ceil(total_length / TAPE_DASH_SIZE))
+                if num_dashes % 2 != desired_parity:
+                    num_dashes -= 1
+
+                u = numpy.hstack(([numpy.float32(0)], numpy.cumsum(segment_lengths)))
+                u /= u[-1]
+
+                cur_dash = [ points[0] ]
+                cur_u = 0.0
+                cur_idx = 0
+
+                emit_dash = True
 
 
-            for dash_idx in range(num_dashes):
+                for dash_idx in range(num_dashes):
 
-                target_u = (dash_idx + 1) / num_dashes
+                    target_u = (dash_idx + 1) / num_dashes
 
-                segment_end_u = u[cur_idx+1]
-
-                while segment_end_u < target_u:
-                    cur_idx += 1
-                    cur_dash.append(points[cur_idx])
                     segment_end_u = u[cur_idx+1]
 
-                segment_start_u = u[cur_idx]
+                    while segment_end_u < target_u:
+                        cur_idx += 1
+                        cur_dash.append(points[cur_idx])
+                        segment_end_u = u[cur_idx+1]
 
-                assert segment_start_u < target_u
-                assert segment_end_u >= target_u
-                
-                segment_alpha = ( (target_u - segment_start_u) /
-                                  (segment_end_u - segment_start_u) )
+                    segment_start_u = u[cur_idx]
 
-                cur_dash.append( gfx.mix(points[cur_idx],
-                                         points[cur_idx+1],
-                                         segment_alpha) )
+                    assert segment_start_u < target_u
+                    assert segment_end_u >= target_u
 
-                if emit_dash:
-                    dashes.append(numpy.array(cur_dash, dtype=numpy.float32))
+                    segment_alpha = ( (target_u - segment_start_u) /
+                                      (segment_end_u - segment_start_u) )
 
-                emit_dash = not emit_dash
+                    cur_dash.append( gfx.mix(points[cur_idx],
+                                             points[cur_idx+1],
+                                             segment_alpha) )
 
-                cur_dash = [ cur_dash[-1] ]
+                    if emit_dash:
+                        dashes.append(numpy.array(cur_dash, dtype=numpy.float32))
 
+                    emit_dash = not emit_dash
+
+                    cur_dash = [ cur_dash[-1] ]
 
         npoints_total = sum([len(points) for points in dashes])
 
@@ -770,7 +795,6 @@ class TapeStrips(SimObject):
 
         indices = []
                 
-
         for points in dashes:
 
             prev_line_l = None
@@ -855,10 +879,10 @@ class TapeStrips(SimObject):
 
         gfx_object = gfx.IndexedPrimitives(vdata, gl.TRIANGLES,
                                            indices=indices,
-                                           color=TAPE_COLOR,
-                                           specular_exponent = 100.0,
-                                           specular_strength = 0.05,
-                                           material_id=int(1 << 0))
+                                           color=self.color,
+                                           specular_exponent = self.specular_exponent,
+                                           specular_strength = self.specular_strength,
+                                           material_id=self.material_id)
 
         self.gfx_objects.append(gfx_object)
 
@@ -868,8 +892,10 @@ class TapeStrips(SimObject):
         self.initialize(self.point_lists)
 
     def render(self):
-        
-        if len(self.point_lists) != len(self._rendered_point_lists):
+
+        if len(self.point_lists) and not len(self.gfx_objects):
+            self.reset()
+        elif len(self.point_lists) != len(self._rendered_point_lists):
             self.reset()
         else:
             for pi, pj in zip(self.point_lists, self._rendered_point_lists):
@@ -878,7 +904,7 @@ class TapeStrips(SimObject):
                     break
             
         super().render()
-        
+
 
 ######################################################################
 
@@ -1218,9 +1244,6 @@ class Robot(SimObject):
         body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
         
-        if self.filter_setpoints:
-            print('FILTERING SEtPOINTS')
-        
         for idx in range(2):
             iir_filter(self.desired_linear_angular_vel[idx],
                        self.desired_linear_angular_vel_raw[idx],
@@ -1452,7 +1475,7 @@ class RoboSim(B2D.b2ContactListener):
 
         self.modification_counter = 0
 
-        self.tape_strips = None
+        self.tape_strips = dict()
         
         self.objects = [ self.robot, self.room ]
 
@@ -1502,11 +1525,11 @@ class RoboSim(B2D.b2ContactListener):
     def add_ball(self, position):
         self.add_object(Ball(self.world, position))
 
-    def add_tape_strip(self, points):
-        if self.tape_strips is None:
-            self.tape_strips = self.add_object(TapeStrips([points]))
+    def add_tape_strip(self, points, cname):
+        if cname not in self.tape_strips:
+            self.tape_strips[cname] = self.add_object(TapeStrips([points], cname))
         else:
-            self.tape_strips.point_lists.append(points)
+            self.tape_strips[cname].point_lists.append(points)
             self.modification_counter += 1
 
     def add_wall(self, p0, p1):
@@ -1534,6 +1557,8 @@ class RoboSim(B2D.b2ContactListener):
 
         for obj in self.objects[2:]:
             obj.destroy()
+
+        self.tape_strips = dict()
             
         self.objects[:] = [self.robot, self.room]
 
@@ -1597,7 +1622,7 @@ class RoboSim(B2D.b2ContactListener):
 
                     self.add_box(dims, pctr, theta)
                 
-            elif isinstance(item, svgelements.Circle):
+            elif isinstance(item, svgelements.Circle) or isinstance(item, svgelements.Ellipse):
                 
                 cidx, color = match_svg_color(fcolor, CIRCLE_COLORS)
 
@@ -1616,10 +1641,10 @@ class RoboSim(B2D.b2ContactListener):
 
                 cidx, color = match_svg_color(scolor, LINE_COLORS)
 
-                if cidx == 0:
+                if cidx < 2:
                     
                     points = numpy.array([p0, p1])
-                    self.add_tape_strip(points)
+                    self.add_tape_strip(points, TAPE_COLOR_NAMES[cidx])
                     
                 else:
 
@@ -1630,7 +1655,9 @@ class RoboSim(B2D.b2ContactListener):
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
 
-                self.add_tape_strip(points)
+                cidx, color = match_svg_color(scolor, LINE_COLORS)
+                
+                self.add_tape_strip(points, TAPE_COLOR_NAMES[cidx])
 
             elif isinstance(item, svgelements.Polygon):
 
@@ -1677,9 +1704,6 @@ class RoboSim(B2D.b2ContactListener):
         
         self.initialize_robot(robot_init_position,
                               robot_init_angle)
-
-        if self.tape_strips is not None:
-            self.tape_strips.reset()
 
         self.svg_filename = os.path.abspath(svgfile)
 
