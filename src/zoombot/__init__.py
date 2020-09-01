@@ -13,6 +13,7 @@
 ######################################################################
 
 from .app import RoboSimApp
+from .find_path import find_path
 
 __version__ = '0.0.1'
 __version_info__ = (0,0,1)

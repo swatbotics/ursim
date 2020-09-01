@@ -115,12 +115,13 @@ MOTOR_VEL_KP = 200 # dimensionless
 MOTOR_VEL_KI = 200 # 1/s - higher means more overshoot
 MOTOR_VEL_INT_MAX = 10.0 / MOTOR_VEL_KI
 
-WHEEL_FORCE_MAX = 3.5
-WHEEL_FORCE_MAX_STDDEV = 0.2
+# 2.5 gave plenty of issues with teleop
+WHEEL_FORCE_MAX = 3.0
+WHEEL_FORCE_MAX_STDDEV = 0.5
 
 ODOM_FREQUENCY = 4
 
-ODOM_NOISE_STDDEV = 0.01
+ODOM_NOISE_STDDEV = 0.005 # about 1% of nominal speed 
 
 # Wn = 0.1
 ODOM_FILTER_B = numpy.array([0.13672874, 0.13672874])
