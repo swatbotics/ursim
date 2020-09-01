@@ -40,7 +40,7 @@ PLOT_MERGES = [
     re.compile(r'motor\.vel\.(.*)'),
     re.compile(r'motor\.torque\.(.*)'),
     re.compile(r'.*\.(cmd\.)?vel\..*'),
-    re.compile(r'robot\.(bump.*|motors_enabled)'),
+    re.compile(r'robot\.bump\.(.*)'),
     re.compile(r'blobfinder\.(.*\.)num_detections'),
     re.compile(r'blobfinder\.(.*\.)max_area'),
     re.compile(r'robot\.wheel_force\.(.*)'),
@@ -53,6 +53,8 @@ PLOT_MERGES = [
 
 DEFAULT_EXCLUDES = [
     'profiling',
+    'motors_enabled',
+    'inferred_current'
 ]
 
 COLORS = dict(blue=[0, 0, 0.8],
@@ -94,7 +96,6 @@ class PlotManager:
         pass
 
     def mouse_enter_axes(self, event):
-        print('entered')
         event.inaxes.format_coord = lambda x, y: self.format_coord(event.inaxes, x, y)
 
     def format_coord(self, ax, x, y):
