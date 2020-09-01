@@ -1226,8 +1226,8 @@ class Robot(SimObject):
         l[LOG_MOTOR_CURRENT_R] = self.motor_state[1, 1]
         l[LOG_MOTOR_VOLTAGE_L] = self.motor_voltages[0]
         l[LOG_MOTOR_VOLTAGE_R] = self.motor_voltages[1]
-        l[LOG_MOTOR_TORQUE_L] = self.motor_torques[0]
-        l[LOG_MOTOR_TORQUE_R] = self.motor_torques[1]
+        l[LOG_MOTOR_TORQUE_L] = -self.motor_torques[0]
+        l[LOG_MOTOR_TORQUE_R] = -self.motor_torques[1]
         l[LOG_WHEEL_FORCE_L] = self.wheel_forces[0]
         l[LOG_WHEEL_FORCE_R] = self.wheel_forces[1]
 
