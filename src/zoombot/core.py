@@ -121,7 +121,7 @@ WHEEL_FORCE_MAX_STDDEV = 0.5
 
 ODOM_FREQUENCY = 4
 
-ODOM_NOISE_STDDEV = 0.005 # about 1% of nominal speed 
+ODOM_NOISE_STDDEV = 0.002 # about 0.4% of nominal speed 
 
 # Wn = 0.1
 ODOM_FILTER_B = numpy.array([0.13672874, 0.13672874])
