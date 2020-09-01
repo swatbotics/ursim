@@ -163,14 +163,16 @@ LOG_MOTOR_VEL_L           = 28
 LOG_MOTOR_VEL_R           = 29
 LOG_MOTOR_CURRENT_L       = 30
 LOG_MOTOR_CURRENT_R       = 31
-LOG_MOTOR_VOLTAGE_L       = 32
-LOG_MOTOR_VOLTAGE_R       = 33
-LOG_MOTOR_TORQUE_L        = 34
-LOG_MOTOR_TORQUE_R        = 35
-LOG_WHEEL_FORCE_L         = 36
-LOG_WHEEL_FORCE_R         = 37
+LOG_MOTOR_TCURRENT_L      = 32
+LOG_MOTOR_TCURRENT_R      = 33
+LOG_MOTOR_VOLTAGE_L       = 34
+LOG_MOTOR_VOLTAGE_R       = 35
+LOG_MOTOR_TORQUE_L        = 36
+LOG_MOTOR_TORQUE_R        = 37
+LOG_WHEEL_FORCE_L         = 38
+LOG_WHEEL_FORCE_R         = 39
 
-LOG_NUM_VARS              = 38
+LOG_NUM_VARS              = 40
 
 LOG_NAMES = [
     'robot.pos.x',
@@ -179,10 +181,10 @@ LOG_NAMES = [
     'robot.vel.x',
     'robot.vel.y',
     'robot.vel.angle',
-    'robot.cmd_vel.forward',
-    'robot.cmd_vel.angle',
-    'robot.cmd_wheel_vel.l',
-    'robot.cmd_wheel_vel.r',
+    'robot.cmd.vel.forward',
+    'robot.cmd.vel.angle',
+    'robot.cmd.wheel_vel.l',
+    'robot.cmd.wheel_vel.r',
     'robot.vel.forward',
     'robot.wheel_vel.l',
     'robot.wheel_vel.r',
@@ -205,6 +207,8 @@ LOG_NAMES = [
     'motor.vel.r',
     'motor.current.l',
     'motor.current.r',
+    'motor.inferred.current.l',
+    'motor.inferred.current.r',
     'motor.voltage.l',
     'motor.voltage.r',
     'motor.torque.l',
@@ -1224,6 +1228,13 @@ class Robot(SimObject):
         l[LOG_MOTOR_VEL_R] = self.motor_state[1, 0]
         l[LOG_MOTOR_CURRENT_L] = self.motor_state[0, 1]
         l[LOG_MOTOR_CURRENT_R] = self.motor_state[1, 1]
+
+        l[LOG_MOTOR_TCURRENT_L] = self.motor_model.steady_current_for_torque(-self.motor_torques[0])
+        l[LOG_MOTOR_TCURRENT_R] = self.motor_model.steady_current_for_torque(-self.motor_torques[1])
+
+        l[LOG_MOTOR_TCURRENT_L] = -self.motor_torques[0]/self.motor_model.K
+        l[LOG_MOTOR_TCURRENT_R] = -self.motor_torques[1]/self.motor_model.K
+        
         l[LOG_MOTOR_VOLTAGE_L] = self.motor_voltages[0]
         l[LOG_MOTOR_VOLTAGE_R] = self.motor_voltages[1]
         l[LOG_MOTOR_TORQUE_L] = -self.motor_torques[0]
