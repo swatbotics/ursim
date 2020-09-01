@@ -48,34 +48,74 @@ def keyboard(event):
                     is_visible = child.get_visible()
                     child.set_visible(not is_visible)
         event.canvas.draw()
+    elif event.key == 'r':
+        print('reset view')
+        fig = event.canvas.figure
+        for ax in fig.axes:
+            ax.set_xlim(auto=True)
+            ax.set_ylim(auto=True)
+            ax.autoscale_view(True)
+        event.canvas.draw()
 
 ######################################################################
 
 class PlotManager:
 
-    def __init__(self, fig, axis_list):
+    def __init__(self, fig):
 
         self.fig = fig
-        self.axis_list = axis_list
 
-        self.axis_line_name_lookup = dict()
+        self.mouse_down = None
         
     def mouse_press(self, event):
-        print('mouse press at {}'.format((event.x, event.y)))
+        
+        if event.inaxes is None:
+            return
+
+        if self.mouse_down is not None:
+            return
+        
+        if event.button == backend_bases.MouseButton.LEFT:
+            self.mouse_down = ('left', event.inaxes, event.xdata, event.ydata)
 
     def mouse_release(self, event):
-        print('mouse release at {}'.format((event.x, event.y)))
+        
+        if self.mouse_down is not None:
+            
+            btn, ax, x0, y0 = self.mouse_down
 
-    def mouse_motion(self, event):
-        #print('mouse is at {}'.format((event.x, event.y)))
-        pass
+            x1, y1 = event.xdata, event.ydata
+
+            if x1 is None or y1 is None:
+                x1, y1 = ax.transData.inverted().transform((event.x, event.y))
+
+            for sib in ax.figure.axes:
+
+                ymin = 1e5
+                ymax = -1e5
+                
+                for line in sib.lines:
+                    xdata, ydata = line.get_data()
+                    mask = (xdata >= x0) & (xdata <= x1)
+                    yvals = ydata[mask]
+                    if len(yvals):
+                        print('{} has range {}-{}'.format(line, yvals.min(), yvals.max()))
+                        ymin = min(ymin, yvals.min())
+                        ymax = max(ymax, yvals.max())
+
+                if ymax > ymin:
+                    m = 0.1*(ymax-ymin)
+                    sib.set_ylim(ymin-m, ymax+m)
+
+            ax.set_xlim(x0, x1)
+            ax.figure.canvas.draw()
 
     def mouse_enter_axes(self, event):
         event.inaxes.format_coord = lambda x, y: self.format_coord(event.inaxes, x, y)
 
     def format_coord(self, ax, x, y):
 
-        outputs = ['t={:.2g}'.format(x)]
+        outputs = ['t={:.2f}'.format(x)]
 
         for line in ax.lines:
             lx, ly = line.get_data()
@@ -89,37 +129,8 @@ class PlotManager:
 
         self.fig.canvas.mpl_connect('button_press_event', self.mouse_press)
         self.fig.canvas.mpl_connect('button_release_event', self.mouse_release)
-        self.fig.canvas.mpl_connect('motion_notify_event', self.mouse_motion)
         self.fig.canvas.mpl_connect('axes_enter_event', self.mouse_enter_axes)
 
-        for idx, ax in enumerate(self.axis_list):
-            
-            names = [line.get_label() for line in ax.lines]
-
-            all_atoms = set()
-
-            name_atoms = [ name.split('.') for name in names ]
-            
-            for atoms in name_atoms:
-                all_atoms = all_atoms | set(atoms)
-
-            redundant_atoms = set()
-
-            for atom in all_atoms:
-                if all([atom in atoms for atoms in name_atoms]):
-                    redundant_atoms.add(atom)
-                    
-            names = []
-
-            for atoms in name_atoms:
-                atoms_filtered = []
-                for atom in atoms:
-                    if atom not in redundant_atoms:
-                        atoms_filtered.append(atom)
-                names.append('.'.join(atoms_filtered))
-                
-            for name, line in zip(names, ax.lines):
-                self.axis_line_name_lookup[(ax, line)] = name
 
 ######################################################################
 
@@ -127,12 +138,13 @@ def make_figure(filename, fig_idx, total_figures, subplots):
     fig = plt.figure(fig_idx)
     fig.canvas.mpl_connect('key_press_event', keyboard)
     fig.canvas.set_window_title('{} - figure {}/{}'.format(filename, fig_idx, total_figures))
-    fig.suptitle("Press 't' to toggle legend, 'q' to close")
     if subplots:
+        fig.suptitle("Press 't' to toggle legend, 'q' to close, 'r' to reset view")
         axis_list = fig.subplots(MAX_PLOT_ROWS, MAX_PLOT_COLS, sharex=True)
-        mgr = PlotManager(fig, axis_list)
+        mgr = PlotManager(fig)
         return fig, axis_list, mgr
     else:
+        fig.suptitle("Press 't' to toggle legend, 'q' to close")
         return fig
 
 ######################################################################
