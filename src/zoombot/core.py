@@ -1304,8 +1304,14 @@ class Robot(SimObject):
             vel_int = clamp_abs(vel_int, MOTOR_VEL_INT_MAX)
             self.wheel_vel_integrator[idx] = vel_int
 
-            V_cmd = MOTOR_VEL_KP*wheel_vel_error + MOTOR_VEL_KI * vel_int
-            V_cmd = clamp_abs(V_cmd, mm.V_nominal)
+            if self.motors_enabled:
+
+                V_cmd = MOTOR_VEL_KP*wheel_vel_error + MOTOR_VEL_KI * vel_int
+                V_cmd = clamp_abs(V_cmd, mm.V_nominal)
+
+            else:
+
+                V_cmd = 0
 
             self.motor_voltages[idx] = V_cmd
 
