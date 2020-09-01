@@ -443,7 +443,7 @@ class RoboSimApp(gfx.GlfwApp):
                 R_mouse = numpy.dot(Rx, Ry)
 
                 w, h = self.sim.dims
-                m = max(numpy.linalg.norm([w, h]), 8.0)
+                m = max(1.5*numpy.linalg.norm([w, h]), 8.0)
 
                 self.view = gfx.look_at(
                     eye=gfx.vec3(0.5*w, 0.5*h - 0.5*m, 0.25*core.ROOM_HEIGHT),
