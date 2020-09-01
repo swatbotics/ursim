@@ -210,16 +210,15 @@ def plot_log(fname, ldata, trace_names=[]):
         ax = subplots[cur_idx]
         cur_idx += 1
 
-        plist.sort()
-
-        for name, trace in plist:
+        for idx, (name, trace) in enumerate(plist):
+            zorder = len(plist) - idx
             kwargs = dict()
             for color, cvalue in COLORS.items():
                 if color in name:
                     kwargs['color'] = cvalue
             if 'angle' in name:
                 trace = trace * 180 / numpy.pi
-            line, = ax.plot(time, trace, label=name, **kwargs)
+            line, = ax.plot(time, trace, label=name, **kwargs, zorder=zorder)
 
         last_in_row = ((cur_idx % MAX_PLOT_ROWS) == 0 or
                         pidx + 1 == len(plots))

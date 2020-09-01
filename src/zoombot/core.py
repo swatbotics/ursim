@@ -111,9 +111,9 @@ GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 
-MOTOR_VEL_KP = 200 # dimensionless
-MOTOR_VEL_KI = 200 # 1/s - higher means more overshoot
-MOTOR_VEL_INT_MAX = 10.0 / MOTOR_VEL_KI
+MOTOR_VEL_KP = 100 # dimensionless
+MOTOR_VEL_KI = 80 # 1/s - higher means more overshoot
+MOTOR_VEL_INT_MAX = 1e5
 
 # 2.5 gave plenty of issues with teleop
 WHEEL_FORCE_MAX = 3.0
@@ -131,83 +131,124 @@ ODOM_FILTER_A = numpy.array([-0.72654253])
 SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966])
 SETPOINT_FILTER_A = numpy.array([-0.85408069])
 
-LOG_ROBOT_POS_X           = 0
-LOG_ROBOT_POS_Y           = 1
-LOG_ROBOT_POS_ANGLE       = 2
-LOG_ROBOT_CMD_VEL_FORWARD = 3
-LOG_ROBOT_CMD_VEL_ANGULAR = 4
-LOG_ROBOT_CMD_VEL_LWHEEL  = 5
-LOG_ROBOT_CMD_VEL_RWHEEL  = 6
-LOG_ROBOT_VEL_FORWARD     = 7
-LOG_ROBOT_VEL_ANGLE       = 8
-LOG_ROBOT_VEL_LWHEEL      = 9
-LOG_ROBOT_VEL_RWHEEL      = 10
-LOG_ROBOT_BUMP_LEFT       = 11
-LOG_ROBOT_BUMP_CENTER     = 12
-LOG_ROBOT_BUMP_RIGHT      = 13
-LOG_ODOM_VEL_RAW_LWHEEL   = 14
-LOG_ODOM_VEL_RAW_RWHEEL   = 15
-LOG_ODOM_VEL_RAW_FORWARD  = 16
-LOG_ODOM_VEL_RAW_ANGLE    = 17
-LOG_ODOM_VEL_FILT_LWHEEL  = 18
-LOG_ODOM_VEL_FILT_RWHEEL  = 19
-LOG_ODOM_VEL_FILT_FORWARD = 20
-LOG_ODOM_VEL_FILT_ANGLE   = 21
-LOG_ODOM_POS_X            = 22
-LOG_ODOM_POS_Y            = 23
-LOG_ODOM_POS_ANGLE        = 24
-LOG_MOTOR_VEL_L           = 25
-LOG_MOTOR_VEL_R           = 26
-LOG_MOTOR_CURRENT_L       = 27
-LOG_MOTOR_CURRENT_R       = 28
-LOG_MOTOR_VOLTAGE_L       = 29
-LOG_MOTOR_VOLTAGE_R       = 30
-LOG_MOTOR_TORQUE_L        = 31
-LOG_MOTOR_TORQUE_R        = 32
-LOG_WHEEL_FORCE_L         = 33
-LOG_WHEEL_FORCE_R         = 34
-LOG_MOTORS_ENABLED        = 35
+LOG_ROBOT_POS_X            = 0
+LOG_ROBOT_POS_Y            = 1
+LOG_ROBOT_POS_ANGLE        = 2
 
-LOG_NUM_VARS              = 36
+LOG_ODOM_POS_X             = 3
+LOG_ODOM_POS_Y             = 4
+LOG_ODOM_POS_ANGLE         = 5
+
+LOG_ROBOT_BUMP_LEFT        = 6
+LOG_ROBOT_BUMP_CENTER      = 7
+LOG_ROBOT_BUMP_RIGHT       = 8
+
+LOG_MOTORS_ENABLED         = 9
+
+LOG_ROBOT_CMD_VEL_FORWARD = 10
+LOG_ROBOT_CMD_VEL_ANGULAR = 11
+
+LOG_ROBOT_CMD_VEL_LWHEEL  = 12
+LOG_ROBOT_CMD_VEL_RWHEEL  = 13
+
+LOG_ROBOT_VEL_FORWARD     = 14
+LOG_ROBOT_VEL_ANGLE       = 15
+
+LOG_ROBOT_VEL_LWHEEL      = 16
+LOG_ROBOT_VEL_RWHEEL      = 17
+
+LOG_ODOM_VEL_RAW_LWHEEL   = 18
+LOG_ODOM_VEL_RAW_RWHEEL   = 19
+
+LOG_ODOM_VEL_RAW_FORWARD  = 20
+LOG_ODOM_VEL_RAW_ANGLE    = 21
+
+LOG_ODOM_VEL_FILT_LWHEEL  = 22
+LOG_ODOM_VEL_FILT_RWHEEL  = 23
+
+LOG_ODOM_VEL_FILT_FORWARD = 24
+LOG_ODOM_VEL_FILT_ANGLE   = 25
+
+LOG_MOTOR_VEL_L           = 26
+LOG_MOTOR_VEL_R           = 27
+
+LOG_MOTOR_CURRENT_L       = 28
+LOG_MOTOR_CURRENT_R       = 29
+
+LOG_MOTOR_VOLTAGE_L       = 30
+LOG_MOTOR_VOLTAGE_R       = 31
+
+LOG_MOTOR_TORQUE_L        = 32
+LOG_MOTOR_TORQUE_R        = 33
+
+LOG_WHEEL_FORCE_L         = 34
+LOG_WHEEL_FORCE_R         = 35
+
+LOG_WHEEL_SKID_FORCE_L    = 36
+LOG_WHEEL_SKID_FORCE_R    = 37
+
+LOG_NUM_VARS              = 38
 
 LOG_NAMES = [
-    'pos_x.true',
-    'pos_y.true',
-    'angle.true',
-    'forward_vel.cmd',
-    'angular_vel.cmd',
-    'wheel_vel_l.cmd',
-    'wheel_vel_r.cmd',
-    'forward_vel.true',
-    'angular_vel.true',
-    'wheel_vel_l.cmd',
-    'wheel_vel_r.cmd',
+    
+    'pos_x.pose.true',
+    'pos_y.pose.true',
+    'angle.pose.true',
+
+    'pos_x.pose.odom',
+    'pos_y.pose.odom',
+    'angle.pose.odom',
+
     'bump.left',
     'bump.center',
     'bump.right',
+
+    'motors_enabled',
+    
+    'forward_vel.cmd',
+    'angular_vel.cmd',
+    
+    'wheel_vel_l.cmd',
+    'wheel_vel_r.cmd',
+    
+    'forward_vel.true',
+    'angular_vel.true',
+    
+    'wheel_vel_l.true',
+    'wheel_vel_r.true',
+    
     'wheel_vel_l.meas',
     'wheel_vel_r.meas',
+    
     'forward_vel.meas',
     'angular_vel.meas',
+    
     'wheel_vel_l.filt',
     'wheel_vel_r.filt',
+    
     'forward_vel.filt',
     'angular_vel.filt',
-    'pos_x.odom',
-    'pos_y.odom',
-    'angle.odom',
+    
     'motor_vel.l',
     'motor_vel.r',
+    
     'motor_current.l',
     'motor_current.r',
+    
     'motor_voltage.l',
     'motor_voltage.r',
+    
     'motor_torque.l',
     'motor_torque.r',
+    
     'wheel_force.l',
     'wheel_force.r',
-    'motors_enabled'
+    
+    'wheel_skid_force.l',
+    'wheel_skid_force.r',
+
 ]
+
 
 assert len(LOG_NAMES) == LOG_NUM_VARS
 
@@ -937,7 +978,7 @@ def clamp_abs(quantity, limit):
     
 ######################################################################
 
-def iir_filter(meas, inputs, outputs, B, A):
+def iir_filter(meas, inputs, outputs, do_filter, B, A):
     
     assert len(inputs) == len(B)
     assert len(outputs) == len(A)
@@ -945,7 +986,10 @@ def iir_filter(meas, inputs, outputs, B, A):
     inputs[1:] = inputs[:-1]
     inputs[0] = meas
 
-    output = numpy.dot(B, inputs) - numpy.dot(A, outputs)
+    if do_filter:
+        output = numpy.dot(B, inputs) - numpy.dot(A, outputs)
+    else:
+        output = meas
 
     outputs[1:] = outputs[:-1]
     outputs[0] = output
@@ -1003,6 +1047,7 @@ class Robot(SimObject):
         self.motor_torques = numpy.zeros(2)
         self.motor_voltages = numpy.zeros(2)
         self.wheel_forces = numpy.zeros(2)
+        self.wheel_skid_forces = numpy.zeros(2)
 
         self.motor_model = Motor()
 
@@ -1057,6 +1102,7 @@ class Robot(SimObject):
         self.motor_torques[:] = 0
         self.motor_voltages[:] = 0
         self.wheel_forces[:] = 0
+        self.wheel_skid_forces[:] = 0
 
         self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
@@ -1224,6 +1270,8 @@ class Robot(SimObject):
         l[LOG_MOTOR_TORQUE_R] = -self.motor_torques[1]
         l[LOG_WHEEL_FORCE_L] = self.wheel_forces[0]
         l[LOG_WHEEL_FORCE_R] = self.wheel_forces[1]
+        l[LOG_WHEEL_SKID_FORCE_L] = self.wheel_skid_forces[0]
+        l[LOG_WHEEL_SKID_FORCE_R] = self.wheel_skid_forces[1]
 
         l[LOG_MOTORS_ENABLED] = self.motors_enabled
 
@@ -1245,18 +1293,16 @@ class Robot(SimObject):
 
         body.ApplyLinearImpulse(lateral_impulse * current_normal,
                                 body.position, True)
-
+        
+        if self.filter_setpoints:
+            print('FILTERING SEtPOINTS')
+        
         for idx in range(2):
-            if self.filter_setpoints:
-                b, a = SETPOINT_FILTER_B, SETPOINT_FILTER_A
-            else:
-                b = [1, 0]
-                a = [0]
             iir_filter(self.desired_linear_angular_vel[idx],
                        self.desired_linear_angular_vel_raw[idx],
                        self.desired_linear_angular_vel_filtered[idx],
-                       b, a)
-                                                              
+                       self.filter_setpoints, SETPOINT_FILTER_B, SETPOINT_FILTER_A)
+
         self.desired_wheel_vel = wheel_lr_from_linear_angular(
             self.desired_linear_angular_vel_filtered[:, 0]
         )
@@ -1282,16 +1328,10 @@ class Robot(SimObject):
 
             meas_wheel_vel = wheel_tgt_speed + wheel_vel_noise[idx]
 
-            if self.filter_vel:
-                b, a = ODOM_FILTER_B, ODOM_FILTER_A
-            else:
-                b = [1, 0]
-                a = [0]
-
             iir_filter(meas_wheel_vel,
                        self.odom_wheel_vel_raw[idx],
                        self.odom_wheel_vel_filtered[idx],
-                       b, a)
+                       self.filter_vel, ODOM_FILTER_B, ODOM_FILTER_A)
 
             wheel_vel_error = (self.desired_wheel_vel[idx] -
                                self.odom_wheel_vel_filtered[idx,0])
@@ -1334,8 +1374,9 @@ class Robot(SimObject):
             vel_impulse = 0.5 * vel_mismatch * self.body.mass
 
             F = vel_impulse / dt_sec
-            F = clamp_abs(F, WHEEL_FORCE_MAX + wheel_force_noise[idx])
+            Fclamp = clamp_abs(F, WHEEL_FORCE_MAX + wheel_force_noise[idx])
 
+            self.wheel_skid_forces[idx] = Fclamp - F
             self.wheel_forces[idx] = F
             self.motor_torques[idx] = mm.motor_torque_from_wheel_tgt_force(-F)
 

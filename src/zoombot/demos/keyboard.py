@@ -63,7 +63,7 @@ def main():
 
     kbctrl = KeyboardController()
 
-    app = RoboSimApp(kbctrl, filter_setpoints=True)
+    app = RoboSimApp(kbctrl, filter_setpoints=False)
     
     kbctrl.app = app
     
