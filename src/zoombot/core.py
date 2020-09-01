@@ -981,7 +981,7 @@ class Robot(SimObject):
                                                    dtype=numpy.float64)
         
         self.odom_pose = Transform2D()
-        self.initial_pose = Transform2D()
+        self.initial_pose_inv = Transform2D()
 
         self.desired_linear_angular_vel = numpy.zeros(2, dtype=numpy.float64)
         
@@ -1039,7 +1039,7 @@ class Robot(SimObject):
         self.orig_angle = angle
 
         self.odom_pose = Transform2D()
-        self.initial_pose = Transform2D(position, angle)
+        self.initial_pose_inv = Transform2D(position, angle).inverse()
 
         self.odom_tick = 0
 
@@ -1186,9 +1186,11 @@ class Robot(SimObject):
 
         l = self.log_vars
 
-        l[LOG_ROBOT_POS_X] = self.body.position.x
-        l[LOG_ROBOT_POS_Y] = self.body.position.y
-        l[LOG_ROBOT_POS_ANGLE] = self.body.angle
+        rel_odom = self.initial_pose_inv * Transform2D(self.body.transform)
+        
+        l[LOG_ROBOT_POS_X] = rel_odom.position[0]
+        l[LOG_ROBOT_POS_Y] = rel_odom.position[1]
+        l[LOG_ROBOT_POS_ANGLE] = rel_odom.angle
         l[LOG_ROBOT_VEL_ANGLE] = self.body.angularVelocity
         l[LOG_ROBOT_CMD_VEL_FORWARD] = self.desired_linear_angular_vel[0]
         l[LOG_ROBOT_CMD_VEL_ANGULAR] = self.desired_linear_angular_vel[1]
@@ -1199,11 +1201,9 @@ class Robot(SimObject):
         l[LOG_ROBOT_VEL_RWHEEL] = self.wheel_vel[1]
         l[LOG_ROBOT_BUMP_LEFT:LOG_ROBOT_BUMP_LEFT+3] = self.bump
 
-        rel_odom = self.initial_pose * self.odom_pose
-        
-        l[LOG_ODOM_POS_X] = rel_odom.position[0]
-        l[LOG_ODOM_POS_Y] = rel_odom.position[1]
-        l[LOG_ODOM_POS_ANGLE] = rel_odom.angle
+        l[LOG_ODOM_POS_X] = self.odom_pose.position[0]
+        l[LOG_ODOM_POS_Y] = self.odom_pose.position[1]
+        l[LOG_ODOM_POS_ANGLE] = self.odom_pose.angle
         l[LOG_ODOM_VEL_RAW_LWHEEL] = self.odom_wheel_vel_raw[0,0]
         l[LOG_ODOM_VEL_RAW_RWHEEL] = self.odom_wheel_vel_raw[1,0]
         l[LOG_ODOM_VEL_RAW_FORWARD] = self.odom_linear_angular_vel_raw[0]

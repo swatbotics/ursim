@@ -28,7 +28,9 @@ MAX_PLOT_COLS = 1
 
 MAX_PLOTS_PER_FIGURE = MAX_PLOT_ROWS*MAX_PLOT_COLS
 
-DEFAULT_EXCLUDES = []
+DEFAULT_EXCLUDES = [
+    'profiling_camera'
+]
 
 COLORS = dict(blue=[0, 0, 0.8],
               green=[0, 0.5, 0],
@@ -78,7 +80,7 @@ class PlotManager:
         for line in ax.lines:
             lx, ly = line.get_data()
             py = numpy.interp(x, lx, ly)
-            name = self.axis_line_name_lookup[(ax, line)]
+            name = re.sub(r'^[^.]+\.', '', line.get_label())
             outputs.append('{}={:.3g}'.format(name, py))
         
         return ' '.join(outputs)
