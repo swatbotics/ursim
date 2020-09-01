@@ -24,6 +24,7 @@ from .clean_gl import gl
 from .find_path import find_path
 from .datalog import Logger
 from .transform2d import Transform2D
+from .motor import Motor
 
 TAPE_COLOR = gfx.vec3(0.3, 0.3, 0.9)
 
@@ -83,7 +84,7 @@ ROOM_COLOR = gfx.vec3(1, 0.97, 0.93)
 ROBOT_BASE_RADIUS = 0.5*0.36
 ROBOT_BASE_HEIGHT = 0.12
 ROBOT_BASE_Z = 0.01
-ROBOT_BASE_MASS = 2.35
+ROBOT_BASE_MASS = 2.5
 ROBOT_BASE_I = 0.5*ROBOT_BASE_MASS*ROBOT_BASE_RADIUS**2
 
 ROBOT_BASE_COLOR = gfx.vec3(0.1, 0.1, 0.1)
@@ -109,10 +110,12 @@ BUMP_DIST = 0.001
 GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
-WHEEL_MAX_FORWARD_FORCE = 10.0 # N
-WHEEL_VEL_KP = 0.3 # dimensionless
-WHEEL_VEL_KI = 0.3 # 1/s - higher means more overshoot
-WHEEL_VEL_INTEGRATOR_MAX = 0.1 # m - affects both overshoot and size of steady-state error
+
+MOTOR_VEL_KP = 200 # dimensionless
+MOTOR_VEL_KI = 200 # 1/s - higher means more overshoot
+MOTOR_VEL_INT_MAX = 10.0 / MOTOR_VEL_KI
+
+WHEEL_FORCE_MAX = 10.0 # N
 
 ODOM_FREQUENCY = 4
 
@@ -154,8 +157,18 @@ LOG_ODOM_VEL_FILT_ANGLE   = 24
 LOG_ODOM_POS_X            = 25
 LOG_ODOM_POS_Y            = 26
 LOG_ODOM_POS_ANGLE        = 27
+LOG_MOTOR_VEL_L           = 28
+LOG_MOTOR_VEL_R           = 29
+LOG_MOTOR_CURRENT_L       = 30
+LOG_MOTOR_CURRENT_R       = 31
+LOG_MOTOR_VOLTAGE_L       = 32
+LOG_MOTOR_VOLTAGE_R       = 33
+LOG_MOTOR_TORQUE_L        = 34
+LOG_MOTOR_TORQUE_R        = 35
+LOG_WHEEL_FORCE_L         = 36
+LOG_WHEEL_FORCE_R         = 37
 
-LOG_NUM_VARS        = 28
+LOG_NUM_VARS              = 38
 
 
 LOG_NAMES = [
@@ -186,13 +199,20 @@ LOG_NAMES = [
     'odom.vel.filtered.angle',
     'odom.pos.x',
     'odom.pos.y',
-    'odom.pos.angle'
+    'odom.pos.angle',
+    'motor.vel.l',
+    'motor.vel.r',
+    'motor.current.l',
+    'motor.current.r',
+    'motor.voltage.l',
+    'motor.voltage.r',
+    'motor.torque.l',
+    'motor.torque.r',
+    'robot.wheel_force.l',
+    'robot.wheel_force.r',
 ]
 
-
-
 assert len(LOG_NAMES) == LOG_NUM_VARS
-
 
 ######################################################################
 
@@ -960,9 +980,19 @@ class Robot(SimObject):
                                                                dtype=numpy.float64)
         
         self.desired_wheel_vel = numpy.zeros(2, dtype=numpy.float32)
-        self.wheel_vel_integrator = numpy.zeros(2, dtype=numpy.float32)
 
+        self.wheel_vel_integrator = numpy.zeros(2, dtype=numpy.float32)
         self.wheel_vel = numpy.zeros(2, dtype=numpy.float32)
+
+        # row 0: left speed/current, row 1: right speed/current
+        self.motor_state = numpy.zeros((2, 2), dtype=numpy.float64)
+
+        # torques for motor
+        self.motor_torques = numpy.zeros(2)
+        self.motor_voltages = numpy.zeros(2)
+        self.wheel_forces = numpy.zeros(2)
+
+        self.motor_model = Motor()
 
         self.forward_vel = 0.0
 
@@ -975,6 +1005,7 @@ class Robot(SimObject):
         self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
 
         self.filter_setpoints = False
+        self.filter_vel = False
 
         self.initialize()
         
@@ -1010,6 +1041,10 @@ class Robot(SimObject):
         self.odom_wheel_vel_filtered[:] = 0
         self.wheel_vel_integrator[:] = 0
         self.wheel_vel[:] = 0
+        self.motor_state[:] = 0
+        self.motor_torques[:] = 0
+        self.motor_voltages[:] = 0
+        self.wheel_forces[:] = 0
 
         self.body = self.world.CreateDynamicBody(
             position = b2ple(position),
@@ -1169,6 +1204,18 @@ class Robot(SimObject):
         l[LOG_ODOM_VEL_FILT_FORWARD] = self.odom_linear_angular_vel_filtered[0]
         l[LOG_ODOM_VEL_FILT_ANGLE] = self.odom_linear_angular_vel_filtered[1]
 
+        l[LOG_MOTOR_VEL_L] = self.motor_state[0, 0]
+        l[LOG_MOTOR_VEL_R] = self.motor_state[1, 0]
+        l[LOG_MOTOR_CURRENT_L] = self.motor_state[0, 1]
+        l[LOG_MOTOR_CURRENT_R] = self.motor_state[1, 1]
+        l[LOG_MOTOR_VOLTAGE_L] = self.motor_voltages[0]
+        l[LOG_MOTOR_VOLTAGE_R] = self.motor_voltages[1]
+        l[LOG_MOTOR_TORQUE_L] = self.motor_torques[0]
+        l[LOG_MOTOR_TORQUE_R] = self.motor_torques[1]
+        l[LOG_WHEEL_FORCE_L] = self.wheel_forces[0]
+        l[LOG_WHEEL_FORCE_R] = self.wheel_forces[1]
+
+
     def sim_update(self, time, dt):
 
         dt_sec = dt.total_seconds()
@@ -1203,55 +1250,74 @@ class Robot(SimObject):
             self.desired_linear_angular_vel_filtered[:, 0]
         )
 
+        mm = self.motor_model
+
         for idx, side in enumerate([1.0, -1.0]):
 
             offset = B2D.b2Vec2(0, side * ROBOT_WHEEL_OFFSET)
 
             world_point = body.GetWorldPoint(offset)
+            
+            ######################################################################
+            # step 1: drive motor
 
-            wheel_vel = body.GetLinearVelocityFromWorldPoint(world_point)
+            wheel_tgt_speed = mm.wheel_tgt_speed_from_motor_speed(
+                self.motor_state[idx,0])
 
-            wheel_fwd_vel = wheel_vel.dot(current_tangent)
+            self.wheel_vel[idx] = wheel_tgt_speed
 
-            if numpy.abs(wheel_fwd_vel) > 1e-5:
-                wheel_noise = numpy.random.normal(scale=ODOM_NOISE_STDDEV)
+            if self.filter_vel:
+                b, a = ODOM_FILTER_B, ODOM_FILTER_A
             else:
-                wheel_noise = 0.0
+                b = [1, 0]
+                a = [0]
+
+            iir_filter(wheel_tgt_speed,
+                       self.odom_wheel_vel_raw[idx],
+                       self.odom_wheel_vel_filtered[idx],
+                       b, a)
+
+            wheel_vel_error = (self.desired_wheel_vel[idx] - wheel_tgt_speed)
+
+            vel_int = self.wheel_vel_integrator[idx] + wheel_vel_error * dt_sec
+            vel_int = clamp_abs(vel_int, MOTOR_VEL_INT_MAX)
+            self.wheel_vel_integrator[idx] = vel_int
+
+            V_cmd = MOTOR_VEL_KP*wheel_vel_error + MOTOR_VEL_KI * vel_int
+            V_cmd = clamp_abs(V_cmd, mm.V_nominal)
+
+            self.motor_voltages[idx] = V_cmd
+
+            motor_torque = self.motor_torques[idx]
+
+            motor_control = numpy.array([motor_torque, V_cmd])
+
+            self.motor_state[idx] = mm.simulate_dynamics(self.motor_state[idx],
+                                                         motor_control,
+                                                         dt_sec)
             
-            self.wheel_vel[idx] = wheel_fwd_vel
+            ######################################################################
+            # step 2: tie to world physics
+
+            wheel_tgt_speed = mm.wheel_tgt_speed_from_motor_speed(
+                self.motor_state[idx,0])
+
+            robot_vel_at_wheel = body.GetLinearVelocityFromWorldPoint(world_point)
+            robot_fwd_vel_at_wheel = robot_vel_at_wheel.dot(current_tangent)
+
+            vel_mismatch = wheel_tgt_speed - robot_fwd_vel_at_wheel
+
+            print('vel_mismatch[{}] ={}'.format(idx, vel_mismatch))
             
-            meas_vel = wheel_fwd_vel + wheel_noise
+            vel_impulse = 0.5 * vel_mismatch * self.body.mass
 
-            filtered_vel = iir_filter(meas_vel,
-                                      self.odom_wheel_vel_raw[idx],
-                                      self.odom_wheel_vel_filtered[idx],
-                                      ODOM_FILTER_B,
-                                      ODOM_FILTER_A)
-            
-            applied_force = 0.0
-            
-            if self.motors_enabled:
+            F = vel_impulse / dt_sec
+            F = clamp_abs(F, WHEEL_FORCE_MAX)
 
-                wheel_vel_error = (
-                    self.desired_wheel_vel[idx] - filtered_vel
-                )
+            self.wheel_forces[idx] = F
+            self.motor_torques[idx] = mm.motor_torque_from_wheel_tgt_force(-F)
 
-                self.wheel_vel_integrator[idx] = clamp_abs(
-                    self.wheel_vel_integrator[idx] + wheel_vel_error * dt_sec,
-                    WHEEL_VEL_INTEGRATOR_MAX)
-
-                wheel_delta_vel_cmd = (WHEEL_VEL_KP * wheel_vel_error +
-                                       WHEEL_VEL_KI * self.wheel_vel_integrator[idx])
-                
-                applied_force = clamp_abs(
-                    wheel_delta_vel_cmd * body.mass / dt_sec,
-                    WHEEL_MAX_FORWARD_FORCE)
-
-            friction_force = -self.rolling_mu * wheel_fwd_vel * body.mass * GRAVITY
-
-            total_force = (0.5*applied_force + friction_force)
-
-            body.ApplyForce(total_force * current_tangent,
+            body.ApplyForce(F * current_tangent,
                             world_point, True)
 
         ##################################################
