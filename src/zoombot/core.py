@@ -131,90 +131,82 @@ ODOM_FILTER_A = numpy.array([-0.72654253])
 SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966])
 SETPOINT_FILTER_A = numpy.array([-0.85408069])
 
-LOG_ROBOT_POS_X =           0
-LOG_ROBOT_POS_Y =           1
-LOG_ROBOT_POS_ANGLE =       2
-LOG_ROBOT_VEL_X =           3
-LOG_ROBOT_VEL_Y =           4
-LOG_ROBOT_VEL_ANGLE =       5
-LOG_ROBOT_CMD_VEL_FORWARD = 6
-LOG_ROBOT_CMD_VEL_ANGULAR = 7
-LOG_ROBOT_CMD_VEL_LWHEEL  = 8
-LOG_ROBOT_CMD_VEL_RWHEEL  = 9
-LOG_ROBOT_VEL_FORWARD =     10
-LOG_ROBOT_VEL_LWHEEL =      11
-LOG_ROBOT_VEL_RWHEEL =      12
-LOG_ROBOT_MOTORS_ENABLED  = 13
-LOG_ROBOT_BUMP_LEFT       = 14
-LOG_ROBOT_BUMP_CENTER     = 15
-LOG_ROBOT_BUMP_RIGHT      = 16
-LOG_ODOM_VEL_RAW_LWHEEL   = 17
-LOG_ODOM_VEL_RAW_RWHEEL   = 18
-LOG_ODOM_VEL_RAW_FORWARD  = 19
-LOG_ODOM_VEL_RAW_ANGLE    = 20
-LOG_ODOM_VEL_FILT_LWHEEL  = 21
-LOG_ODOM_VEL_FILT_RWHEEL  = 22
-LOG_ODOM_VEL_FILT_FORWARD = 23
-LOG_ODOM_VEL_FILT_ANGLE   = 24
-LOG_ODOM_POS_X            = 25
-LOG_ODOM_POS_Y            = 26
-LOG_ODOM_POS_ANGLE        = 27
-LOG_MOTOR_VEL_L           = 28
-LOG_MOTOR_VEL_R           = 29
-LOG_MOTOR_CURRENT_L       = 30
-LOG_MOTOR_CURRENT_R       = 31
-LOG_MOTOR_TCURRENT_L      = 32
-LOG_MOTOR_TCURRENT_R      = 33
-LOG_MOTOR_VOLTAGE_L       = 34
-LOG_MOTOR_VOLTAGE_R       = 35
-LOG_MOTOR_TORQUE_L        = 36
-LOG_MOTOR_TORQUE_R        = 37
-LOG_WHEEL_FORCE_L         = 38
-LOG_WHEEL_FORCE_R         = 39
+LOG_ROBOT_POS_X           = 0
+LOG_ROBOT_POS_Y           = 1
+LOG_ROBOT_POS_ANGLE       = 2
+LOG_ROBOT_CMD_VEL_FORWARD = 3
+LOG_ROBOT_CMD_VEL_ANGULAR = 4
+LOG_ROBOT_CMD_VEL_LWHEEL  = 5
+LOG_ROBOT_CMD_VEL_RWHEEL  = 6
+LOG_ROBOT_VEL_FORWARD     = 7
+LOG_ROBOT_VEL_ANGLE       = 8
+LOG_ROBOT_VEL_LWHEEL      = 9
+LOG_ROBOT_VEL_RWHEEL      = 10
+LOG_ROBOT_BUMP_LEFT       = 11
+LOG_ROBOT_BUMP_CENTER     = 12
+LOG_ROBOT_BUMP_RIGHT      = 13
+LOG_ODOM_VEL_RAW_LWHEEL   = 14
+LOG_ODOM_VEL_RAW_RWHEEL   = 15
+LOG_ODOM_VEL_RAW_FORWARD  = 16
+LOG_ODOM_VEL_RAW_ANGLE    = 17
+LOG_ODOM_VEL_FILT_LWHEEL  = 18
+LOG_ODOM_VEL_FILT_RWHEEL  = 19
+LOG_ODOM_VEL_FILT_FORWARD = 20
+LOG_ODOM_VEL_FILT_ANGLE   = 21
+LOG_ODOM_POS_X            = 22
+LOG_ODOM_POS_Y            = 23
+LOG_ODOM_POS_ANGLE        = 24
+LOG_MOTOR_VEL_L           = 25
+LOG_MOTOR_VEL_R           = 26
+LOG_MOTOR_CURRENT_L       = 27
+LOG_MOTOR_CURRENT_R       = 28
+LOG_MOTOR_VOLTAGE_L       = 29
+LOG_MOTOR_VOLTAGE_R       = 30
+LOG_MOTOR_TORQUE_L        = 31
+LOG_MOTOR_TORQUE_R        = 32
+LOG_WHEEL_FORCE_L         = 33
+LOG_WHEEL_FORCE_R         = 34
+LOG_MOTORS_ENABLED        = 35
 
-LOG_NUM_VARS              = 40
+LOG_NUM_VARS              = 36
 
 LOG_NAMES = [
-    'robot.pos.x',
-    'robot.pos.y',
-    'robot.pos.angle',
-    'robot.vel.x',
-    'robot.vel.y',
-    'robot.vel.angle',
-    'robot.cmd.vel.forward',
-    'robot.cmd.vel.angle',
-    'robot.cmd.wheel_vel.l',
-    'robot.cmd.wheel_vel.r',
-    'robot.vel.forward',
-    'robot.wheel_vel.l',
-    'robot.wheel_vel.r',
-    'robot.motors_enabled',
-    'robot.bump.left',
-    'robot.bump.center',
-    'robot.bump.right',
-    'odom.wheel_vel.raw.l',
-    'odom.wheel_vel.raw.r',
-    'odom.vel.raw.forward',
-    'odom.vel.raw.angle',
-    'odom.wheel_vel.filtered.l',
-    'odom.wheel_vel.filtered.r',
-    'odom.vel.filtered.forward',
-    'odom.vel.filtered.angle',
-    'odom.pos.x',
-    'odom.pos.y',
-    'odom.pos.angle',
-    'motor.vel.l',
-    'motor.vel.r',
-    'motor.current.l',
-    'motor.current.r',
-    'motor.inferred.current.l',
-    'motor.inferred.current.r',
-    'motor.voltage.l',
-    'motor.voltage.r',
-    'motor.torque.l',
-    'motor.torque.r',
-    'robot.wheel_force.l',
-    'robot.wheel_force.r',
+    'pos_x.true',
+    'pos_y.true',
+    'angle.true',
+    'forward_vel.cmd',
+    'angular_vel.cmd',
+    'wheel_vel_l.cmd',
+    'wheel_vel_r.cmd',
+    'forward_vel.true',
+    'angular_vel.true',
+    'wheel_vel_l.cmd',
+    'wheel_vel_r.cmd',
+    'bump.left',
+    'bump.center',
+    'bump.right',
+    'wheel_vel_l.meas',
+    'wheel_vel_r.meas',
+    'forward_vel.meas',
+    'angular_vel.meas',
+    'wheel_vel_l.filt',
+    'wheel_vel_r.filt',
+    'forward_vel.filt',
+    'angular_vel.filt',
+    'pos_x.odom',
+    'pos_y.odom',
+    'angle.odom',
+    'motor_vel.l',
+    'motor_vel.r',
+    'motor_current.l',
+    'motor_current.r',
+    'motor_voltage.l',
+    'motor_voltage.r',
+    'motor_torque.l',
+    'motor_torque.r',
+    'wheel_force.l',
+    'wheel_force.r',
+    'motors_enabled'
 ]
 
 assert len(LOG_NAMES) == LOG_NUM_VARS
@@ -1197,8 +1189,6 @@ class Robot(SimObject):
         l[LOG_ROBOT_POS_X] = self.body.position.x
         l[LOG_ROBOT_POS_Y] = self.body.position.y
         l[LOG_ROBOT_POS_ANGLE] = self.body.angle
-        l[LOG_ROBOT_VEL_X] = self.body.linearVelocity.x
-        l[LOG_ROBOT_VEL_Y] = self.body.linearVelocity.y
         l[LOG_ROBOT_VEL_ANGLE] = self.body.angularVelocity
         l[LOG_ROBOT_CMD_VEL_FORWARD] = self.desired_linear_angular_vel[0]
         l[LOG_ROBOT_CMD_VEL_ANGULAR] = self.desired_linear_angular_vel[1]
@@ -1207,7 +1197,6 @@ class Robot(SimObject):
         l[LOG_ROBOT_VEL_FORWARD] = self.forward_vel
         l[LOG_ROBOT_VEL_LWHEEL] = self.wheel_vel[0]
         l[LOG_ROBOT_VEL_RWHEEL] = self.wheel_vel[1]
-        l[LOG_ROBOT_MOTORS_ENABLED] = self.motors_enabled
         l[LOG_ROBOT_BUMP_LEFT:LOG_ROBOT_BUMP_LEFT+3] = self.bump
 
         rel_odom = self.initial_pose * self.odom_pose
@@ -1229,18 +1218,14 @@ class Robot(SimObject):
         l[LOG_MOTOR_CURRENT_L] = self.motor_state[0, 1]
         l[LOG_MOTOR_CURRENT_R] = self.motor_state[1, 1]
 
-        l[LOG_MOTOR_TCURRENT_L] = self.motor_model.steady_current_for_torque(-self.motor_torques[0])
-        l[LOG_MOTOR_TCURRENT_R] = self.motor_model.steady_current_for_torque(-self.motor_torques[1])
-
-        l[LOG_MOTOR_TCURRENT_L] = -self.motor_torques[0]/self.motor_model.K
-        l[LOG_MOTOR_TCURRENT_R] = -self.motor_torques[1]/self.motor_model.K
-        
         l[LOG_MOTOR_VOLTAGE_L] = self.motor_voltages[0]
         l[LOG_MOTOR_VOLTAGE_R] = self.motor_voltages[1]
         l[LOG_MOTOR_TORQUE_L] = -self.motor_torques[0]
         l[LOG_MOTOR_TORQUE_R] = -self.motor_torques[1]
         l[LOG_WHEEL_FORCE_L] = self.wheel_forces[0]
         l[LOG_WHEEL_FORCE_R] = self.wheel_forces[1]
+
+        l[LOG_MOTORS_ENABLED] = self.motors_enabled
 
     def sim_update(self, time, dt):
 

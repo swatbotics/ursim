@@ -28,34 +28,7 @@ MAX_PLOT_COLS = 1
 
 MAX_PLOTS_PER_FIGURE = MAX_PLOT_ROWS*MAX_PLOT_COLS
 
-PLOT_MERGES = [
-    re.compile(r'.*\.(cmd\.)?vel(\.[xy])'),
-    re.compile(r'(.*\.)(cmd\.)?wheel_vel(\.raw|\.filtered)?\.l'),
-    re.compile(r'(.*\.)(cmd\.)?wheel_vel(\.raw|\.filtered)?\.r'),
-    re.compile(r'(robot|odom)\.pos.x'),
-    re.compile(r'(robot|odom)\.pos.y'),
-    re.compile(r'(robot|odom)\.pos.angle'),
-    re.compile(r'(robot|odom)\.(cmd\.)?vel(\.raw|\.filtered)?\.forward'),
-    re.compile(r'(robot|odom)\.(cmd\.)?vel(\.raw|\.filtered)?\.angle'),
-    re.compile(r'motor\.vel\.(.*)'),
-    re.compile(r'motor\.torque\.(.*)'),
-    re.compile(r'.*\.(cmd\.)?vel\..*'),
-    re.compile(r'robot\.bump\.(.*)'),
-    re.compile(r'blobfinder\.(.*\.)num_detections'),
-    re.compile(r'blobfinder\.(.*\.)max_area'),
-    re.compile(r'robot\.wheel_force\.(.*)'),
-    re.compile(r'motor\.voltage\.(.*)'),
-    #re.compile(r'motor\.(inferred_)?current\.(.*)'),
-    re.compile(r'motor\..*current\.(.*)'),
-    re.compile(r'profiling\.camera\.([^.]+)'),
-    re.compile(r'profiling'),
-]
-
-DEFAULT_EXCLUDES = [
-    'profiling',
-    'motors_enabled',
-    'inferred_current'
-]
+DEFAULT_EXCLUDES = []
 
 COLORS = dict(blue=[0, 0, 0.8],
               green=[0, 0.5, 0],
@@ -187,31 +160,25 @@ def plot_log(fname, ldata, trace_names=[]):
         if matches_exclude and not matches_trace:
             continue
 
-        if name.endswith('.pos.x'):
-            py = name.replace('.pos.x', '.pos.y')
+        dot = name.find('.')
+        if dot >= 0:
+            group = name[:dot]
+            remainder = name[dot+1:]
+        else:
+            group = name
+            remainder = ''
+        
+        if group == 'pos_x':
+            py = 'pos_y.' + remainder
             if py in ldata:
-                poses.append(name[:-2])
+                poses.append(remainder)
 
-        matched_name = name
-
-        for expr in PLOT_MERGES:
-            m = expr.match(name)
-            if m is not None:
-                matched_name = m.group(0)
-                if m.lastindex is not None:
-                    for idx in range(m.lastindex, 0, -1):
-                        span = m.span(idx)
-                        if span is not None:
-                            matched_name = (matched_name[:span[0]] +
-                                            matched_name[span[1]:])
-                break
-
-        if matched_name in plot_lookup:
-            plot_idx = plot_lookup[matched_name]
+        if group in plot_lookup:
+            plot_idx = plot_lookup[group]
         else:
             plot_idx = len(plots)
             plots.append([])
-            plot_lookup[matched_name] = plot_idx
+            plot_lookup[group] = plot_idx
 
         plots[plot_idx].append((name, trace))
 
@@ -266,20 +233,22 @@ def plot_log(fname, ldata, trace_names=[]):
         fig = make_figure(fname, fig_idx, total_figures, False)
 
         for idx, pname in enumerate(poses):
+
+            print('found pose', pname)
             
-            x = ldata[pname + '.x']
-            y = ldata[pname + '.y']
+            x = ldata['pos_x.' + pname]
+            y = ldata['pos_y.' + pname]
 
             handle, = plt.plot(x, y, label=pname, zorder=2)
             color = numpy.array(matplotlib.colors.to_rgb(handle.get_color()))
             
-            tname = pname + '.angle'
+            tname = 'angle.' + pname
             if tname in ldata:
                 theta = ldata[tname]
                 c = numpy.cos(theta)
                 s = numpy.sin(theta)
                 plt.quiver(x[::8], y[::8], c[::8], s[::8],
-                           label=tname, color=(0.7*color + 0.3),
+                           color=(0.7*color + 0.3),
                            units='dots', width=3.0*handle.get_linewidth(),
                            zorder=1)
 

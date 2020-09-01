@@ -79,9 +79,9 @@ LOG_PROCESS_TIME = 2
 LOG_DETECTIONS_START = 3
 
 LOG_TIME_VARS = [
-    'profiling.camera.render',
-    'profiling.camera.grab',
-    'profiling.camera.process',
+    'profiling_camera.render',
+    'profiling_camera.grab',
+    'profiling_camera.process',
 ]
 
 USE_PBOS = True
@@ -253,9 +253,8 @@ class SimCamera:
         lvars = LOG_TIME_VARS[:]
 
         for idx, color_name in enumerate(self.detector.color_names):
-            prefix = 'blobfinder.' + color_name + '.'
-            lvars.append(prefix + 'num_detections')
-            lvars.append(prefix + 'max_area')
+            lvars.append('blob_num_detections.' + color_name)
+            lvars.append('blob_max_area.' + color_name)
 
         self.log_vars = numpy.zeros(len(lvars), dtype=numpy.float32)
 
@@ -432,7 +431,7 @@ class SimCamera:
 
         # render to 0 upon completion of 0, prepare to grab 0
         # 
-        with logger.timer('profiling.camera.render', self.frame_budget):
+        with logger.timer('profiling_camera.render', self.frame_budget):
             if was_reset:
                 if DOUBLE_BUFFER:
                     self.last_rendered_frame = 1
@@ -444,7 +443,7 @@ class SimCamera:
             self.render()
             # prep grab 1
         
-        with logger.timer('profiling.camera.grab', self.frame_budget):
+        with logger.timer('profiling_camera.grab', self.frame_budget):
             # grab 0
             self.grab_frame()
 
@@ -452,7 +451,7 @@ class SimCamera:
         #self.total_grabbed_frames += 1
         #print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
 
-        with logger.timer('profiling.camera.process', self.frame_budget):
+        with logger.timer('profiling_camera.process', self.frame_budget):
             self.process_frame()
 
               
