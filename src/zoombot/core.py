@@ -111,9 +111,9 @@ GRAVITY = 9.8
 
 WHEEL_MAX_LATERAL_IMPULSE = 0.5 # m/(s*kg)
 
-MOTOR_VEL_KP = 100 # dimensionless
-MOTOR_VEL_KI = 80 # 1/s - higher means more overshoot
-MOTOR_VEL_INT_MAX = 1e5
+MOTOR_VEL_KP = 100 # V per m/s
+MOTOR_VEL_KI = 200 # V per m
+MOTOR_VEL_INT_MAX = 0.05 # m/s * s = m
 
 # 2.5 gave plenty of issues with teleop
 WHEEL_FORCE_MAX = 2.0
@@ -123,134 +123,64 @@ ODOM_FREQUENCY = 4
 
 ODOM_NOISE_STDDEV = 0.015
 
-# Wn = 0.1
-ODOM_FILTER_B = numpy.array([0.13672874, 0.13672874])
-ODOM_FILTER_A = numpy.array([-0.72654253])
-
 # Wn = 0.05
 SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966])
 SETPOINT_FILTER_A = numpy.array([-0.85408069])
 
-LOG_ROBOT_POS_X            = 0
-LOG_ROBOT_POS_Y            = 1
-LOG_ROBOT_POS_ANGLE        = 2
-
-LOG_ODOM_POS_X             = 3
-LOG_ODOM_POS_Y             = 4
-LOG_ODOM_POS_ANGLE         = 5
-
-LOG_ROBOT_BUMP_LEFT        = 6
-LOG_ROBOT_BUMP_CENTER      = 7
-LOG_ROBOT_BUMP_RIGHT       = 8
-
-LOG_MOTORS_ENABLED         = 9
-
-LOG_ROBOT_CMD_VEL_FORWARD = 10
-LOG_ROBOT_CMD_VEL_ANGULAR = 11
-
-LOG_ROBOT_CMD_VEL_LWHEEL  = 12
-LOG_ROBOT_CMD_VEL_RWHEEL  = 13
-
-LOG_ROBOT_VEL_FORWARD     = 14
-LOG_ROBOT_VEL_ANGLE       = 15
-
-LOG_ROBOT_VEL_LWHEEL      = 16
-LOG_ROBOT_VEL_RWHEEL      = 17
-
-LOG_ODOM_VEL_RAW_LWHEEL   = 18
-LOG_ODOM_VEL_RAW_RWHEEL   = 19
-
-LOG_ODOM_VEL_RAW_FORWARD  = 20
-LOG_ODOM_VEL_RAW_ANGLE    = 21
-
-LOG_ODOM_VEL_FILT_LWHEEL  = 22
-LOG_ODOM_VEL_FILT_RWHEEL  = 23
-
-LOG_ODOM_VEL_FILT_FORWARD = 24
-LOG_ODOM_VEL_FILT_ANGLE   = 25
-
-LOG_MOTOR_VEL_L           = 26
-LOG_MOTOR_VEL_R           = 27
-
-LOG_MOTOR_CURRENT_L       = 28
-LOG_MOTOR_CURRENT_R       = 29
-
-LOG_MOTOR_VOLTAGE_L       = 30
-LOG_MOTOR_VOLTAGE_R       = 31
-
-LOG_MOTOR_TORQUE_L        = 32
-LOG_MOTOR_TORQUE_R        = 33
-
-LOG_WHEEL_FORCE_L         = 34
-LOG_WHEEL_FORCE_R         = 35
-
-LOG_WHEEL_SKID_FORCE_L    = 36
-LOG_WHEEL_SKID_FORCE_R    = 37
-
-LOG_NUM_VARS              = 38
-
-LOG_NAMES = [
-    
-    'pos_x.pose.true',
-    'pos_y.pose.true',
-    'angle.pose.true',
-
-    'pos_x.pose.odom',
-    'pos_y.pose.odom',
-    'angle.pose.odom',
-
-    'bump.left',
-    'bump.center',
-    'bump.right',
-
-    'motors_enabled',
-    
-    'forward_vel.cmd',
-    'angular_vel.cmd',
-    
-    'wheel_vel_l.cmd',
-    'wheel_vel_r.cmd',
-    
-    'forward_vel.true',
-    'angular_vel.true',
-    
-    'wheel_vel_l.true',
-    'wheel_vel_r.true',
-    
-    'wheel_vel_l.meas',
-    'wheel_vel_r.meas',
-    
-    'forward_vel.meas',
-    'angular_vel.meas',
-    
-    'wheel_vel_l.filt',
-    'wheel_vel_r.filt',
-    
-    'forward_vel.filt',
-    'angular_vel.filt',
-    
-    'motor_vel.l',
-    'motor_vel.r',
-    
-    'motor_current.l',
-    'motor_current.r',
-    
-    'motor_voltage.l',
-    'motor_voltage.r',
-    
-    'motor_torque.l',
-    'motor_torque.r',
-    
-    'wheel_force.l',
-    'wheel_force.r',
-    
-    'wheel_skid_force.l',
-    'wheel_skid_force.r',
-
-]
+# Wn = 0.1
+VOLTAGE_FILTER_B = numpy.array([0.13672874, 0.13672874])
+VOLTAGE_FILTER_A = numpy.array([-0.72654253])
 
 
-assert len(LOG_NAMES) == LOG_NUM_VARS
+
+LOG_NAMES = []
+
+def log_var(s):
+    global LOG_NAMES
+    LOG_NAMES.append(s)
+    return len(LOG_NAMES)-1
+
+LOG_ROBOT_POS_X           = log_var('pos_x.pose.true')
+LOG_ROBOT_POS_Y           = log_var('pos_y.pose.true')
+LOG_ROBOT_POS_ANGLE       = log_var('angle.pose.true')
+LOG_ODOM_POS_X            = log_var('pos_x.pose.odom')
+LOG_ODOM_POS_Y            = log_var('pos_y.pose.odom')
+LOG_ODOM_POS_ANGLE        = log_var('angle.pose.odom')
+LOG_ROBOT_BUMP_LEFT       = log_var('bump.left')
+LOG_ROBOT_BUMP_CENTER     = log_var('bump.center')
+LOG_ROBOT_BUMP_RIGHT      = log_var('bump.right')
+LOG_MOTORS_ENABLED        = log_var('motors_enabled')
+LOG_ROBOT_CMD_VEL_FORWARD = log_var('forward_vel.cmd')
+LOG_ROBOT_CMD_VEL_ANGULAR = log_var('angular_vel.cmd')
+LOG_ROBOT_CMD_VEL_LWHEEL  = log_var('wheel_vel_l.cmd')
+LOG_ROBOT_CMD_VEL_RWHEEL  = log_var('wheel_vel_r.cmd')
+LOG_ROBOT_VEL_FORWARD     = log_var('forward_vel.true')
+LOG_ROBOT_VEL_ANGLE       = log_var('angular_vel.true')
+LOG_ROBOT_VEL_LWHEEL      = log_var('wheel_vel_l.true')
+LOG_ROBOT_VEL_RWHEEL      = log_var('wheel_vel_r.true')
+LOG_ODOM_VEL_LWHEEL       = log_var('wheel_vel_l.meas')
+LOG_ODOM_VEL_RWHEEL       = log_var('wheel_vel_r.meas')
+LOG_ODOM_VEL_FORWARD      = log_var('forward_vel.meas')
+LOG_ODOM_VEL_ANGLE        = log_var('angular_vel.meas')
+
+LOG_MOTOR_VEL_L           = log_var('motor_vel.l')
+LOG_MOTOR_VEL_R           = log_var('motor_vel.r')
+
+LOG_MOTOR_CURRENT_L       = log_var('motor_current.l')
+LOG_MOTOR_CURRENT_R       = log_var('motor_current.r')
+
+LOG_MOTOR_VOLTAGE_L       = log_var('motor_voltage.l')
+LOG_MOTOR_VOLTAGE_R       = log_var('motor_voltage.r')
+
+LOG_MOTOR_TORQUE_L        = log_var('motor_torque.l')
+LOG_MOTOR_TORQUE_R        = log_var('motor_torque.r')
+
+LOG_WHEEL_FORCE_L         = log_var('wheel_force.l')
+LOG_WHEEL_FORCE_R         = log_var('wheel_force.r')
+
+LOG_WHEEL_SKID_FORCE_L    = log_var('wheel_skid_force.l')
+LOG_WHEEL_SKID_FORCE_R    = log_var('wheel_skid_force.r')
+
 
 ######################################################################
 
@@ -1015,14 +945,9 @@ class Robot(SimObject):
         ], dtype=float)
         
 
-        self.odom_linear_angular_vel_raw = numpy.zeros(2, dtype=numpy.float32)
-        self.odom_linear_angular_vel_filtered = numpy.zeros(2, dtype=numpy.float32)
+        self.odom_linear_angular_vel = numpy.zeros(2, dtype=numpy.float32)
         
-        self.odom_wheel_vel_raw = numpy.zeros((2, len(ODOM_FILTER_B)),
-                                              dtype=numpy.float64)
-        
-        self.odom_wheel_vel_filtered = numpy.zeros((2, len(ODOM_FILTER_A)),
-                                                   dtype=numpy.float64)
+        self.odom_wheel_vel = numpy.zeros(2, dtype=numpy.float32)
         
         self.odom_pose = Transform2D()
         self.initial_pose_inv = Transform2D()
@@ -1045,7 +970,8 @@ class Robot(SimObject):
 
         # torques for motor
         self.motor_torques = numpy.zeros(2)
-        self.motor_voltages = numpy.zeros(2)
+        self.motor_voltages_raw = numpy.zeros((2, len(VOLTAGE_FILTER_B)))
+        self.motor_voltages_filtered = numpy.zeros((2, len(VOLTAGE_FILTER_A)))
         self.wheel_forces = numpy.zeros(2)
         self.wheel_skid_forces = numpy.zeros(2)
 
@@ -1059,7 +985,7 @@ class Robot(SimObject):
 
         self.bump = numpy.zeros(len(BUMP_ANGLE_RANGES), dtype=numpy.uint8)
 
-        self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
+        self.log_vars = numpy.zeros(len(LOG_NAMES), dtype=numpy.float32)
 
         self.filter_setpoints = False
         self.filter_vel = True
@@ -1094,13 +1020,13 @@ class Robot(SimObject):
         self.desired_linear_angular_vel_raw[:] = 0
         self.desired_linear_angular_vel_filtered[:] = 0
 
-        self.odom_wheel_vel_raw[:] = 0
-        self.odom_wheel_vel_filtered[:] = 0
+        self.odom_wheel_vel[:] = 0
         self.wheel_vel_integrator[:] = 0
         self.wheel_vel[:] = 0
         self.motor_state[:] = 0
         self.motor_torques[:] = 0
-        self.motor_voltages[:] = 0
+        self.motor_voltages_raw[:] = 0
+        self.motor_voltages_filtered[:] = 0
         self.wheel_forces[:] = 0
         self.wheel_skid_forces[:] = 0
 
@@ -1251,22 +1177,18 @@ class Robot(SimObject):
         l[LOG_ODOM_POS_X] = self.odom_pose.position[0]
         l[LOG_ODOM_POS_Y] = self.odom_pose.position[1]
         l[LOG_ODOM_POS_ANGLE] = self.odom_pose.angle
-        l[LOG_ODOM_VEL_RAW_LWHEEL] = self.odom_wheel_vel_raw[0,0]
-        l[LOG_ODOM_VEL_RAW_RWHEEL] = self.odom_wheel_vel_raw[1,0]
-        l[LOG_ODOM_VEL_RAW_FORWARD] = self.odom_linear_angular_vel_raw[0]
-        l[LOG_ODOM_VEL_RAW_ANGLE] = self.odom_linear_angular_vel_raw[1]
-        l[LOG_ODOM_VEL_FILT_LWHEEL] = self.odom_wheel_vel_filtered[0,0]
-        l[LOG_ODOM_VEL_FILT_RWHEEL] = self.odom_wheel_vel_filtered[1,0]
-        l[LOG_ODOM_VEL_FILT_FORWARD] = self.odom_linear_angular_vel_filtered[0]
-        l[LOG_ODOM_VEL_FILT_ANGLE] = self.odom_linear_angular_vel_filtered[1]
+        l[LOG_ODOM_VEL_LWHEEL] = self.odom_wheel_vel[0]
+        l[LOG_ODOM_VEL_RWHEEL] = self.odom_wheel_vel[1]
+        l[LOG_ODOM_VEL_FORWARD] = self.odom_linear_angular_vel[0]
+        l[LOG_ODOM_VEL_ANGLE] = self.odom_linear_angular_vel[1]
 
         l[LOG_MOTOR_VEL_L] = self.motor_state[0, 0]
         l[LOG_MOTOR_VEL_R] = self.motor_state[1, 0]
         l[LOG_MOTOR_CURRENT_L] = self.motor_state[0, 1]
         l[LOG_MOTOR_CURRENT_R] = self.motor_state[1, 1]
 
-        l[LOG_MOTOR_VOLTAGE_L] = self.motor_voltages[0]
-        l[LOG_MOTOR_VOLTAGE_R] = self.motor_voltages[1]
+        l[LOG_MOTOR_VOLTAGE_L] = self.motor_voltages_filtered[0,0]
+        l[LOG_MOTOR_VOLTAGE_R] = self.motor_voltages_filtered[1,0]
         l[LOG_MOTOR_TORQUE_L] = -self.motor_torques[0]
         l[LOG_MOTOR_TORQUE_R] = -self.motor_torques[1]
         l[LOG_WHEEL_FORCE_L] = self.wheel_forces[0]
@@ -1327,15 +1249,10 @@ class Robot(SimObject):
 
             self.wheel_vel[idx] = wheel_tgt_speed
 
-            meas_wheel_vel = wheel_tgt_speed + wheel_vel_noise[idx]
-
-            iir_filter(meas_wheel_vel,
-                       self.odom_wheel_vel_raw[idx],
-                       self.odom_wheel_vel_filtered[idx],
-                       self.filter_vel, ODOM_FILTER_B, ODOM_FILTER_A)
+            self.odom_wheel_vel[idx] = wheel_tgt_speed + wheel_vel_noise[idx]
 
             wheel_vel_error = (self.desired_wheel_vel[idx] -
-                               self.odom_wheel_vel_filtered[idx,0])
+                               self.odom_wheel_vel[idx])
 
             vel_int = self.wheel_vel_integrator[idx] + wheel_vel_error * dt_sec
             vel_int = clamp_abs(vel_int, MOTOR_VEL_INT_MAX)
@@ -1350,11 +1267,19 @@ class Robot(SimObject):
 
                 V_cmd = 0
 
-            self.motor_voltages[idx] = V_cmd
+            filter_motors = True
+            
+            iir_filter(V_cmd,
+                       self.motor_voltages_raw[idx],
+                       self.motor_voltages_filtered[idx],
+                       filter_motors,
+                       VOLTAGE_FILTER_B, VOLTAGE_FILTER_A)
 
             motor_torque = self.motor_torques[idx]
 
-            motor_control = numpy.array([motor_torque, V_cmd])
+            V_cmd_filt = self.motor_voltages_filtered[idx, 0]
+
+            motor_control = numpy.array([motor_torque, V_cmd_filt])
 
             self.motor_state[idx] = mm.simulate_dynamics(self.motor_state[idx],
                                                          motor_control,
@@ -1388,19 +1313,16 @@ class Robot(SimObject):
 
         ##################################################
 
-        self.odom_linear_angular_vel_raw[:] = linear_angular_from_wheel_lr(
-            self.odom_wheel_vel_raw[:,0])
+        self.odom_linear_angular_vel[:] = linear_angular_from_wheel_lr(
+            self.odom_wheel_vel)
         
-        self.odom_linear_angular_vel_filtered[:] = linear_angular_from_wheel_lr(
-            self.odom_wheel_vel_filtered[:,0])
-
         self.odom_tick += 1
         
         if self.odom_tick % ODOM_FREQUENCY == 0:
 
             odt = dt_sec * ODOM_FREQUENCY
-            odom_fwd = odt * self.odom_linear_angular_vel_raw[0]
-            odom_spin = odt * self.odom_linear_angular_vel_raw[1]
+            odom_fwd = odt * self.odom_linear_angular_vel[0]
+            odom_spin = odt * self.odom_linear_angular_vel[1]
 
             self.odom_pose.position += odom_fwd * self.odom_pose.matrix[:2, 0]
             self.odom_pose.angle += odom_spin

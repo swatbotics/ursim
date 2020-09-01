@@ -35,7 +35,7 @@ class SimpleSquareController(ctrl.Controller):
         
         elapsed = time - self.init_time
 
-        is_done = elapsed.total_seconds() >= 2.0
+        is_done = elapsed.total_seconds() >= 2.19
 
         world_from_cur_robot = robot_state.odom_pose
 
@@ -53,12 +53,18 @@ class SimpleSquareController(ctrl.Controller):
                 new_state = 'turn'
             else:
                 new_state = 'straight'
+                
             self.set_state(time, new_state, robot_state.odom_pose)
 
         ##################################################
         # output logic
+
+        if elapsed.total_seconds() >= 2.0:
+
+            return ctrl.ControllerOutput(
+                forward_vel=0.0, angular_vel=0.0)
             
-        if self.state == 'straight':
+        elif self.state == 'straight':
 
             return ctrl.ControllerOutput(
                 forward_vel=0.5, angular_vel=0.0)

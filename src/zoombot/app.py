@@ -160,8 +160,8 @@ class RoboSimApp(gfx.GlfwApp):
             bool(robot.bump[0]),
             bool(robot.bump[1]),
             bool(robot.bump[2]),
-            robot.odom_linear_angular_vel_filtered[0],
-            robot.odom_linear_angular_vel_filtered[1])
+            robot.odom_linear_angular_vel[0],
+            robot.odom_linear_angular_vel[1])
 
         scan = ctrl.LaserScan(
             angles=self.sim_camera.scan_angles.copy(),
