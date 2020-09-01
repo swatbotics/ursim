@@ -74,9 +74,39 @@ class PlotManager:
 
         if self.mouse_down is not None:
             return
+
+        btn = None
         
         if event.button == backend_bases.MouseButton.LEFT:
-            self.mouse_down = ('left', event.inaxes, event.xdata, event.ydata)
+            btn = 'left'
+        elif event.button == backend_bases.MouseButton.RIGHT:
+            btn = 'right'
+
+        if btn is not None:
+            self.mouse_down = (btn, event.inaxes, event.xdata, event.ydata)
+
+    def set_xlim(self, ax, x0, x1):
+
+        for sib in ax.figure.axes:
+
+            ymin = 1e5
+            ymax = -1e5
+
+            for line in sib.lines:
+                xdata, ydata = line.get_data()
+                mask = (xdata >= x0) & (xdata <= x1)
+                yvals = ydata[mask]
+                if len(yvals):
+                    ymin = min(ymin, yvals.min())
+                    ymax = max(ymax, yvals.max())
+
+            if ymax > ymin:
+                m = 0.1*(ymax-ymin)
+                sib.set_ylim(ymin-m, ymax+m)
+
+        ax.set_xlim(x0, x1)
+        ax.figure.canvas.draw()
+        
 
     def mouse_release(self, event):
         
@@ -89,26 +119,19 @@ class PlotManager:
             if x1 is None or y1 is None:
                 x1, y1 = ax.transData.inverted().transform((event.x, event.y))
 
-            for sib in ax.figure.axes:
+            if btn == 'left':
 
-                ymin = 1e5
-                ymax = -1e5
+                self.set_xlim(ax, x0, x1)
+
+            elif btn == 'right':
                 
-                for line in sib.lines:
-                    xdata, ydata = line.get_data()
-                    mask = (xdata >= x0) & (xdata <= x1)
-                    yvals = ydata[mask]
-                    if len(yvals):
-                        print('{} has range {}-{}'.format(line, yvals.min(), yvals.max()))
-                        ymin = min(ymin, yvals.min())
-                        ymax = max(ymax, yvals.max())
+                xmid = 0.5*(x0+x1)
+                xmin, xmax = ax.get_xlim()
+                xrng = numpy.abs(xmax-xmin)
 
-                if ymax > ymin:
-                    m = 0.1*(ymax-ymin)
-                    sib.set_ylim(ymin-m, ymax+m)
+                self.set_xlim(ax, xmid-0.75*xrng, xmid+0.75*xrng)
 
-            ax.set_xlim(x0, x1)
-            ax.figure.canvas.draw()
+        self.mouse_down = None
 
     def mouse_enter_axes(self, event):
         event.inaxes.format_coord = lambda x, y: self.format_coord(event.inaxes, x, y)
