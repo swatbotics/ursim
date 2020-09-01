@@ -116,12 +116,12 @@ MOTOR_VEL_KI = 80 # 1/s - higher means more overshoot
 MOTOR_VEL_INT_MAX = 1e5
 
 # 2.5 gave plenty of issues with teleop
-WHEEL_FORCE_MAX = 3.0
-WHEEL_FORCE_MAX_STDDEV = 0.5
+WHEEL_FORCE_MAX = 2.0
+WHEEL_FORCE_MAX_STDDEV = 3.0
 
 ODOM_FREQUENCY = 4
 
-ODOM_NOISE_STDDEV = 0.002 # about 0.4% of nominal speed 
+ODOM_NOISE_STDDEV = 0.015
 
 # Wn = 0.1
 ODOM_FILTER_B = numpy.array([0.13672874, 0.13672874])
@@ -1232,7 +1232,8 @@ class Robot(SimObject):
 
         l = self.log_vars
 
-        rel_odom = self.initial_pose_inv * Transform2D(self.body.transform)
+        rel_odom = self.initial_pose_inv * Transform2D(self.body.position,
+                                                       self.body.angle)
         
         l[LOG_ROBOT_POS_X] = rel_odom.position[0]
         l[LOG_ROBOT_POS_Y] = rel_odom.position[1]
@@ -1373,8 +1374,10 @@ class Robot(SimObject):
             # note 0.5 because we have two wheels
             vel_impulse = 0.5 * vel_mismatch * self.body.mass
 
+            F_max = numpy.maximum(0, WHEEL_FORCE_MAX + wheel_force_noise[idx])
+
             F = vel_impulse / dt_sec
-            Fclamp = clamp_abs(F, WHEEL_FORCE_MAX + wheel_force_noise[idx])
+            Fclamp = clamp_abs(F, F_max)
 
             self.wheel_skid_forces[idx] = Fclamp - F
             self.wheel_forces[idx] = F
