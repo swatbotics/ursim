@@ -146,8 +146,7 @@ class Motor:
         # http://kobuki.yujinrobot.com/wiki/online-user-guide/
         # https://www.portescap.com/en/products/brush-dc-motors/16n78-athlonix-brush-dc-motor
         
-        #J = 0.0002  # way too big to be physically plausible but if it gets any smaller motor basically stops instantly with no output
-        J = 3e-5
+        J = 1e-5
         V = 12
 
         if 1:

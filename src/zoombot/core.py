@@ -115,11 +115,12 @@ MOTOR_VEL_KP = 200 # dimensionless
 MOTOR_VEL_KI = 200 # 1/s - higher means more overshoot
 MOTOR_VEL_INT_MAX = 10.0 / MOTOR_VEL_KI
 
-WHEEL_FORCE_MAX = 10.0 # N
+WHEEL_FORCE_MAX = 3.5
+WHEEL_FORCE_MAX_STDDEV = 0.2
 
 ODOM_FREQUENCY = 4
 
-ODOM_NOISE_STDDEV = 0.015
+ODOM_NOISE_STDDEV = 0.005
 
 # Wn = 0.1
 ODOM_FILTER_B = numpy.array([0.13672874, 0.13672874])
@@ -169,7 +170,6 @@ LOG_WHEEL_FORCE_L         = 36
 LOG_WHEEL_FORCE_R         = 37
 
 LOG_NUM_VARS              = 38
-
 
 LOG_NAMES = [
     'robot.pos.x',
@@ -704,6 +704,7 @@ class TapeStrips(SimObject):
     def __init__(self, point_lists):
         super().__init__()
         self.point_lists = point_lists
+        self._rendered_point_lists = []
 
     def initialize(self, point_lists):
         
@@ -892,8 +893,22 @@ class TapeStrips(SimObject):
 
         self.gfx_objects.append(gfx_object)
 
+        self._rendered_point_lists = [p.copy() for p in self.point_lists]
+
     def reset(self):
         self.initialize(self.point_lists)
+
+    def render(self):
+        
+        if len(self.point_lists) != len(self._rendered_point_lists):
+            self.reset()
+        else:
+            for pi, pj in zip(self.point_lists, self._rendered_point_lists):
+                if len(pi) != len(pj) or not numpy.all(pi == pj):
+                    self.reset()
+                    break
+            
+        super().render()
         
 
 ######################################################################
@@ -1005,7 +1020,7 @@ class Robot(SimObject):
         self.log_vars = numpy.zeros(LOG_NUM_VARS, dtype=numpy.float32)
 
         self.filter_setpoints = False
-        self.filter_vel = False
+        self.filter_vel = True
 
         self.initialize()
         
@@ -1215,7 +1230,6 @@ class Robot(SimObject):
         l[LOG_WHEEL_FORCE_L] = self.wheel_forces[0]
         l[LOG_WHEEL_FORCE_R] = self.wheel_forces[1]
 
-
     def sim_update(self, time, dt):
 
         dt_sec = dt.total_seconds()
@@ -1250,6 +1264,9 @@ class Robot(SimObject):
             self.desired_linear_angular_vel_filtered[:, 0]
         )
 
+        wheel_vel_noise = numpy.random.normal(size=2, scale=ODOM_NOISE_STDDEV)
+        wheel_force_noise = numpy.random.normal(size=2, scale=WHEEL_FORCE_MAX_STDDEV)
+
         mm = self.motor_model
 
         for idx, side in enumerate([1.0, -1.0]):
@@ -1266,18 +1283,21 @@ class Robot(SimObject):
 
             self.wheel_vel[idx] = wheel_tgt_speed
 
+            meas_wheel_vel = wheel_tgt_speed + wheel_vel_noise[idx]
+
             if self.filter_vel:
                 b, a = ODOM_FILTER_B, ODOM_FILTER_A
             else:
                 b = [1, 0]
                 a = [0]
 
-            iir_filter(wheel_tgt_speed,
+            iir_filter(meas_wheel_vel,
                        self.odom_wheel_vel_raw[idx],
                        self.odom_wheel_vel_filtered[idx],
                        b, a)
 
-            wheel_vel_error = (self.desired_wheel_vel[idx] - wheel_tgt_speed)
+            wheel_vel_error = (self.desired_wheel_vel[idx] -
+                               self.odom_wheel_vel_filtered[idx,0])
 
             vel_int = self.wheel_vel_integrator[idx] + wheel_vel_error * dt_sec
             vel_int = clamp_abs(vel_int, MOTOR_VEL_INT_MAX)
@@ -1307,12 +1327,11 @@ class Robot(SimObject):
 
             vel_mismatch = wheel_tgt_speed - robot_fwd_vel_at_wheel
 
-            print('vel_mismatch[{}] ={}'.format(idx, vel_mismatch))
-            
+            # note 0.5 because we have two wheels
             vel_impulse = 0.5 * vel_mismatch * self.body.mass
 
             F = vel_impulse / dt_sec
-            F = clamp_abs(F, WHEEL_FORCE_MAX)
+            F = clamp_abs(F, WHEEL_FORCE_MAX + wheel_force_noise[idx])
 
             self.wheel_forces[idx] = F
             self.motor_torques[idx] = mm.motor_torque_from_wheel_tgt_force(-F)

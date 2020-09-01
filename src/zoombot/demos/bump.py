@@ -35,7 +35,7 @@ class BumpController(ctrl.Controller):
 
     def set_state(self, time, state, duration):
         print('set state to {} with '
-              'duration {} at time {:.2f}'.format(
+              'duration {} at time {}'.format(
                   state, duration, time))
         self.init_time = time
         self.state = state
