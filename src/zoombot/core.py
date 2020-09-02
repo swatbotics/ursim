@@ -1012,6 +1012,8 @@ class Robot(SimObject):
 
         self.bump = numpy.zeros(len(BUMP_ANGLE_RANGES), dtype=numpy.uint8)
 
+        self.leds_on = False
+
         self.log_vars = numpy.zeros(len(LOG_NAMES), dtype=numpy.float32)
 
         self.filter_setpoints = False
@@ -1402,7 +1404,7 @@ class Robot(SimObject):
         for i in range(3):
             lite = self.bump_lites[i]
             bump = self.bump[i]
-            if bump:
+            if bump or self.leds_on:
                 lite.enable_lighting = False
                 lite.color = gfx.vec3(1, 0, 0)
             else:

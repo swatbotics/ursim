@@ -64,7 +64,7 @@ def main():
 
     svg_file = find_path('environments/first_environment.svg')
     
-    if sys.argv[1].endswith('svg'):
+    if len(sys.argv) > 1 and sys.argv[1].endswith('svg'):
         svg_file = sys.argv[1]
         lib_svg_file = find_path('environments/' + svg_file)
         if not os.path.exists(svg_file) and os.path.exists(lib_svg_file):

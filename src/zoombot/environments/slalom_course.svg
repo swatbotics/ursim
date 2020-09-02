@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 24.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 900 675" style="enable-background:new 0 0 900 675;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:none;stroke:#A0A0A0;stroke-width:5;}
+	.st2{fill:#00E000;}
+	.st3{fill:#FF8C00;}
+	.st4{fill:#7700FF;}
+	.st5{fill:none;stroke:#D6BA9D;stroke-width:5;stroke-miterlimit:10;}
+	.st6{fill:#D6BA9D;}
+	.st7{fill:none;stroke:#0000FF;stroke-width:5;}
+	.st8{fill:none;stroke:#FF0000;stroke-width:5;stroke-linejoin:bevel;stroke-miterlimit:5;}
+</style>
+<rect class="st0" width="900" height="675"/>
+<line class="st1" x1="126" y1="511" x2="126" y2="591"/>
+<line class="st1" x1="126" y1="129" x2="126" y2="209"/>
+<circle class="st2" cx="129.2" cy="207.1" r="5"/>
+<circle class="st2" cx="126" cy="127.9" r="5"/>
+<circle class="st3" cx="373.4" cy="172" r="5"/>
+<circle class="st2" cx="373.4" cy="242" r="5"/>
+<circle class="st3" cx="387.8" cy="494.9" r="5"/>
+<circle class="st3" cx="128" cy="591" r="5"/>
+<circle class="st3" cx="387.8" cy="420.1" r="5"/>
+<ellipse class="st3" cx="632" cy="571.3" rx="5" ry="5"/>
+<circle class="st2" cx="623.2" cy="503.1" r="5"/>
+<circle class="st2" cx="127.9" cy="511.8" r="5"/>
+<ellipse transform="matrix(0.1602 -0.9871 0.9871 0.1602 -149.5383 996.2388)" class="st4" cx="510.7" cy="586" rx="10" ry="10"/>
+<line id="tag2" class="st5" x1="630.4" y1="489.3" x2="683" y2="418.8"/>
+<rect x="269.8" y="318.5" transform="matrix(0.9968 -7.953373e-02 7.953373e-02 0.9968 -26.4837 26.0513)" class="st6" width="88" height="54"/>
+<rect x="249.5" y="569.4" transform="matrix(0.9244 -0.3814 0.3814 0.9244 -205.2725 157.0284)" class="st6" width="88" height="54"/>
+<rect x="190.4" y="301.4" transform="matrix(4.944440e-03 -1 1 4.944440e-03 -129.1634 561.0938)" class="st6" width="54" height="88"/>
+<rect x="455.4" y="75.4" transform="matrix(0.9965 -8.377995e-02 8.377995e-02 0.9965 -6.8232 42.2007)" class="st6" width="88" height="54"/>
+<circle class="st3" cx="651.7" cy="227.7" r="5"/>
+<circle class="st3" cx="697.4" cy="168.5" r="5"/>
+<line id="tag1_2_" class="st5" x1="649.5" y1="246.6" x2="701.2" y2="317.8"/>
+<line id="tag1_3_" class="st5" x1="697.8" y1="322.8" x2="687.1" y2="410.2"/>
+<polyline class="st7" points="692.4,207.1 739.5,245.5 771,302.9 781,372.9 762.7,444.6 743,479.8 700.8,523.7 651.7,540.7 "/>
+<rect x="824.1" y="313.5" transform="matrix(0.9989 -4.748752e-02 4.748752e-02 0.9989 -16.0171 40.8211)" class="st6" width="54" height="88"/>
+<rect x="794" y="441" transform="matrix(0.2342 -0.9722 0.9722 0.2342 186.8149 1173.0636)" class="st6" width="88" height="54"/>
+<rect x="807.6" y="210.2" transform="matrix(0.9601 -0.2797 0.2797 0.9601 -37.7821 243.5793)" class="st6" width="54" height="88"/>
+<rect x="753.4" y="115.1" transform="matrix(0.6574 -0.7536 0.7536 0.6574 147.5263 642.6011)" class="st6" width="54" height="88"/>
+<rect x="739.1" y="542.7" transform="matrix(0.6644 -0.7474 0.7474 0.6644 -163.0107 776.4625)" class="st6" width="88" height="54"/>
+<line class="st1" x1="156.2" y1="212.1" x2="340.3" y2="247"/>
+<line class="st1" x1="403.2" y1="237" x2="618.2" y2="237"/>
+<line class="st1" x1="409.8" y1="167" x2="664.8" y2="163.5"/>
+<line class="st1" x1="347.5" y1="169" x2="156.2" y2="132.9"/>
+<line class="st1" x1="598.6" y1="489.9" x2="413.1" y2="425.1"/>
+<line class="st1" x1="415.9" y1="502.5" x2="606.9" y2="565.7"/>
+<line class="st1" x1="368.4" y1="420.1" x2="156.2" y2="503.1"/>
+<line class="st1" x1="362.2" y1="503.1" x2="156.2" y2="586"/>
+<rect x="240.7" y="54.8" transform="matrix(0.2474 -0.9689 0.9689 0.2474 105.7346 333.7845)" class="st6" width="54" height="88"/>
+<polygon class="st8" points="245.4,545 249.8,561 290.9,540.9 "/>
+</svg>

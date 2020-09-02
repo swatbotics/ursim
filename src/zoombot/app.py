@@ -14,9 +14,12 @@
 
 from datetime import timedelta
 import os, time
+import wave
 
 import glfw
 import numpy
+
+import sounddevice
 
 from . import core, gfx, ctrl, camera
 from .find_path import find_path
@@ -134,6 +137,42 @@ class RoboSimApp(gfx.GlfwApp):
         self.controller = controller
         self.sim.robot.filter_setpoints = filter_setpoints
 
+        self.snd = wave.open(find_path('sounds/honk.wav'))
+
+        params = self.snd.getparams()
+
+        assert params.sampwidth == 2
+
+        self.snd_bytes_per_frame = params.nchannels * params.sampwidth
+        self.snd_should_play = False
+
+        self.stream = sounddevice.RawOutputStream(samplerate=params.framerate,
+                                                  channels=params.nchannels,
+                                                  dtype='int16',
+                                                  blocksize=2048,
+                                                  callback=self.snd_callback)
+
+        self.stream.start()
+
+    def snd_callback(self, outdata, frames, time, status):
+        
+        if status.output_underflow:
+            print('Sound output underflow: increase blocksize?', file=sys.stderr)
+            raise sd.CallbackAbort
+
+        bytes_to_read = frames * self.snd_bytes_per_frame
+
+        if not self.snd_should_play:
+            bytes_read = 0
+        else:
+            data = self.snd.readframes(frames)
+            bytes_read = len(data)
+            outdata[:bytes_read] = data
+
+        if bytes_read < bytes_to_read:
+            self.snd_should_play = False
+            outdata[bytes_read:] = bytearray(bytes_to_read - bytes_read)
+        
     def get_robot_pose(self):
 
         return core.b2xform(self.sim.robot.body.transform,
@@ -220,6 +259,12 @@ class RoboSimApp(gfx.GlfwApp):
             self.update_sim()
             self.need_render = True
 
+        elif key == glfw.KEY_Y:
+
+            if not self.snd_should_play:
+                self.snd_should_play = True
+                self.snd.setpos(0)
+
         elif key == glfw.KEY_R:
 
             self.sim.reset(reload_svg=True)
@@ -285,6 +330,8 @@ class RoboSimApp(gfx.GlfwApp):
     ############################################################
         
     def update(self):
+
+        self.sim.robot.leds_on = self.snd_should_play
         
         if self.animating:
             now = glfw.get_time()
