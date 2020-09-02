@@ -329,7 +329,7 @@ def main():
             filename = sys.argv[1]
         extra_args = sys.argv[2:]
 
-    _, ldata = read_log(filename)
+    _, ldata = read_log(filename, as_dict=True)
     plot_log(os.path.basename(filename), ldata, extra_args)
 
 ######################################################################

@@ -22,7 +22,7 @@ import svgelements
 from . import gfx
 from .clean_gl import gl
 from .find_path import find_path
-from .datalog import Logger
+from .datalog import DataLog
 from .transform2d import Transform2D
 from .motor import Motor
 
@@ -1180,8 +1180,8 @@ class Robot(SimObject):
     def reset(self):
         self.initialize(self.orig_position, self.orig_angle)
 
-    def setup_log(self, logger):
-        logger.add_variables(LOG_NAMES, self.log_vars)
+    def setup_log(self, datalog):
+        datalog.add_variables(LOG_NAMES, self.log_vars)
 
     def update_log(self):
 
@@ -1485,8 +1485,8 @@ class RoboSim(B2D.b2ContactListener):
         
         self.physics_ticks_per_update = 4
 
-        self.logger = Logger(self.dt * self.physics_ticks_per_update)
-        self.robot.setup_log(self.logger)
+        self.datalog = DataLog(self.dt * self.physics_ticks_per_update)
+        self.robot.setup_log(self.datalog)
 
         self.velocity_iterations = 6
         self.position_iterations = 2
@@ -1538,7 +1538,11 @@ class RoboSim(B2D.b2ContactListener):
         self.add_object(Wall(self.world, numpy.array(p0), numpy.array(p1)))
 
     def reset(self, reload_svg=True):
-        self.logger.finish()
+        
+        filename = self.datalog.finish()
+        if filename is not None:
+            print('wrote log', filename)
+            
         if reload_svg and self.svg_filename is not None:
             self.clear()
             self.load_svg(self.svg_filename)
@@ -1551,6 +1555,10 @@ class RoboSim(B2D.b2ContactListener):
 
     def clear(self):
 
+        filename = self.datalog.finish()
+        if filename is not None:
+            print('wrote log', filename)
+        
         self.sim_time = timedelta(0)
         self.sim_ticks = 0
         self.modification_counter += 1
@@ -1714,6 +1722,10 @@ class RoboSim(B2D.b2ContactListener):
 
     def update(self):
 
+        if not self.datalog.is_logging():
+            filename = self.datalog.begin_log()
+            print('starting log', filename)
+        
         for i in range(self.physics_ticks_per_update):
 
             for obj in self.objects:
@@ -1729,7 +1741,8 @@ class RoboSim(B2D.b2ContactListener):
             self.sim_ticks += 1
 
         self.robot.update_log()
-        self.logger.append_log_row()
+        
+        self.datalog.append_log_row()
 
 
     def kick_ball(self):

@@ -1,3 +1,17 @@
+######################################################################
+#
+# zoombot/motor.py
+# 
+# Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
+# Copyright (C) Matt Zucker 2020
+#
+######################################################################
+#
+# Electromechanical state-space model and simulation of a brushed
+# DC motor.
+#
+######################################################################
+
 import numpy
 
 RPS_PER_RPM = numpy.pi / 30
@@ -414,7 +428,7 @@ def _test_motor_drive_mass():
     
 
 if __name__ == '__main__':
-
-    #_test_motor_basics()
-    _test_motor_drive_mass()
+    pass
+    #test_motor_basics()
+    #_test_motor_drive_mass()
     

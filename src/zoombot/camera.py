@@ -248,7 +248,7 @@ class SimCamera:
         #self.total_grab_time = 0
         #self.total_grabbed_frames = 0
 
-        logger = sim.logger
+        datalog = sim.datalog
 
         lvars = LOG_TIME_VARS[:]
 
@@ -258,7 +258,7 @@ class SimCamera:
 
         self.log_vars = numpy.zeros(len(lvars), dtype=numpy.float32)
 
-        logger.add_variables(lvars, self.log_vars)
+        datalog.add_variables(lvars, self.log_vars)
 
         self.last_modification_counter = None
             
@@ -427,11 +427,11 @@ class SimCamera:
         was_reset = (mcount != self.last_modification_counter)
         self.last_modification_counter = mcount
 
-        logger = self.sim.logger
+        datalog = self.sim.datalog
 
         # render to 0 upon completion of 0, prepare to grab 0
         # 
-        with logger.timer('profiling_camera.render', self.frame_budget):
+        with datalog.timer('profiling_camera.render', self.frame_budget):
             if was_reset:
                 if DOUBLE_BUFFER:
                     self.last_rendered_frame = 1
@@ -443,7 +443,7 @@ class SimCamera:
             self.render()
             # prep grab 1
         
-        with logger.timer('profiling_camera.grab', self.frame_budget):
+        with datalog.timer('profiling_camera.grab', self.frame_budget):
             # grab 0
             self.grab_frame()
 
@@ -451,7 +451,7 @@ class SimCamera:
         #self.total_grabbed_frames += 1
         #print('average grab time: {}'.format(self.total_grab_time/self.total_grabbed_frames))
 
-        with logger.timer('profiling_camera.process', self.frame_budget):
+        with datalog.timer('profiling_camera.process', self.frame_budget):
             self.process_frame()
 
               

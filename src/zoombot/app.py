@@ -58,7 +58,7 @@ from .clean_gl import gl
 # DONE: document BlobDetection
 # DONE: implement dynamic motor model from http://ctms.engin.umich.edu/CTMS/index.php?example=MotorSpeed&section=SystemModeling
 # DONE: friction model to muck up odometry without adding quite so much noise?
-# TODO: overshooting on turns? maybe not enough floor grip?
+# DONE: overshooting on turns? maybe not enough floor grip?
 # TODO: add logger to controller interface
 # TODO: docs for plotter?
 # TODO: nicer GUI/camera interface?
@@ -132,7 +132,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.last_update_time = None
 
         self.log_time = numpy.zeros(LOG_PROFILING_COUNT, dtype=numpy.float32)
-        self.sim.logger.add_variables(LOG_PROFILING_NAMES, self.log_time)
+        self.sim.datalog.add_variables(LOG_PROFILING_NAMES, self.log_time)
 
         self.controller_initialized = False
 
@@ -211,10 +211,10 @@ class RoboSimApp(gfx.GlfwApp):
                             core.ROBOT_CAMERA_LENS_Z)
 
     def update_sim(self):
-
+        
         cam = self.sim_camera
 
-        with self.sim.logger.timer('profiling.camera', self.frame_budget):
+        with self.sim.datalog.timer('profiling.camera', self.frame_budget):
             self.sim_camera.update()
 
         if not self.controller_initialized:
@@ -252,7 +252,7 @@ class RoboSimApp(gfx.GlfwApp):
             self.sim.robot.desired_linear_angular_vel[:] = (
                 result.forward_vel, result.angular_vel)
 
-        with self.sim.logger.timer('profiling.physics', self.frame_budget):
+        with self.sim.datalog.timer('profiling.physics', self.frame_budget):
             self.sim.update()
 
     def set_animating(self, a):
@@ -264,7 +264,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.animating = a
 
     def destroy(self):
-        self.sim.logger.finish()
+        self.sim.clear()
 
     def key(self, key, scancode, action, mods):
 
@@ -492,8 +492,7 @@ class RoboSimApp(gfx.GlfwApp):
         
     def render(self):
 
-
-        with self.sim.logger.timer('profiling.rendercalls', self.frame_budget):
+        with self.sim.datalog.timer('profiling.rendercalls', self.frame_budget):
 
             gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
             gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
