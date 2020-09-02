@@ -11,4 +11,4 @@ log*.npz
 /build
 /dist
 /.eggs
-/zoombot.egg-info
+/src/zoombot.egg-info
