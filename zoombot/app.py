@@ -15,6 +15,7 @@
 from datetime import timedelta
 import os, time
 import wave
+from importlib.resources import open_binary
 
 import glfw
 import numpy
@@ -24,7 +25,6 @@ import queue
 import threading
 
 from . import core, gfx, ctrl, camera
-from .find_path import find_path
 from .clean_gl import gl
 
 # DONE: teardown graphics
@@ -147,7 +147,7 @@ class RoboSimApp(gfx.GlfwApp):
 
     def initialize_audio(self):
 
-        snd = wave.open(find_path('sounds/honk.wav'))
+        snd = wave.open(open_binary('zoombot.sounds', 'honk.wav'))
         params = snd.getparams()
 
         assert params.sampwidth == 2

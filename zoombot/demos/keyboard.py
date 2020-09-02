@@ -16,10 +16,11 @@
 import numpy
 import glfw
 import sys, os
+from importlib.resources import open_text
 
 from .. import ctrl
 from ..app import RoboSimApp
-from ..find_path import find_path
+
 
 ######################################################################
 
@@ -64,13 +65,12 @@ class KeyboardController(ctrl.Controller):
 
 def main():
 
-    svg_file = find_path('environments/first_environment.svg')
+    svg_file = open_text('zoombot.environments', 'first_environment.svg')
     
     if len(sys.argv) > 1 and sys.argv[1].endswith('svg'):
         svg_file = sys.argv[1]
-        lib_svg_file = find_path('environments/' + svg_file)
-        if not os.path.exists(svg_file) and os.path.exists(lib_svg_file):
-            svg_file = lib_svg_file
+        if not os.path.exists(svg_file):
+            svg_file = open_text('zoombot.environments', svg_file)
 
     kbctrl = KeyboardController()
 

@@ -11,9 +11,9 @@
 
 import numpy
 import glfw
+from importlib.resources import open_binary
 
 from .. import gfx
-from ..find_path import find_path
 from ..clean_gl import gl
 
 ######################################################################
@@ -31,7 +31,7 @@ class HelloWorldApp(gfx.GlfwApp):
 
         self.framebuffer = gfx.Framebuffer(512, 512)
 
-        self.texture = gfx.load_texture(find_path('textures/monalisa.jpg'), 'RGB')
+        self.texture = gfx.load_texture(open_binary('zoombot.textures', 'monalisa.jpg'), 'RGB')
         
         self.fsquad = gfx.FullscreenQuad(self.texture)
 

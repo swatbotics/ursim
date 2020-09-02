@@ -17,8 +17,7 @@ import numpy
 import os
 import json
 import sys
-
-from .find_path import find_path
+from importlib.resources import open_text
 
 ######################################################################
 
@@ -269,7 +268,7 @@ def label_image(all_bboxes, image, labels=None, scratch=None):
 
 class ColorBlobDetector:
 
-    def __init__(self, config_filename=None, mode='bgr'):
+    def __init__(self, config_file=None, mode='bgr'):
 
         assert mode in ['bgr', 'rgb']
 
@@ -284,13 +283,14 @@ class ColorBlobDetector:
 
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         
-        if config_filename is None:
-            self.json_filename = find_path('color_definitions.json')
+        if config_file is None:
+            config_file = open_text('zoombot', 'color_definitions.json')
         else:
-            self.json_filename = config_filename
+            config_file = open(config_file, 'r')
 
-        with open(self.json_filename, 'r') as istr:
-            cdata = numpy_from_json(json.load(istr))
+        cdata = numpy_from_json(json.load(config_file))
+
+        config_file.close()
 
         colors = cdata['colors']
 
@@ -327,10 +327,7 @@ class ColorBlobDetector:
 
         self.full_palette = lpalette
 
-    def save(self, config_filename=None):
-        
-        if config_filename is None:
-            config_filename = self.json_filename
+    def save(self, config_filename):
 
         colors = []
 

@@ -14,6 +14,7 @@
 
 import os
 from datetime import timedelta
+from importlib.resources import open_binary
 
 import numpy
 import Box2D as B2D
@@ -21,7 +22,6 @@ import svgelements
 
 from . import gfx
 from .clean_gl import gl
-from .find_path import find_path
 from .datalog import DataLog
 from .transform2d import Transform2D
 from .motor import Motor
@@ -609,12 +609,12 @@ class Room(SimObject):
         )
 
         if self.floor_texture is None:
-            self.floor_texture = gfx.load_texture(find_path('textures/floor_texture.png'))
+            self.floor_texture = gfx.load_texture(open_binary('zoombot.textures', 'floor_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 
         if self.wall_texture is None:
-            self.wall_texture = gfx.load_texture(find_path('textures/wall_texture.png'))
+            self.wall_texture = gfx.load_texture(open_binary('zoombot.textures', 'wall_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
             
@@ -1494,7 +1494,7 @@ class RoboSim(B2D.b2ContactListener):
         self.sim_time = timedelta()
         self.sim_ticks = 0
 
-        self.svg_filename = None
+        self.svg_file = None
 
         self.framebuffer = None
 
@@ -1506,12 +1506,12 @@ class RoboSim(B2D.b2ContactListener):
         self.dims = numpy.array([room_width, room_height],
                                 dtype=numpy.float32)
         self.room.initialize(self.dims)
-        self.svg_filename = None
+        self.svg_file = None
         self.modification_counter += 1
 
     def add_object(self, obj):
         self.objects.append(obj)
-        self.svg_filename = None
+        self.svg_file = None
         self.modification_counter += 1
         return obj
 
@@ -1543,9 +1543,11 @@ class RoboSim(B2D.b2ContactListener):
         if filename is not None:
             print('wrote log', filename)
             
-        if reload_svg and self.svg_filename is not None:
+        if reload_svg and self.svg_file is not None:
             self.clear()
-            self.load_svg(self.svg_filename)
+            if not isinstance(self.svg_file, str):
+                self.svg_file.seek(0)
+            self.load_svg(self.svg_file)
         else:
             self.sim_time = timedelta(0)
             self.sim_ticks = 0
@@ -1715,7 +1717,7 @@ class RoboSim(B2D.b2ContactListener):
         self.initialize_robot(robot_init_position,
                               robot_init_angle)
 
-        self.svg_filename = os.path.abspath(svgfile)
+        self.svg_file = svgfile
 
     def initialize_robot(self, pos, angle):
         self.robot.initialize(pos, angle)
