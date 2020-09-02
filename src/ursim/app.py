@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/app.py
+# ursim/app.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -147,7 +147,7 @@ class RoboSimApp(gfx.GlfwApp):
 
     def initialize_audio(self):
 
-        snd = wave.open(open_binary('zoombot.sounds', 'honk.wav'))
+        snd = wave.open(open_binary('ursim.sounds', 'honk.wav'))
         params = snd.getparams()
 
         assert params.sampwidth == 2

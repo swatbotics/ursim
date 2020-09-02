@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/demos/keyboard.py
+# ursim/demos/keyboard.py
 #
 # Demonstrates control of the robot with the keyboard.
 # 
@@ -65,12 +65,12 @@ class KeyboardController(ctrl.Controller):
 
 def main():
 
-    svg_file = open_text('zoombot.environments', 'first_environment.svg')
+    svg_file = open_text('ursim.environments', 'first_environment.svg')
     
     if len(sys.argv) > 1 and sys.argv[1].endswith('svg'):
         svg_file = sys.argv[1]
         if not os.path.exists(svg_file):
-            svg_file = open_text('zoombot.environments', svg_file)
+            svg_file = open_text('ursim.environments', svg_file)
 
     kbctrl = KeyboardController()
 

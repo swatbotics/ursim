@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/demos/square.py
+# ursim/demos/square.py
 #
 # Demonstrates a very simple state machine inside a controller that
 # drives the robot around a square.

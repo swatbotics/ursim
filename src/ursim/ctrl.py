@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/ctrl.py
+# ursim/ctrl.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -8,7 +8,7 @@
 ######################################################################
 #
 # Data structures used for defining controllers for simulated robots.
-# Users of the zoombot module should be familiar with these. See the
+# Users of the ursim module should be familiar with these. See the
 # demos for example usage.
 #
 ######################################################################
@@ -45,7 +45,7 @@ RobotState.__doc__ = """
 Data from non-camera robot sensors. It contains the following fields:
 
   * odom_pose: the relative odometry pose since startup, as an object
-    of type zoombot.transform2d.Transform2D
+    of type ursim.transform2d.Transform2D
 
   * bump_left, bump_center, bump_right: status of bump sensors, expressed
     as boolean False/True values for contact at each location
@@ -69,7 +69,7 @@ Data from camera sensors. It contains the following fields:
   * detections: Dictionary mapping color name strings to lists of
     color_blob_detector.BlobDetection. See the documentation of that
     class for more details, or look at the
-    zoombot.demos.blob_detection example.
+    ursim.demos.blob_detection example.
 
 
 """
@@ -97,7 +97,7 @@ class Controller:
 
     """Controller is the base class for robot controllers. You will want
     to create your own subclasses of controller for each
-    application. See the examples in the zoombot.demos package for
+    application. See the examples in the ursim.demos package for
     usage.
 
     """
@@ -109,7 +109,7 @@ class Controller:
             guaranteed to be.
 
           * odom_pose: the relative pose of the robot as an object of
-            type zoombot.transform2d.Transform2D. Frequently the
+            type ursim.transform2d.Transform2D. Frequently the
             identity transform, but not necessarily guaranteed to be.
 
         This function is guaranteed to be called before the first call
@@ -155,7 +155,7 @@ class Controller:
         which you may call add_variables() on.
 
         The default behavior is to not log any variables. See
-        zoombot.demos.ctrl_datalog for example usage.
+        ursim.demos.ctrl_datalog for example usage.
 
         """
         pass

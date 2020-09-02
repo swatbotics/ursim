@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/demos/ctrl_datalog.py
+# ursim/demos/ctrl_datalog.py
 #
 # Demonstrates how to add logging capability to a robot controller.
 # 

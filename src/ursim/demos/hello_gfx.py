@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/demos/hello_gfx.py
+# ursim/demos/hello_gfx.py
 #
 # Demonstrates low-level graphics operations.
 # 
@@ -31,7 +31,7 @@ class HelloWorldApp(gfx.GlfwApp):
 
         self.framebuffer = gfx.Framebuffer(512, 512)
 
-        self.texture = gfx.load_texture(open_binary('zoombot.textures', 'monalisa.jpg'), 'RGB')
+        self.texture = gfx.load_texture(open_binary('ursim.textures', 'monalisa.jpg'), 'RGB')
         
         self.fsquad = gfx.FullscreenQuad(self.texture)
 

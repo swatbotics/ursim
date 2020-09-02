@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/core.py
+# ursim/core.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -609,12 +609,12 @@ class Room(SimObject):
         )
 
         if self.floor_texture is None:
-            self.floor_texture = gfx.load_texture(open_binary('zoombot.textures', 'floor_texture.png'))
+            self.floor_texture = gfx.load_texture(open_binary('ursim.textures', 'floor_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 
         if self.wall_texture is None:
-            self.wall_texture = gfx.load_texture(open_binary('zoombot.textures', 'wall_texture.png'))
+            self.wall_texture = gfx.load_texture(open_binary('ursim.textures', 'wall_texture.png'))
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
             gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
             

@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/demos/blob_detection.py
+# ursim/demos/blob_detection.py
 #
 # Demonstrates how to use camera color blob detection inside of a
 # controller.

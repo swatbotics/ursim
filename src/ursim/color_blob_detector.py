@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/color_blob_detector.py
+# ursim/color_blob_detector.py
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -284,7 +284,7 @@ class ColorBlobDetector:
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         
         if config_file is None:
-            config_file = open_text('zoombot', 'color_definitions.json')
+            config_file = open_text('ursim', 'color_definitions.json')
         else:
             config_file = open(config_file, 'r')
 

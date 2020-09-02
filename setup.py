@@ -1,23 +1,23 @@
 from setuptools import setup, find_packages
 
-description=('Robotics simulator developed for ENGR 028: Mobile Robotics, '
+description=('Robot simulator developed for ENGR 028: Mobile Robotics, '
              'taught at Swarthmore College in Fall 2020.')
 
 requirements = [line for line in open('requirements.txt', 'r')]
 
 setup(
-    name='zoombot',
+    name='ursim',
     version='0.1.0',
     description=description,
     author='Matt Zucker',
     author_email='mzucker1@swarthmore.edu',
-    url='https://github.com/swatbotics/zoombot',
+    url='https://github.com/swatbotics/ursim',
     python_requires='>=3.7',
     install_requires=requirements,
     setup_requires=requirements+['setuptools>=41.2'],
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    package_data=dict(zoombot=[
+    package_data=dict(ursim=[
         'color_definitions.json',
         'environments/*.svg',
         'sounds/*.wav',

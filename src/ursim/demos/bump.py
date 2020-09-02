@@ -1,6 +1,6 @@
 ######################################################################
 #
-# zoombot/demos/bump.py
+# ursim/demos/bump.py
 #
 # Demonstrates using the bump sensor for safe robot operation.
 # 
