@@ -1,7 +1,4 @@
 import numpy
-import datetime
-import matplotlib.pyplot as plt
-import scipy.integrate
 
 RPS_PER_RPM = numpy.pi / 30
 RPM_PER_RPS = 30 / numpy.pi
@@ -209,6 +206,10 @@ class Motor:
 
 def _test_motor_basics():
 
+    import datetime
+    import scipy.integrate
+    import matplotlib.pyplot as plt
+    
     M = Motor()
 
     noload_speed = M.steady_speed_for_torque(0)
