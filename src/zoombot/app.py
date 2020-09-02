@@ -149,7 +149,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.stream = sounddevice.RawOutputStream(samplerate=params.framerate,
                                                   channels=params.nchannels,
                                                   dtype='int16',
-                                                  blocksize=2048,
+                                                  blocksize=0,
                                                   callback=self.snd_callback)
 
         self.stream.start()
