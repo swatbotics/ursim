@@ -20,6 +20,8 @@ import glfw
 import numpy
 
 import sounddevice
+import queue
+import threading
 
 from . import core, gfx, ctrl, camera
 from .find_path import find_path
@@ -137,41 +139,71 @@ class RoboSimApp(gfx.GlfwApp):
         self.controller = controller
         self.sim.robot.filter_setpoints = filter_setpoints
 
-        self.snd = wave.open(find_path('sounds/honk.wav'))
+        self.initialize_audio()
 
-        params = self.snd.getparams()
+    def initialize_audio(self):
+
+        snd = wave.open(find_path('sounds/honk.wav'))
+        params = snd.getparams()
 
         assert params.sampwidth == 2
 
-        self.snd_bytes_per_frame = params.nchannels * params.sampwidth
-        self.snd_should_play = False
+        sdata = numpy.empty((params.nframes, params.nchannels),
+                            dtype=numpy.int16)
+        
+        bytes_per_frame = params.nchannels * params.sampwidth
+        blocksize = 1024
+        
+        cur_frame = 0
 
-        self.stream = sounddevice.RawOutputStream(samplerate=params.framerate,
-                                                  channels=params.nchannels,
-                                                  dtype='int16',
-                                                  blocksize=0,
-                                                  callback=self.snd_callback)
+        while True:
+            
+            block_bytes = snd.readframes(blocksize)
+            block_array = numpy.frombuffer(block_bytes, dtype=sdata.dtype)
+            block_array = block_array.reshape(-1, params.nchannels)
+
+            frames_read = len(block_array)
+
+            sdata[cur_frame:cur_frame+frames_read] = block_array
+            cur_frame += frames_read
+
+            if frames_read < blocksize:
+                break
+
+        assert cur_frame == params.nframes
+
+        self.snd_should_play = False
+        self.snd_playback_frame = 0
+
+        self.snd_data = sdata
+
+        self.stream = sounddevice.OutputStream(samplerate=params.framerate,
+                                               channels=params.nchannels,
+                                               dtype='int16',
+                                               blocksize=0,
+                                               callback=self.snd_callback)
 
         self.stream.start()
 
-    def snd_callback(self, outdata, frames, time, status):
-        
-        if status.output_underflow:
-            print('Sound output underflow: increase blocksize?', file=sys.stderr)
-            raise sd.CallbackAbort
-
-        bytes_to_read = frames * self.snd_bytes_per_frame
+    def snd_callback(self, outdata, frames_requested, time, status):
 
         if not self.snd_should_play:
-            bytes_read = 0
-        else:
-            data = self.snd.readframes(frames)
-            bytes_read = len(data)
-            outdata[:bytes_read] = data
+            outdata[:] = 0
+            return
 
-        if bytes_read < bytes_to_read:
+        end_frame = min(self.snd_playback_frame + frames_requested,
+                        len(self.snd_data))
+
+        frames_out = end_frame - self.snd_playback_frame
+
+        outdata[:frames_out] = self.snd_data[self.snd_playback_frame:end_frame]
+        outdata[frames_out:] = 0
+
+        if frames_out < frames_requested:
             self.snd_should_play = False
-            outdata[bytes_read:] = bytearray(bytes_to_read - bytes_read)
+            self.snd_playback_frame = 0
+        else:
+            self.snd_playback_frame = end_frame
         
     def get_robot_pose(self):
 
@@ -263,7 +295,6 @@ class RoboSimApp(gfx.GlfwApp):
 
             if not self.snd_should_play:
                 self.snd_should_play = True
-                self.snd.setpos(0)
 
         elif key == glfw.KEY_R:
 
