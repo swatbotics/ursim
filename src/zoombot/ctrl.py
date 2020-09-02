@@ -14,6 +14,7 @@
 ######################################################################
 
 import numpy
+from .datalog import DataLog
 from .color_blob_detector import BlobDetection
 from .transform2d import Transform2D
 
@@ -51,6 +52,26 @@ Data from non-camera robot sensors. It contains the following fields:
 
   * forward_vel, anglular_vel: filtered (smoothed) measurements of robot
     forward and angular velocity in its own coordinate frame
+"""
+
+######################################################################
+
+CameraData = namedtuple('CameraData',
+                        'scan, detections')
+
+CameraData.__doc__ = """
+
+Data from camera sensors. It contains the following fields:
+
+  * scan: An object of type LaserScan (see documentation in this
+    module).
+
+  * detections: Dictionary mapping color name strings to lists of
+    color_blob_detector.BlobDetection. See the documentation of that
+    class for more details, or look at the
+    zoombot.demos.blob_detection example.
+
+
 """
 
 ######################################################################
@@ -103,7 +124,7 @@ class Controller:
         """
         pass
 
-    def update(self, time, dt, robot_state, scan, detections):
+    def update(self, time, dt, robot_state, camera_data):
         """Called by the simulator at regular intervals to get a controller
         output from this controller. Parameters:
 
@@ -119,15 +140,22 @@ class Controller:
           * robot_state: Robot sensor data as an object of type
             RobotState (see documentation in this module).
 
-          * scan: Simulated scan data as an object of type
-            LaserScan (see documentation in this module).
-
-          * detections: Dictionary mapping color name strings to lists
-            of color_blob_detector.BlobDetection. See the
-            documentation of that class for more details, or look at
-            the zoombot.demos.blob_detection example.
+          * camera_data: Camera sensor data as an object of type
+            CameraData (see documentation in this module).
 
         Returns an object of type ControllerOutput, or None to disable
         motors entirely.
         """
         return ControllerOutput(forward_vel=0, angular_vel=0)
+
+    def setup_log(self, datalog):
+
+        """Called by the simulator once to set up logging for this controller.
+        The parameter datalog is an object of type datalog.DataLog,
+        which you may call add_variables() on.
+
+        The default behavior is to not log any variables. See
+        zoombot.demos.ctrl_datalog for example usage.
+
+        """
+        pass

@@ -1,6 +1,9 @@
 ######################################################################
 #
 # zoombot/demos/square.py
+#
+# Demonstrates a very simple state machine inside a controller that
+# drives the robot around a square.
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -28,7 +31,7 @@ class SimpleSquareController(ctrl.Controller):
         self.state = state
         self.init_odom_pose = odom_pose.copy()
 
-    def update(self, time, dt, robot_state, scan, detections):
+    def update(self, time, dt, robot_state, camera_data):
 
         ##################################################
         # state transition logic

@@ -59,7 +59,9 @@ from .clean_gl import gl
 # DONE: implement dynamic motor model from http://ctms.engin.umich.edu/CTMS/index.php?example=MotorSpeed&section=SystemModeling
 # DONE: friction model to muck up odometry without adding quite so much noise?
 # DONE: overshooting on turns? maybe not enough floor grip?
-# TODO: add logger to controller interface
+# DONE: add logger to controller interface
+# DONE: log enum strings?
+# DONE: future expansion for controller interface - just add fields to RobotState or CameraData
 # TODO: docs for plotter?
 # TODO: nicer GUI/camera interface?
 # TODO: more sophisticated frame rate control?
@@ -138,6 +140,8 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.controller = controller
         self.sim.robot.filter_setpoints = filter_setpoints
+
+        controller.setup_log(self.sim.datalog)
 
         self.initialize_audio()
 
@@ -237,12 +241,15 @@ class RoboSimApp(gfx.GlfwApp):
         scan = ctrl.LaserScan(
             angles=self.sim_camera.scan_angles.copy(),
             ranges=self.sim_camera.scan_ranges.copy())
+
+        camera_data = ctrl.CameraData(
+            scan=scan,
+            detections=self.sim_camera.detections)
             
         result = self.controller.update(self.sim.sim_time,
                                         self.frame_budget,
                                         robot_state,
-                                        scan,
-                                        self.sim_camera.detections)
+                                        camera_data)
 
         if result is None:
             self.sim.robot.motors_enabled = False

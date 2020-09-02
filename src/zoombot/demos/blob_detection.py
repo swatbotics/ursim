@@ -1,6 +1,9 @@
 ######################################################################
 #
 # zoombot/demos/blob_detection.py
+#
+# Demonstrates how to use camera color blob detection inside of a
+# controller.
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -46,9 +49,11 @@ class LookAtController(ctrl.Controller):
                 print('gonna stare at {} for a bit'.format(self.sequence[self.cur_idx][0]))
             self.cur_move = move
 
-    def update(self, time, dt, robot_state, scan, detections):
+    def update(self, time, dt, robot_state, camera_data):
 
         color_name, direction = self.sequence[self.cur_idx]
+
+        detections = camera_data.detections
         
         ##################################################
         # state transition logic

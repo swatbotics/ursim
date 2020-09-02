@@ -47,12 +47,18 @@ class DataLog:
     are also allowed, and each will appear in its own plot. By
     convention, sets of variables whose unique identifiers are the
     same, but whose plot titles include pos_x and pos_y (and
-    optionally pos_angle) are recognized as poses, and are plotted
+    optionally angle) are recognized as poses, and are plotted
     separately by the plotter, for example:
 
        pos_x.my_special_pose
        pos_y.my_special_pose
-       pos_angle.my_special_pose
+       angle.my_special_pose
+
+    Finally: if the unique id for a pose includes 'location',
+    it will be plotted as markers instead of lines, and it will
+    not be included in the standard array of timeseries plots unless
+    specified on the command line.
+
     """
     
     """Numpy data type mnemonics stored numerically."""
@@ -73,6 +79,7 @@ class DataLog:
         self.total_variables = 0
 
         self.variables = dict()
+        self.enums = dict()
 
         if isinstance(dt, datetime.timedelta):
             dt = dt.total_seconds()
@@ -224,10 +231,19 @@ class DataLog:
 
         log_names = numpy.array(log_names, dtype='U')
 
+        enums_dict = dict()
+
+        for name, enum in self.enums.items():
+            d = dict()
+            for value_string, value_num in enum.lookup.items():
+                d[value_num] = value_string
+            enums_dict[name] = d
+                
         numpy.savez_compressed(self.current_filename,
                                dt=self.dt,
                                names=log_names,
-                               data=written_portion)
+                               data=written_portion,
+                               enums=enums_dict)
 
         filename_written = self.current_filename
 
@@ -254,12 +270,70 @@ class DataLog:
             return None
 
     def lookup_variable(self, name):
-        """Returns the group index and the array index of the named variable,
+        """Returns the array and the array index for the named variable,
         or None if the variable was not added to this log."""
         if name not in self.variables:
             return None
-        return self.variables[name]
+        group_idx, idx = self.variables[name]
+        return self.groups[group_idx].array, idx
 
+    def register_enum(self, name, lookup=None, is_final=None):
+        """Register a set of string values and obtain an object that can be
+        used to write strings into the log. Parameters:
+
+          * name: the name of a variable that has already been added
+            using the add_variables() method. 
+
+          * lookup: either a list of strings (in which case the index
+            each string in the list will be the corresponding numeric
+            value), a dict mapping strings to numbers, or None in
+            which case arbitrary strings can be written to the log
+            (see notes for is_final, however).
+
+          * is_final: if True, then the provided lookup list or dict
+            is presumed to contain all possible string values for the
+            given name, and attempting to store a value not in lookup
+            will result in an error; otherwise, allows arbitrary
+            strings to be stored. However, this may lead to slower
+            performance and larger log files, and is generally not
+            recommended.
+
+        Returns a helper object with a single method
+        store_value(value) that lets you store a value. Here is
+        example usage:
+
+            foo_array = numpy.zeros(1)
+            datalog.add_variables(['foo'], foo_array)
+
+            helper = datalog.register_enum('foo', ['hello', 'world'])
+
+            datalog.begin_log()
+
+            helper.store_value('hello')
+            datalog.append_log_row()
+
+            helper.store_value('world')
+            datalog.append_log_row()
+
+            datalog.write_log()
+            
+        See demos/ctrl_datalog.py for an additional example.
+        """
+
+        if lookup is None:
+            assert is_final is None or not is_final
+            is_final = False
+        elif not isinstance(lookup, dict):
+            lookup = dict([(value, idx) for idx, value in enumerate(lookup)])
+
+        array, idx = self.lookup_variable(name)
+        
+        helper = _EnumHelper(array, idx, lookup, is_final)
+
+        self.enums[name] = helper
+        
+        return helper
+                                       
     def timer(self, name, denom=1.0, display=None):
         """Returns a timer object that can be used inside a Python "with"
         statement to do some basic profiling and write the result to
@@ -285,9 +359,32 @@ class DataLog:
             a given budget duration in seconds
 
         """
-        group_idx, var_idx = self.lookup_variable(name)
-        group = self.groups[group_idx]
-        return _LogTimer(group.array, var_idx, denom)
+        array, idx = self.lookup_variable(name)
+        return _LogTimer(array, idx, denom)
+
+######################################################################
+
+class _EnumHelper:
+
+    def __init__(self, array, idx, lookup, is_final):
+        
+        self.array = array
+        self.idx = idx
+        self.lookup = lookup
+        self.lookup_is_final = is_final
+
+        if len(lookup):
+            self.max_value = max(lookup.values())
+        else:
+            self.max_value = 0
+
+    def store_value(self, value):
+
+        if not self.lookup_is_final and value not in self.lookup:
+            self.max_value += 1
+            lookup[value] = self.max_value
+
+        self.array[self.idx] = self.lookup[value]
 
 ######################################################################
 
@@ -321,24 +418,31 @@ def read_log(filename, as_dict=True):
     The return values of this function depend on the as_dict
     parameter. 
 
-    If as_dict is True, the function returns (dt, lookup) where dt is
-    the timestep specified at log creation time (or None if not
-    specified), and lookup is a dictionary mapping variable names to
-    flat numpy arrays of data per timestep.
+    If as_dict is True, the function returns (dt, lookup, enums) where
+    dt is the timestep specified at log creation time (or None if not
+    specified), lookup is a dictionary mapping variable names to flat
+    numpy arrays of data per timestep. Finally, enums is a dictionary
+    mapping variable names to dictionaries mapping numeric values to
+    strings. For example with a single enum:
 
-    If as_dict is False, the function returns (dt, names, data) where
-    dt is the same as above, names is a list of variable names of
-    length nvars, and data is a numpy array of shape (nrows, nvars).
+        enums = { 'mybool': { 0: 'false', 1: 'true' } }
+
+    If as_dict is False, the function returns (dt, names, data, enums)
+    where dt is the same as above, names is a list of variable names
+    of length nvars, data is a numpy array of shape (nrows, nvars),
+    and enums is the same as above.
+
     """
     
-    npzfile = numpy.load(filename)
+    npzfile = numpy.load(filename, allow_pickle=True)
     
     dt = npzfile['dt']
     names = npzfile['names']
     data = npzfile['data']
+    enums = npzfile['enums'].item()
 
     if not as_dict:
-        return dt, names, data
+        return dt, names, data, enums
     else:
         lookup = dict([(str(name), data[:,col]) for col, name in enumerate(names)])
-        return dt, lookup
+        return dt, lookup, enums

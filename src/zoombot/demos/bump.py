@@ -1,6 +1,8 @@
 ######################################################################
 #
 # zoombot/demos/bump.py
+#
+# Demonstrates using the bump sensor for safe robot operation.
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -41,7 +43,7 @@ class BumpController(ctrl.Controller):
         self.state = state
         self.duration = duration
 
-    def update(self, time, dt, robot_state, scan, detections):
+    def update(self, time, dt, robot_state, camera_data):
         
         ##################################################
         # state transition logic
@@ -52,6 +54,7 @@ class BumpController(ctrl.Controller):
                    elapsed.total_seconds() >= self.duration)
 
         if self.is_virtual:
+            scan = camera_data.scan
             bump_left = scan.ranges[0] < MIN_DIST
             bump_center = scan.ranges[len(scan.ranges)//2] < MIN_DIST
             bump_right = scan.ranges[-1] < MIN_DIST

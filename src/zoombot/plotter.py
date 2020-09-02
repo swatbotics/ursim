@@ -29,7 +29,8 @@ MAX_PLOT_COLS = 1
 MAX_PLOTS_PER_FIGURE = MAX_PLOT_ROWS*MAX_PLOT_COLS
 
 DEFAULT_EXCLUDES = [
-    'profiling_camera'
+    'profiling_camera',
+    'location'
 ]
 
 COLORS = dict(blue=[0, 0, 0.8],
@@ -61,9 +62,10 @@ def keyboard(event):
 
 class PlotManager:
 
-    def __init__(self, fig):
+    def __init__(self, fig, enums):
 
         self.fig = fig
+        self.enums = enums
 
         self.mouse_down = None
         
@@ -142,9 +144,20 @@ class PlotManager:
 
         for line in ax.lines:
             lx, ly = line.get_data()
-            py = numpy.interp(x, lx, ly)
-            name = re.sub(r'^[^.]+\.', '', line.get_label())
-            outputs.append('{}={:.3g}'.format(name, py))
+            name = line.get_label()
+            abbrev = re.sub(r'^[^.]+\.', '', name)
+            if name in self.enums:
+                lookup = self.enums[name]
+                idx = numpy.abs(lx - x).argmin()
+                py = ly[idx]
+                if py in lookup:
+                    value = lookup[py]
+                else:
+                    value = str(py)
+                outputs.append('{}={}'.format(abbrev, value))
+            else:
+                py = numpy.interp(x, lx, ly)
+                outputs.append('{}={:.3g}'.format(abbrev, py))
         
         return ' '.join(outputs)
 
@@ -157,14 +170,14 @@ class PlotManager:
 
 ######################################################################
 
-def make_figure(filename, fig_idx, total_figures, subplots):  
+def make_figure(filename, fig_idx, total_figures, subplots, enums=None):
     fig = plt.figure(fig_idx)
     fig.canvas.mpl_connect('key_press_event', keyboard)
     fig.canvas.set_window_title('{} - figure {}/{}'.format(filename, fig_idx, total_figures))
     if subplots:
         fig.suptitle("Press 't' to toggle legend, 'q' to close, 'r' to reset view")
         axis_list = fig.subplots(MAX_PLOT_ROWS, MAX_PLOT_COLS, sharex=True)
-        mgr = PlotManager(fig)
+        mgr = PlotManager(fig, enums)
         return fig, axis_list, mgr
     else:
         fig.suptitle("Press 't' to toggle legend, 'q' to close")
@@ -172,7 +185,7 @@ def make_figure(filename, fig_idx, total_figures, subplots):
 
 ######################################################################
     
-def plot_log(fname, ldata, trace_names=[]):
+def plot_log(fname, ldata, enums, trace_names=[]):
 
     assert 'time' in ldata.keys()
 
@@ -194,9 +207,6 @@ def plot_log(fname, ldata, trace_names=[]):
         if len(trace_names) and not matches_trace:
             continue
 
-        if matches_exclude and not matches_trace:
-            continue
-
         dot = name.find('.')
         if dot >= 0:
             group = name[:dot]
@@ -209,6 +219,9 @@ def plot_log(fname, ldata, trace_names=[]):
             py = 'pos_y.' + remainder
             if py in ldata:
                 poses.append(remainder)
+        
+        if matches_exclude and not matches_trace:
+            continue
 
         if group in plot_lookup:
             plot_idx = plot_lookup[group]
@@ -230,7 +243,7 @@ def plot_log(fname, ldata, trace_names=[]):
     managers = []
 
     fig_idx = 1
-    fig, subplots, mgr = make_figure(fname, fig_idx, total_figures, True)
+    fig, subplots, mgr = make_figure(fname, fig_idx, total_figures, True, enums)
     managers.append(mgr)
 
     for pidx, plist in enumerate(plots):
@@ -238,7 +251,8 @@ def plot_log(fname, ldata, trace_names=[]):
         if cur_idx >= MAX_PLOTS_PER_FIGURE:
             mgr.setup()
             fig_idx += 1
-            fig, subplots, mgr = make_figure(fname, fig_idx, total_figures, True)
+            fig, subplots, mgr = make_figure(fname, fig_idx, total_figures,
+                                             True, enums)
             managers.append(mgr)
             cur_idx -= MAX_PLOTS_PER_FIGURE
             
@@ -270,12 +284,22 @@ def plot_log(fname, ldata, trace_names=[]):
 
         for idx, pname in enumerate(poses):
 
-            print('found pose', pname)
-            
             x = ldata['pos_x.' + pname]
             y = ldata['pos_y.' + pname]
 
-            handle, = plt.plot(x, y, label=pname, zorder=2)
+            if 'location' in pname:
+                style = 'x'
+                stepover = 1
+            else:
+                style = '-'
+                stepover = 4
+
+            kwargs = dict()
+            for color, cvalue in COLORS.items():
+                if color in pname:
+                    kwargs['color'] = cvalue
+                
+            handle, = plt.plot(x, y, style, label=pname, zorder=2, **kwargs)
             color = numpy.array(matplotlib.colors.to_rgb(handle.get_color()))
             
             tname = 'angle.' + pname
@@ -283,7 +307,8 @@ def plot_log(fname, ldata, trace_names=[]):
                 theta = ldata[tname]
                 c = numpy.cos(theta)
                 s = numpy.sin(theta)
-                plt.quiver(x[::8], y[::8], c[::8], s[::8],
+                plt.quiver(x[::stepover], y[::stepover],
+                           c[::stepover], s[::stepover],
                            color=(0.7*color + 0.3),
                            units='dots', width=3.0*handle.get_linewidth(),
                            zorder=1)
@@ -311,14 +336,6 @@ def get_latest():
 
 def main():
 
-    #matplotlib.rcParams['toolbar'] = 'None'
-    #toolbar = plt.get_current_fig_manager().toolbar
-    #print(toolbar.__dict__)
-    #for x in toolbar.actions():
-    #    print(x.text())
-    #    #if x.text() in unwanted_buttons:
-    #    #    toolbar.removeAction(x)
-
     if len(sys.argv) == 1:
         filename = get_latest()
         extra_args = []
@@ -329,8 +346,8 @@ def main():
             filename = sys.argv[1]
         extra_args = sys.argv[2:]
 
-    _, ldata = read_log(filename, as_dict=True)
-    plot_log(os.path.basename(filename), ldata, extra_args)
+    _, ldata, enums = read_log(filename, as_dict=True)
+    plot_log(os.path.basename(filename), ldata, enums, extra_args)
 
 ######################################################################
 

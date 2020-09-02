@@ -1,6 +1,8 @@
 ######################################################################
 #
 # zoombot/demos/keyboard.py
+#
+# Demonstrates control of the robot with the keyboard.
 # 
 # Written for ENGR 028/CPSC 082: Mobile Robotics, Summer 2020
 # Copyright (C) Matt Zucker 2020
@@ -27,7 +29,7 @@ class KeyboardController(ctrl.Controller):
         super().__init__()
         self.app = None
 
-    def update(self, time, dt, robot_state, scan, detections):
+    def update(self, time, dt, robot_state, camera_data):
         
         la = numpy.zeros(2)
 
@@ -72,7 +74,7 @@ def main():
 
     kbctrl = KeyboardController()
 
-    app = RoboSimApp(kbctrl, filter_setpoints=True)
+    app = RoboSimApp(kbctrl)
     kbctrl.app = app
 
     app.sim.load_svg(svg_file)
