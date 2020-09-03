@@ -18,7 +18,7 @@ from ursim import RoboSimApp, ctrl
 
 class LookAtController(ctrl.Controller):
 
-    sequence = [
+    COLOR_DIR_SEQUENCE = [
         ('orange_pylon', 1),
         ('green_pylon', -1),
         ('purple_ball', 1)
@@ -43,14 +43,14 @@ class LookAtController(ctrl.Controller):
             
         if move is not None:
             if move:
-                print('looking for {}'.format(self.sequence[self.cur_idx][0]))
+                print('looking for {}'.format(self.COLOR_DIR_SEQUENCE[self.cur_idx][0]))
             else:
-                print('gonna stare at {} for a bit'.format(self.sequence[self.cur_idx][0]))
+                print('gonna stare at {} for a bit'.format(self.COLOR_DIR_SEQUENCE[self.cur_idx][0]))
             self.cur_move = move
 
     def update(self, time, dt, robot_state, camera_data):
 
-        color_name, direction = self.sequence[self.cur_idx]
+        color_name, direction = self.COLOR_DIR_SEQUENCE[self.cur_idx]
 
         detections = camera_data.detections
         
@@ -65,7 +65,7 @@ class LookAtController(ctrl.Controller):
                 
                 print('done staring!')
                 
-                next_idx = (self.cur_idx+1) % len(self.sequence)
+                next_idx = (self.cur_idx+1) % len(self.COLOR_DIR_SEQUENCE)
                 self.set_state(time, idx=next_idx, move=True)
                 
         elif len(detections[color_name]):
