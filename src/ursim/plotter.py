@@ -16,7 +16,6 @@ from collections import Counter
 
 import numpy
 import matplotlib
-from matplotlib import backend_bases
 import matplotlib.pyplot as plt
 
 from .datalog import read_log
@@ -79,9 +78,9 @@ class PlotManager:
 
         btn = None
         
-        if event.button == backend_bases.MouseButton.LEFT:
+        if event.button == 1:
             btn = 'left'
-        elif event.button == backend_bases.MouseButton.RIGHT:
+        elif event.button == 3:
             btn = 'right'
 
         if btn is not None:
