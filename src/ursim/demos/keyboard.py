@@ -16,7 +16,7 @@
 import numpy
 import glfw
 import sys, os
-from importlib.resources import open_text
+from importlib_resources import open_text
 
 from ursim import RoboSimApp, ctrl
 

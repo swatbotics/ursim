@@ -6,3 +6,4 @@ matplotlib >= 3.0.0
 opencv-python ~= 4.4.0
 Pillow >= 7.0.0
 sounddevice >= 0.4
+importlib_resources >= 1.0

@@ -7,6 +7,6 @@
 #
 ######################################################################
 #
-# Dummy file to enable resource loading via importlib.resources.
+# Dummy file to enable resource loading via importlib_resources.
 #
 ######################################################################

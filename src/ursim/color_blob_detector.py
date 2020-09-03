@@ -17,7 +17,7 @@ import numpy
 import os
 import json
 import sys
-from importlib.resources import open_text
+from importlib_resources import open_text
 
 ######################################################################
 

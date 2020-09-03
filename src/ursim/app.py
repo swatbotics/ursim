@@ -15,7 +15,7 @@
 from datetime import timedelta
 import os, time
 import wave
-from importlib.resources import open_binary
+from importlib_resources import open_binary
 
 import glfw
 import numpy

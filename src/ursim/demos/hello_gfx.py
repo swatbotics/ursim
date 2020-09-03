@@ -11,7 +11,7 @@
 
 import numpy
 import glfw
-from importlib.resources import open_binary
+from importlib_resources import open_binary
 
 from ursim import gfx
 from ursim.clean_gl import gl

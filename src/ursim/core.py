@@ -14,7 +14,7 @@
 
 import os
 from datetime import timedelta
-from importlib.resources import open_binary
+from importlib_resources import open_binary
 
 import numpy
 import Box2D as B2D

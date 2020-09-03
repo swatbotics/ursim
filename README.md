@@ -15,14 +15,13 @@ prompt and typing
 
     python --version
 
-It should report back at least version 3.7. 
+It should report back at least version 3.5.
 
-If you don't see 3.7 or above, try running `python3 --version` or
+If you don't see 3.5 or above, try running `python3 --version` or
 `python3.7 --version` instead. If either of the latter two commands
 yields a working Python interpreter of the correct version, replace
 `python` in the second command below with either `python3` or
 `python3.7` as appropriate.
-
 
 Now clone this repository, then go into a terminal and enter the
 following commands to creat and activate a virtual environment,
@@ -41,6 +40,12 @@ whatever path you cloned this repository into!
     python3 -m venv --system-site-packages dev_env
     source dev_env/bin/activate
     
+Note for Ubuntu users: please run the command
+
+    sudo apt-get install libportaudio2
+
+before running the software.
+    
 #### Finishing setup:
 
 In either case, you will see the prefix `(dev_env)` in front of your
@@ -49,7 +54,7 @@ terminal command prompt to let you know the command worked.
 Once you can see `(dev_env)` at the start of your terminal command
 prompt, you can run the commands
 
-    pip install --upgrade setuptools wheel
+    pip install --upgrade setuptools wheel pip
     python setup.py develop
     
 First-time use
