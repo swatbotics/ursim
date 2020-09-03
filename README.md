@@ -21,18 +21,19 @@ interpreter of the correct version, replace `python` in the second
 command below with either `python3` or `python3.7` as appropriate.
 
 
-Now clone this repository, then go into a terminal and
-enter the following commands, depending on your OS.
+Now clone this repository, then go into a terminal and enter the
+following commands, depending on your OS. Don't forget to replace
+`PATH_TO_URSIM` with whatever path you cloned this repository into!
 
 #### Windows:
 
-    cd \path\to\ursim
+    cd PATH_TO_URSIM
     python -m venv --system-site-packages dev_env
     dev_env\Scripts\activate.bat
 
 #### Mac OS or Linux:
 
-    cd /path/to/ursim
+    cd PATH_TO_URSIM
     python3 -m venv --system-site-packages dev_env
     source dev_env/bin/activate
 
@@ -91,12 +92,12 @@ commands, depending on your OS.
 
 #### Windows:
 
-    cd \path\to\ursim
+    cd PATH_TO_URSIM
     dev_env\Scripts\activate.bat
 
 #### Mac OS or Linux:
 
-    cd /path/to/ursim
+    cd PATH_TO_URSIM
     source dev_env/bin/activate
 
 You will want to confirm you see `(dev_env)` appear at the left of
