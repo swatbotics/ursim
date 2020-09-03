@@ -10,11 +10,12 @@ Installation and first-time use
 #### This project was developed and tested with Python 3.7
 
 Python 2.7 reached end of life in January 2020. You should verify that
-you have a working Python 3 interpreter by typing
+you have a working Python 3 interpreter by going to your command
+prompt and typing
 
     python --version
 
-at your command prompt. It should report back at least version 3.7. 
+It should report back at least version 3.7. 
 
 If you don't see 3.7 or above, try running `python3 --version` or
 `python3.7 --version` instead. If either of the latter two commands
