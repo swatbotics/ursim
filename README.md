@@ -31,13 +31,13 @@ whatever path you cloned this repository into!
 #### Windows:
 
     cd PATH_TO_URSIM
-    python -m venv --system-site-packages dev_env
+    python -m venv dev_env
     dev_env\Scripts\activate.bat
 
 #### Mac OS or Linux:
 
     cd PATH_TO_URSIM
-    python3 -m venv --system-site-packages dev_env
+    python3 -m venv dev_env
     source dev_env/bin/activate
     
 Note for Ubuntu users: please run the command
