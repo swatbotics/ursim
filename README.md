@@ -16,7 +16,7 @@ enter the following commands:
     python -m venv --system-site-packages dev_env
     dev_env\Scripts\activate.bat
 
-**Mac OS or Linux:***
+**Mac OS or Linux:**
 
     cd /path/to/ursim
     python -m venv --system-site-packages dev_env
@@ -59,13 +59,13 @@ The `dev_env`
 that we set up in the previous section is a useful way to store Python
 modules for a project without needing to install them globally to the
 entire system. If you ever want to return to the normal set of Python
-packages available outside of the virtual environment, you can always
-run the command
+packages available outside of the virtual environment, you can run the
+command
 
     deactivate
 
 whenever you see the `(dev_env)` prompt to return to your normal
-environment. You can also always use the `exit` command to exit the
+environment. You can also use the `exit` command to exit the
 terminal command prompt as you would normally.
 
 Re-entering the virtual environment from a new terminal session
@@ -80,7 +80,7 @@ commands:
     cd \path\to\ursim
     dev_env\Scripts\activate.bat
 
-**Mac OS or Linux:***
+**Mac OS or Linux:**
 
     cd /path/to/ursim
     source dev_env/bin/activate
@@ -94,7 +94,7 @@ Useful scripts and other demos
 There are two scripts from the `ursim` you will frequently use when
 working with the simulator.
 
-####`ursim.plotter`
+#### `ursim.plotter`
 
 The first useful program is the `ursim.plotter` module.  Try running
 to plot variables from the log file created when you ran the keyboard
@@ -130,7 +130,7 @@ You can also specify the most recent log filename by using the `-l` flag:
 
     python -m ursim.plotter -l wheel motor
 
-####`ursim.cleanup`
+#### `ursim.cleanup`
 
 If you want to get rid of a number of log files in the current directory,
 you can run
@@ -141,9 +141,10 @@ It will prompt you to confirm deletion of the log files. You can also run
 
     python -m ursim.cleanup -y
 
-to skip the prompt. This also deletes camera image files (see below).
+to skip the prompt. This also deletes camera image files created with
+the `C` key (see below).
 
-####Other demos
+#### Other demos
 
 There are a number of other robot demos in the `ursim.demos`
 package. Try running each of the following:
