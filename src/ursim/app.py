@@ -386,7 +386,9 @@ class RoboSimApp(gfx.GlfwApp):
             now = glfw.get_time()
             if self.was_animating:
                 deadline = self.prev_update + self.frame_budget
-                while now < deadline:
+                while now + 0.001 < deadline: # get within 1ms of deadline
+                    if now + 0.002 < deadline: # sleep 1ms if within 2 ms
+                        time.sleep(0.001)
                     now = glfw.get_time()
                 delta_t = now - self.prev_update
                 self.log_time[LOG_PROFILING_DELTA] = delta_t/self.frame_budget
