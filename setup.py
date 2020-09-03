@@ -12,7 +12,7 @@ setup(
     author='Matt Zucker',
     author_email='mzucker1@swarthmore.edu',
     url='https://github.com/swatbotics/ursim',
-    python_requires='>=3.7',
+    python_requires='>=3.5',
     install_requires=requirements,
     setup_requires=requirements+['setuptools>=41.2'],
     packages=find_packages('src'),
