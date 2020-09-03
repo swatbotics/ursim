@@ -14,11 +14,13 @@ you have a working Python 3 interpreter by typing
 
     python --version
 
-at your command prompt. It should report back at least version 3.7. If
-it does not, try running `python3 --version` or `python3.7 --version`
-instead. If either of the latter two commands yields a working Python
-interpreter of the correct version, replace `python` in the second
-command below with either `python3` or `python3.7` as appropriate.
+at your command prompt. It should report back at least version 3.7. 
+
+If you don't see 3.7 or above, try running `python3 --version` or
+`python3.7 --version` instead. If either of the latter two commands
+yields a working Python interpreter of the correct version, replace
+`python` in the second command below with either `python3` or
+`python3.7` as appropriate.
 
 
 Now clone this repository, then go into a terminal and enter the
