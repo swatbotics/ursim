@@ -54,7 +54,7 @@ terminal command prompt to let you know the command worked.
 Once you can see `(dev_env)` at the start of your terminal command
 prompt, you can run the commands
 
-    pip install --upgrade setuptools wheel pip
+    python -m pip install --upgrade setuptools wheel pip
     python setup.py develop
     
 First-time use
