@@ -10,13 +10,13 @@ Installation and first-time use
 Clone this repository, then go into a terminal and
 enter the following commands:
 
-**Windows:**
+#### Windows:
 
     cd \path\to\ursim
     python -m venv --system-site-packages dev_env
     dev_env\Scripts\activate.bat
 
-**Mac OS or Linux:**
+#### Mac OS or Linux:
 
     cd /path/to/ursim
     python -m venv --system-site-packages dev_env
@@ -75,12 +75,12 @@ Whenever you open a new terminal session, you will need to re-activate
 the virtual environment before using `ursim` by repeating these two
 commands:
 
-**Windows:**
+#### Windows:
 
     cd \path\to\ursim
     dev_env\Scripts\activate.bat
 
-**Mac OS or Linux:**
+#### Mac OS or Linux:
 
     cd /path/to/ursim
     source dev_env/bin/activate
