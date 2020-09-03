@@ -184,4 +184,26 @@ demos, the following keys are always available in the simulator:
    | `Space`             | advance simulation by single step                |
    | `Esc` or `Q`        | quit                                             |
 
-Next, I suggest you check out the code in [the demos directory](src/ursim/demos) before starting to write your own code!
+Writing your own robot controllers
+----------------------------------
+
+Now you have all the tools you need to start trying out your own robot
+controllers.  I suggest you start by reading through the the code in
+[the demos directory](src/ursim/demos).
+
+I also strongly suggest that you read the relevant documentation in the
+[`ursim.ctrl`](src/ursim/ctrl.py) submodule.
+
+If you are interested in writing to the data log from your controller,
+I suggest you check out the [`ursim.datalog`](src/ursim/datalog.py)
+documentation as well.
+
+This documentation is available through the built-in
+[Python documentation system](https://docs.python.org/3/library/pydoc.html),
+so you can run the commands
+
+    python -m pydoc ursim.ctrl
+    python -m pydoc ursim.datalog
+
+You can also use the usual `pydoc` flags to output HTML or run a
+documentation webserver.
