@@ -1,6 +1,6 @@
 *~
 __pycache__
-/venv
+/dev_env
 .DS_Store
 /camera_images*/
 /*.png

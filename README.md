@@ -1,8 +1,171 @@
 ursim: Untitled Robot Simulator
 ===============================
 
-Robot simulator developed for ENGR 028: Mobile Robotics, 
+Robot simulator developed for ENGR 028: Mobile Robotics,
 taught at Swarthmore College in Fall 2020.
 
-### TODO: write more documentation!
+Installation and first-time use
+-------------------------------
 
+Clone this repository, then go into a terminal and
+enter the following commands:
+
+**Windows:**
+
+    cd \path\to\ursim
+    python -m venv --system-site-packages dev_env
+    dev_env\Scripts\activate.bat
+
+**Mac OS or Linux:***
+
+    cd /path/to/ursim
+    python -m venv --system-site-packages dev_env
+    source dev_env/bin/activate
+
+In either case, you will see the prefix `(dev_env)` in front of your
+terminal command prompt to let you know the command worked.
+
+Once you can see `(dev_env)` at the start of your terminal command
+prompt, you can run the commands
+
+    pip install --upgrade setuptools wheel
+    python setup.py develop
+
+If the setup.py command worked, you should then be able to run
+
+    python -m zoombot.demos.keyboard
+
+which will bring up a demo with interactive control of a simulated
+robot. You can use the mouse to aim the camera. The following keys
+will control the robot:
+
+   | Key          | Action        |
+   | :--          | :--           |
+   | `U`          | forward-left  |
+   | `I`          | forward       |
+   | `O`          | forward-right |
+   | `J`          | spin left     |
+   | `K`          | backward      |
+   | `L`          | spin right    |
+   | `Esc` or `Q` | quit          |
+
+If everything worked so far, congratulations!
+
+Leaving the virtual environment
+-------------------------------
+
+The `dev_env`
+[virtual environment](https://docs.python.org/3/library/venv.html)
+that we set up in the previous section is a useful way to store Python
+modules for a project without needing to install them globally to the
+entire system. If you ever want to return to the normal set of Python
+packages available outside of the virtual environment, you can always
+run the command
+
+    deactivate
+
+whenever you see the `(dev_env)` prompt to return to your normal
+environment. You can also always use the `exit` command to exit the
+terminal command prompt as you would normally.
+
+Re-entering the virtual environment from a new terminal session
+---------------------------------------------------------------
+
+Whenever you open a new terminal session, you will need to re-activate
+the virtual environment before using `ursim` by repeating these two
+commands:
+
+**Windows:**
+
+    cd \path\to\ursim
+    dev_env\Scripts\activate.bat
+
+**Mac OS or Linux:***
+
+    cd /path/to/ursim
+    source dev_env/bin/activate
+
+You will want to confirm you see `(dev_env)` appear at the left of
+your prompt before continuing.
+
+Useful scripts and other demos
+------------------------------
+
+There are two scripts from the `ursim` you will frequently use when
+working with the simulator.
+
+####`ursim.plotter`
+
+The first useful program is the `ursim.plotter` module.  Try running
+to plot variables from the log file created when you ran the keyboard
+demo:
+
+    python -m ursim.plotter
+
+If the program exits with the message `no log files found!`, you can
+re-run the keyboard control demo in the current directory and try
+again.
+
+It will bring up a series of windows that graph data from the most
+recent data log in the current directory. On the timeseries plots that
+appear (all but the final pose window), instead of using the toolbar
+buttons to zoom in and out, I suggest just swiping over the time
+interval of interest with your mouse. So to zoom all traces in a
+figure to the time interval [1, 2], click the left mouse button in a
+plot near t=1, drag to t=2, and release the mouse button. You can use
+the `R` key to reset the view, or right-click to zoom out.
+
+You can plot another log file besides the most recent one by supplying
+a file name on the command line:
+
+    python -m ursim.plotter LOGFILE.npz
+
+You can also filter variables within a log file by supplying text that
+will be matched against variable names. For example, to plot all
+variables in a given log file matching `wheel` or `motor`, run
+
+    python -m ursim.plotter LOGFILE.npz wheel motor
+
+You can also specify the most recent log filename by using the `-l` flag:
+
+    python -m ursim.plotter -l wheel motor
+
+####`ursim.cleanup`
+
+If you want to get rid of a number of log files in the current directory,
+you can run
+
+    python -m ursim.cleanup
+
+It will prompt you to confirm deletion of the log files. You can also run
+
+    python -m ursim.cleanup -y
+
+to skip the prompt. This also deletes camera image files (see below).
+
+####Other demos
+
+There are a number of other robot demos in the `ursim.demos`
+package. Try running each of the following:
+
+    python -m ursim.demos.square
+    python -m ursim.demos.bump
+    python -m ursim.demos.blob_detection
+    python -m ursim.demos.ctrl_datalog
+
+Although the robot direction control keys are not available in these
+demos, the following keys are always available in the simulator:
+
+   | Key                 | Action                                           |
+   | :-:                 | :--                                              |
+   | `1`                 | toggle visualization of camera object detections |
+   | `2`                 | toggle visualization of laser range data         |
+   | `3`                 | toggle visualization of robot camera view        |
+   | `R`                 | reset the simulation to the initial state        |
+   | `C`                 | save camera images to current directory          |
+   | `V`                 | restore the camera to the initial view           |
+   | `Enter` or `Return` | pause/unpause simulation                         |
+   | `Space`             | advance simulation by single step                |
+   | `Esc` or `Q`        | quit                                             |
+
+Next, I suggest you check out the code in [the demos directory](src/ursim/demos) before starting to write your own code!

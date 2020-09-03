@@ -107,9 +107,7 @@ class RoboSimApp(gfx.GlfwApp):
         self.xrot = 0
         self.yrot = 0
 
-        self.mouse_pos = numpy.array(self.framebuffer_size/2, dtype=numpy.float32)
-
-        self.handle_mouse_rot()
+        self.reset_window_camera()
 
         self.animating = True
         self.was_animating = False
@@ -278,7 +276,7 @@ class RoboSimApp(gfx.GlfwApp):
         if action != glfw.PRESS:
             return
         
-        if key == glfw.KEY_ESCAPE:
+        if key == glfw.KEY_ESCAPE or key == glfw.KEY_Q:
             
             glfw.set_window_should_close(self.window, gl.TRUE)
 
@@ -303,6 +301,10 @@ class RoboSimApp(gfx.GlfwApp):
             if not self.snd_should_play:
                 self.snd_should_play = True
 
+        elif key == glfw.KEY_V:
+
+            self.reset_window_camera()
+                
         elif key == glfw.KEY_R:
 
             self.sim.reset(reload_svg=True)
@@ -349,6 +351,15 @@ class RoboSimApp(gfx.GlfwApp):
 
     ############################################################
 
+    def reset_window_camera(self):
+
+        self.mouse_pos = numpy.array(self.framebuffer_size/2,
+                                     dtype=numpy.float32)
+
+        self.handle_mouse_rot()
+
+    ############################################################
+    
     def handle_mouse_rot(self):
 
         foo = (self.mouse_pos / self.framebuffer_size)
