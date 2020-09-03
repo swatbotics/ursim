@@ -4,8 +4,8 @@ ursim: Untitled Robot Simulator
 Robot simulator developed for ENGR 028: Mobile Robotics,
 taught at Swarthmore College in Fall 2020.
 
-Installation and first-time use
--------------------------------
+Installation
+------------
 
 #### This project was developed and tested with Python 3.7
 
@@ -25,8 +25,9 @@ yields a working Python interpreter of the correct version, replace
 
 
 Now clone this repository, then go into a terminal and enter the
-following commands, depending on your OS. Don't forget to replace
-`PATH_TO_URSIM` with whatever path you cloned this repository into!
+following commands to creat and activate a virtual environment,
+depending on your OS. Don't forget to replace `PATH_TO_URSIM` with
+whatever path you cloned this repository into!
 
 #### Windows:
 
@@ -39,6 +40,8 @@ following commands, depending on your OS. Don't forget to replace
     cd PATH_TO_URSIM
     python3 -m venv --system-site-packages dev_env
     source dev_env/bin/activate
+    
+#### Finishing setup:
 
 In either case, you will see the prefix `(dev_env)` in front of your
 terminal command prompt to let you know the command worked.
@@ -48,6 +51,9 @@ prompt, you can run the commands
 
     pip install --upgrade setuptools wheel
     python setup.py develop
+    
+First-time use
+==============
 
 If the setup.py command worked, you should then be able to run
 
