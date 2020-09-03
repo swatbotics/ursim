@@ -129,6 +129,9 @@ WHEEL_FORCE_MAX_STDDEV = 3.0
 ODOM_FREQUENCY = 4
 
 ODOM_NOISE_STDDEV = 0.02
+ODOM_NOISE_THRESHOLD_VEL = 0.005
+
+WHEEL_STOPPED_THRESHOLD_VEL = 0.15
 
 # Wn = 0.05
 SETPOINT_FILTER_B = numpy.array([0.07295966, 0.07295966])
@@ -988,6 +991,7 @@ class Robot(SimObject):
                                                                dtype=numpy.float64)
         
         self.desired_wheel_vel = numpy.zeros(2, dtype=numpy.float32)
+        self.wheel_stopped_count = numpy.zeros(2, dtype=int)
 
         self.wheel_vel_integrator = numpy.zeros(2, dtype=numpy.float32)
         self.wheel_vel = numpy.zeros(2, dtype=numpy.float32)
@@ -1050,6 +1054,7 @@ class Robot(SimObject):
         self.desired_linear_angular_vel_filtered[:] = 0
 
         self.odom_wheel_vel[:] = 0
+        self.wheel_stopped_count[:] = 0
         self.wheel_vel_integrator[:] = 0
         self.wheel_vel[:] = 0
         self.motor_state[:] = 0
@@ -1261,6 +1266,7 @@ class Robot(SimObject):
 
         mm = self.motor_model
 
+        
         for idx, side in enumerate([1.0, -1.0]):
 
             offset = B2D.b2Vec2(0, side * ROBOT_WHEEL_OFFSET)
@@ -1275,18 +1281,35 @@ class Robot(SimObject):
 
             self.wheel_vel[idx] = wheel_tgt_speed
 
-            self.odom_wheel_vel[idx] = wheel_tgt_speed + wheel_vel_noise[idx]
+            if wheel_tgt_speed > ODOM_NOISE_THRESHOLD_VEL:
+                self.odom_wheel_vel[idx] = wheel_tgt_speed + wheel_vel_noise[idx]
+            else:
+                self.odom_wheel_vel[idx] = wheel_tgt_speed
 
             wheel_vel_error = (self.desired_wheel_vel[idx] -
                                self.odom_wheel_vel[idx])
 
+            if (self.desired_wheel_vel[idx] == 0 and
+                numpy.abs(self.odom_wheel_vel[idx]) < WHEEL_STOPPED_THRESHOLD_VEL):
+                
+                self.wheel_stopped_count[idx] += 1
+
+            else:
+                
+                self.wheel_stopped_count[idx] = 0
+
+            
             vel_int = self.wheel_vel_integrator[idx] + wheel_vel_error * dt_sec
             vel_int = clamp_abs(vel_int, MOTOR_VEL_INT_MAX)
             self.wheel_vel_integrator[idx] = vel_int
 
             if self.motors_enabled:
 
-                V_cmd = MOTOR_VEL_KP*wheel_vel_error + MOTOR_VEL_KI * vel_int
+                if self.wheel_stopped_count[idx] > 5:
+                    V_cmd = 0
+                else:
+                    V_cmd = MOTOR_VEL_KP*wheel_vel_error + MOTOR_VEL_KI * vel_int
+                    
                 V_cmd = clamp_abs(V_cmd, mm.V_nominal)
 
             else:
