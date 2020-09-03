@@ -7,8 +7,22 @@ taught at Swarthmore College in Fall 2020.
 Installation and first-time use
 -------------------------------
 
-Clone this repository, then go into a terminal and
-enter the following commands:
+#### This project was developed and tested with Python 3.7
+
+Python 2.7 reached end of life in January 2020. You should verify that
+you have a working Python 3 interpreter by typing
+
+    python --version
+
+at your command prompt. It should report back at least version 3.7. If
+it does not, try running `python3 --version` or `python3.7 --version`
+instead. If either of the latter two commands yields a working Python
+interpreter of the correct version, replace `python` in the second
+command below with either `python3` or `python3.7` as appropriate.
+
+
+Now clone this repository, then go into a terminal and
+enter the following commands, depending on your OS.
 
 #### Windows:
 
@@ -19,7 +33,7 @@ enter the following commands:
 #### Mac OS or Linux:
 
     cd /path/to/ursim
-    python -m venv --system-site-packages dev_env
+    python3 -m venv --system-site-packages dev_env
     source dev_env/bin/activate
 
 In either case, you will see the prefix `(dev_env)` in front of your
@@ -73,7 +87,7 @@ Re-entering the virtual environment from a new terminal session
 
 Whenever you open a new terminal session, you will need to re-activate
 the virtual environment before using `ursim` by repeating these two
-commands:
+commands, depending on your OS.
 
 #### Windows:
 
