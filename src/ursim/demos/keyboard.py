@@ -18,9 +18,7 @@ import glfw
 import sys, os
 from importlib.resources import open_text
 
-from .. import ctrl
-from ..app import RoboSimApp
-
+from ursim import RoboSimApp, ctrl
 
 ######################################################################
 

@@ -13,8 +13,8 @@ import numpy
 import glfw
 from importlib.resources import open_binary
 
-from .. import gfx
-from ..clean_gl import gl
+from ursim import gfx
+from ursim.clean_gl import gl
 
 ######################################################################
 

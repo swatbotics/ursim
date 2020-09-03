@@ -11,8 +11,7 @@
 
 import numpy
 
-from ..app import RoboSimApp
-from .. import ctrl
+from ursim import RoboSimApp, ctrl
 
 ######################################################################
 
