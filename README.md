@@ -47,7 +47,7 @@ prompt, you can run the commands
 
 If the setup.py command worked, you should then be able to run
 
-    python -m zoombot.demos.keyboard
+    python -m ursim.demos.keyboard
 
 which will bring up a demo with interactive control of a simulated
 robot. You can use the mouse to aim the camera. The following keys
