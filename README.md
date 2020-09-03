@@ -40,7 +40,7 @@ whatever path you cloned this repository into!
     python -m venv dev_env
     source dev_env/bin/activate
     
-Note for Ubuntu users: please run the command
+***Additional note for Ubuntu users:*** please run the command
 
     sudo apt-get install libportaudio2
 
