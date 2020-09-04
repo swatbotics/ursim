@@ -1615,6 +1615,10 @@ class RoboSim(B2D.b2ContactListener):
         tape_point_lists = []
 
         for item in svg:
+            
+            # any geometry we want to deal with has an xform
+            if not hasattr(item, 'transform'):
+                continue
 
             xx, yx, xy, yy, x0, y0 = [getattr(item.transform, letter)
                                       for letter in 'abcdef']
