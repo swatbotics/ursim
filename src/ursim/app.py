@@ -145,7 +145,7 @@ class RoboSimApp(gfx.GlfwApp):
 
     def initialize_audio(self):
 
-        snd = wave.open(open_binary('ursim.sounds', 'honk.wav'))
+        snd = wave.open(open_binary('ursim.sounds', 'beep.wav'))
         params = snd.getparams()
 
         assert params.sampwidth == 2
