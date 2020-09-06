@@ -7,7 +7,7 @@ taught at Swarthmore College in Fall 2020.
 Installation
 ------------
 
-#### This project was developed and tested with Python 3.7
+#### This project was developed and tested with Python 3
 
 Python 2.7 reached end of life in January 2020. You should verify that
 you have a working Python 3 interpreter by going to your command
