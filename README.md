@@ -51,7 +51,7 @@ your OS:
 
     sudo apt-get install libportaudio2
 
-before running the software.
+before continuing.
     
 #### Finishing setup:
 
