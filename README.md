@@ -23,6 +23,8 @@ yields a working Python interpreter of the correct version, replace
 `python` in the second command below with either `python3` or
 `python3.7` as appropriate.
 
+### Setup
+
 Now go into a command prompt and navigate to a directory where you would 
 like to put this software, then clone it:
 
