@@ -18,10 +18,7 @@ prompt and typing
 It should report back at least version 3.5.
 
 If you don't see 3.5 or above, try running `python3 --version` or
-`python3.7 --version` instead. If either of the latter two commands
-yields a working Python interpreter of the correct version, replace
-`python` in the second command below with either `python3` or
-`python3.7` as appropriate.
+`python3.7 --version` instead. 
 
 ### Setup
 
@@ -30,8 +27,9 @@ like to put this software, then clone it:
 
     git clone https://github.com/swatbotics/ursim.git
 
-Then enter the following commands to enter the repository you just cloned
-and create a virtual environment:
+Then enter the following commands to enter the repository you just
+cloned and create a virtual environment (note you may need to replace
+`python` with `python3` or `python3.7` for this command):
 
     cd ursim
     python -m venv dev_env
