@@ -15,10 +15,9 @@ prompt and typing
 
     python --version
 
-It should report back at least version 3.5.
-
-If you don't see 3.5 or above, try running `python3 --version` or
-`python3.7 --version` instead. 
+It should report back at least version 3.5. If not, try running
+`python3 --version` or `python3.7 --version` instead. Failing that,
+you'll need to update your Python version.
 
 ### Setup
 
@@ -28,8 +27,9 @@ like to put this software, then clone it:
     git clone https://github.com/swatbotics/ursim.git
 
 Then enter the following commands to enter the repository you just
-cloned and create a virtual environment (note you may need to replace
-`python` with `python3` or `python3.7` for this command):
+cloned and create a virtual environment (note: replace `python` with
+`python3` or `python3.7` for this command if the default Python
+version is 2.7):
 
     cd ursim
     python -m venv dev_env
