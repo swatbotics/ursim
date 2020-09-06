@@ -24,7 +24,7 @@ yields a working Python interpreter of the correct version, replace
 `python3.7` as appropriate.
 
 Now go into a command prompt and navigate to a directory where you would 
-like to put this software, then check it out:
+like to put this software, then clone it:
 
     git clone https://github.com/swatbotics/ursim.git
 
