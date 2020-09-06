@@ -23,21 +23,26 @@ yields a working Python interpreter of the correct version, replace
 `python` in the second command below with either `python3` or
 `python3.7` as appropriate.
 
-Now clone this repository, then go into a terminal and enter the
-following commands to creat and activate a virtual environment,
-depending on your OS. Don't forget to replace `PATH_TO_URSIM` with
-whatever path you cloned this repository into!
+Now go into a command prompt and navigate to a directory where you would 
+like to put this software, then check it out:
+
+    git clone https://github.com/swatbotics/ursim.git
+
+Then enter the following commands to enter the repository you just cloned
+and create a virtual environment:
+
+    cd ursim
+    python -m venv dev_env
+
+Next, activate the virtual environment. The command will depend on
+your OS:
 
 #### Windows:
 
-    cd PATH_TO_URSIM
-    python -m venv dev_env
     dev_env\Scripts\activate.bat
 
 #### Mac OS or Linux:
 
-    cd PATH_TO_URSIM
-    python -m venv dev_env
     source dev_env/bin/activate
     
 ***Additional note for Ubuntu users:*** please run the command
@@ -102,7 +107,8 @@ Re-entering the virtual environment from a new terminal session
 
 Whenever you open a new terminal session, you will need to re-activate
 the virtual environment before using `ursim` by repeating these two
-commands, depending on your OS.
+commands, depending on your OS (make sure to replace `PATH_TO_URSIM`
+with whatever directory you cloned the repository into):
 
 #### Windows:
 
