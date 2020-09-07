@@ -52,7 +52,10 @@ Data from non-camera robot sensors. It contains the following fields:
 
   * forward_vel, anglular_vel: filtered (smoothed) measurements of robot
     forward and angular velocity in its own coordinate frame
-"""
+
+Note that additional fields may be added to this data type in future
+simulator versions; however, the order of existing fields will be
+preserved."""
 
 ######################################################################
 
@@ -71,8 +74,9 @@ Data from camera sensors. It contains the following fields:
     class for more details, or look at the
     ursim.demos.blob_detection example.
 
-
-"""
+Note that additional fields may be added to this data type in future
+simulator versions; however, the order of existing fields will be
+preserved."""
 
 ######################################################################
 
