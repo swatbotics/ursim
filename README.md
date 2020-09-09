@@ -53,6 +53,8 @@ before continuing.
     
 #### Finishing setup:
 
+***Note: once the virtual environment is activated, you no longer need to type `python3` or `python3.7`, just run `python` for the following commands.***
+
 In either case, you will see the prefix `(dev_env)` in front of your
 terminal command prompt to let you know the command worked.
 
