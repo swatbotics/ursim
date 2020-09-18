@@ -179,13 +179,19 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.snd_data = sdata
 
-        self.stream = sounddevice.OutputStream(samplerate=params.framerate,
-                                               channels=params.nchannels,
-                                               dtype='int16',
-                                               blocksize=1024,
-                                               callback=self.snd_callback)
+        try:
 
-        self.stream.start()
+            self.stream = sounddevice.OutputStream(samplerate=params.framerate,
+                                                   channels=params.nchannels,
+                                                   dtype='int16',
+                                                   blocksize=1024,
+                                                   callback=self.snd_callback)
+
+            self.stream.start()
+
+        except:
+
+            self.stream = None
 
     def snd_callback(self, outdata, frames_requested, time, status):
 
