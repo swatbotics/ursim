@@ -49,7 +49,6 @@ PYLON_COLORS = [
     gfx.vec3(0, 0.8, 0),
 ]
 
-
 BALL_COLOR = gfx.vec3(0.5, 0, 1)
 
 CIRCLE_COLORS = [ BALL_COLOR ] + PYLON_COLORS
@@ -1482,7 +1481,86 @@ class SvgTransformer:
         return self.scl * x, self.scl*y
 
 ######################################################################
+# helper function for below
+
+def _flatten(seg, scl, u0, p0, u1, p1, points):
+
+    # precondition: points[-1] = p0 unless very first point
+
+    d01 = svgelements.Point.distance(p0, p1)
+
+    if d01*scl > TAPE_DASH_SIZE:
+
+        umid = 0.5*(u0 + u1)
+        pmid = seg.point(umid)
+
+        _flatten(seg, scl, u0, p0, umid, pmid, points)
+
+        # now pmid is added
+
+        _flatten(seg, scl, umid, pmid, u1, p1, points)
+
+        # now p1 is added
+
+    else:
+
+        points.append(p1)
+
+    # postcondition: points[-1] = p1
+
+######################################################################
+# flatten a bezier path segment
     
+def flatten(seg, scl):
+    
+    p0 = seg.point(0)
+    p1 = seg.point(1)
+
+    points = []
+    
+    _flatten(seg, scl, 0.0, p0, 1.0, p1, points)
+
+    return points
+
+######################################################################
+# get position and angle from triangle
+
+def robot_from_triangle(points):
+
+    assert len(points) == 3
+
+    pairs = numpy.array([
+        [0, 1],
+        [1, 2],
+        [2, 0]
+    ])
+
+    diffs = points[pairs[:,0]] - points[pairs[:,1]]
+
+    dists = numpy.linalg.norm(diffs, axis=1)
+    a = dists.argmin()
+
+    i, j = pairs[a]
+    k = 3-i-j
+
+    tangent = diffs[a]
+    ctr = 0.5*(points[i] + points[j])
+
+    normal = gfx.normalize(gfx.vec2(-tangent[1], tangent[0]))
+
+    dist = numpy.dot(normal, points[k]-ctr)
+
+    if dist < 0:
+        normal = -normal
+        dist = -dist
+
+    robot_init_position = ctr + 0.5 * dist * normal
+    robot_init_angle = numpy.arctan2(normal[1], normal[0])
+
+    return robot_init_position, robot_init_angle
+
+######################################################################
+
 class RoboSim(B2D.b2ContactListener):
 
     def __init__(self):
@@ -1603,7 +1681,7 @@ class RoboSim(B2D.b2ContactListener):
         print('parsed', svgfile)
 
         scl = 1e-2
-        
+
         xform = SvgTransformer(svg.viewbox.viewbox_width,
                                svg.viewbox.viewbox_height, scl)
 
@@ -1614,7 +1692,15 @@ class RoboSim(B2D.b2ContactListener):
 
         tape_point_lists = []
 
-        for item in svg:
+        items = [ item for item in svg ]
+
+        while len(items):
+
+            item = items.pop(0)
+
+            if isinstance(item, svgelements.Group):
+                items = [ child for child in item ] + items
+                continue
             
             # any geometry we want to deal with has an xform
             if not hasattr(item, 'transform'):
@@ -1639,6 +1725,9 @@ class RoboSim(B2D.b2ContactListener):
             if item.stroke.value is not None:
                 scolor = vec_from_svg_color(item.stroke)
 
+            points = None
+            is_closed = False
+
             if isinstance(item, svgelements.Rect):
 
                 w, h = xform.scale_dims(item.width, item.height)
@@ -1655,13 +1744,14 @@ class RoboSim(B2D.b2ContactListener):
                 if numpy.all(fcolor == 1):
 
                     # room rectangle
-                    continue
+                    pass
 
                 else:
 
                     self.add_box(dims, pctr, theta)
                 
-            elif isinstance(item, svgelements.Circle) or isinstance(item, svgelements.Ellipse):
+            elif (isinstance(item, svgelements.Circle) or
+                  isinstance(item, svgelements.Ellipse)):
                 
                 cidx, color = match_svg_color(fcolor, CIRCLE_COLORS)
 
@@ -1678,65 +1768,70 @@ class RoboSim(B2D.b2ContactListener):
                 p0 = xform.transform(item.x1, item.y1)
                 p1 = xform.transform(item.x2, item.y2)
 
-                cidx, color = match_svg_color(scolor, LINE_COLORS)
-
-                if cidx < 2:
-                    
-                    points = numpy.array([p0, p1])
-                    self.add_tape_strip(points, TAPE_COLOR_NAMES[cidx])
-                    
-                else:
-
-                    self.add_wall(p0, p1)
+                points = numpy.array([p0, p1])
+                is_closed = False
 
             elif isinstance(item, svgelements.Polyline):
                 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
 
-                cidx, color = match_svg_color(scolor, LINE_COLORS)
-                
-                self.add_tape_strip(points, TAPE_COLOR_NAMES[cidx])
+                is_closed = False
 
+            elif isinstance(item, svgelements.Path):
+
+                points = []
+                
+                for seg in item.segments():
+                    if isinstance(seg, svgelements.Move):
+                        points.append(seg.point(0))
+                    elif isinstance(seg, svgelements.Line):
+                        points.append(seg.point(1))
+                    elif isinstance(seg, svgelements.Close):
+                        is_closed = True
+                    else:
+                        points.extend(flatten(seg, scl))
+
+                points = numpy.array([ xform.transform(p.x, p.y) for p in points ])
+                
             elif isinstance(item, svgelements.Polygon):
 
                 points = numpy.array(
                     [xform.transform(p.x, p.y) for p in item.points])
 
-                assert len(points) == 3
-
-                pairs = numpy.array([
-                    [0, 1],
-                    [1, 2],
-                    [2, 0]
-                ])
-
-                diffs = points[pairs[:,0]] - points[pairs[:,1]]
-
-                dists = numpy.linalg.norm(diffs, axis=1)
-                a = dists.argmin()
-
-                i, j = pairs[a]
-                k = 3-i-j
-
-                tangent = diffs[a]
-                ctr = 0.5*(points[i] + points[j])
-
-                normal = gfx.normalize(gfx.vec2(-tangent[1], tangent[0]))
-
-                dist = numpy.dot(normal, points[k]-ctr)
-
-                if dist < 0:
-                    normal = -normal
-                    dist = -dist
-
-                robot_init_position = ctr + 0.5 * dist * normal
-                robot_init_angle = numpy.arctan2(normal[1], normal[0])
+                is_closed = True
 
             else:
                 
                 print('*** warning: ignoring SVG item:', item, '***')
                 continue
+
+            ##################################################
+
+            if points is not None:
+
+                if len(points) == 2 and not is_closed:
+
+                    cidx, color = match_svg_color(scolor, LINE_COLORS)
+
+                    if cidx < len(TAPE_COLORS):
+                        self.add_tape_strip(points, TAPE_COLOR_NAMES[cidx])
+                    else:
+                        self.add_wall(points[0], points[1])
+
+                elif len(points) == 3 and is_closed:
+
+                    robot_init_position, robot_init_angle = robot_from_triangle(points)
+
+                else:
+
+                    if is_closed:
+                        points = numpy.vstack((points, [points[0]]))
+
+                    cidx, color = match_svg_color(scolor, TAPE_COLORS)
+                    self.add_tape_strip(points, TAPE_COLOR_NAMES[cidx])
+
+            ##################################################
 
         assert self.robot == self.objects[0]
         assert self.room == self.objects[1]
