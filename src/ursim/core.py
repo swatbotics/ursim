@@ -295,7 +295,8 @@ class Pylon(SimObject):
         self.body_linear_mu = 0.9
 
         cidx = PYLON_COLOR_NAMES.index(cname)
-        
+
+        self.color_name = cname
         self.color = PYLON_COLORS[cidx]
         self.material_id = (1 << (cidx+1))
 
@@ -1561,6 +1562,36 @@ def robot_from_triangle(points):
 
 ######################################################################
 
+class SimObserver:
+
+    """Base class for objects that can get notified when simulator updates
+    happen, and are given access to the simulator state. Good for
+    making scorekeepers for various objectives..."""
+
+    def __init__(self):
+        """Initializer."""
+        pass
+
+    def register(self, sim):
+        """Called once when observer is added to simulator. The simulation
+        environment should be set up but the app not yet started at
+        this point."""
+        pass
+
+    def initialize(self, sim):
+        """Called before first update and after any restarts."""
+        pass
+
+    def pre_update(self, sim):
+        """Called before each update (but after logging has started)."""
+        pass
+
+    def post_update(self, sim):
+        """Called after each update (but before log row is written)."""
+        pass
+
+######################################################################
+
 class RoboSim(B2D.b2ContactListener):
 
     def __init__(self):
@@ -1597,9 +1628,7 @@ class RoboSim(B2D.b2ContactListener):
 
         self.svg_file = None
 
-        self.framebuffer = None
-
-        self.detections = None
+        self.observers = []
 
         print('created the world!')
 
@@ -1638,6 +1667,11 @@ class RoboSim(B2D.b2ContactListener):
     def add_wall(self, p0, p1):
         self.add_object(Wall(self.world, numpy.array(p0), numpy.array(p1)))
 
+    def add_observer(self, observer):
+        self.observers.append(observer)
+        observer.register(self)
+        observer.initialize(self)
+
     def reset(self, reload_svg=True):
         
         filename = self.datalog.finish()
@@ -1655,6 +1689,9 @@ class RoboSim(B2D.b2ContactListener):
             for obj in self.objects:
                 obj.reset()
         self.modification_counter += 1
+
+        for observer in self.observers:
+            observer.initialize(self)
 
     def clear(self):
 
@@ -1849,6 +1886,9 @@ class RoboSim(B2D.b2ContactListener):
         if not self.datalog.is_logging():
             filename = self.datalog.begin_log()
             print('starting log', filename)
+
+        for observer in self.observers:
+            observer.pre_update(self)
         
         for i in range(self.physics_ticks_per_update):
 
@@ -1866,8 +1906,10 @@ class RoboSim(B2D.b2ContactListener):
 
         self.robot.update_log()
         
+        for observer in self.observers:
+            observer.post_update(self)
+        
         self.datalog.append_log_row()
-
 
     def kick_ball(self):
 
@@ -1899,5 +1941,3 @@ class RoboSim(B2D.b2ContactListener):
 
         if other is not None:
             self.robot.colliders.add(other.userData)
-    
-            
