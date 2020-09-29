@@ -38,7 +38,7 @@ disables the robot's motors.
 RobotState = namedtuple('RobotState',
                         'odom_pose, '
                         'bump_left, bump_center, bump_right,'
-                        'forward_vel, anglular_vel')
+                        'forward_vel, angular_vel')
 
 RobotState.__doc__ = """
 
