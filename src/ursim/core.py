@@ -1026,8 +1026,26 @@ class Robot(SimObject):
         self.filter_setpoints = False
         self.filter_vel = True
 
+        if 'URSIM_PERFECT_ODOMETRY' in os.environ:
+            print('**********************************************************************')
+            print('URSIM_PERFECT_ODOMETRY was set, using perfect odometry!')
+            print('**********************************************************************')
+            print()
+            self.perfect_odometry = True
+        else:
+            self.perfect_odometry = False
+
+        if 'URSIM_PERFECT_CONTACT' in os.environ:
+            print('**********************************************************************')
+            print('URSIM_PERFECT_CONTACT was set, disabling perturbation forces!')
+            print('**********************************************************************')
+            print()
+            self.perfect_contact = True
+        else:
+            self.perfect_contact = False
+
         self.initialize()
-        
+
     def initialize(self, position=None, angle=None):
 
         self.destroy()
@@ -1264,8 +1282,15 @@ class Robot(SimObject):
             self.desired_linear_angular_vel_filtered[:, 0]
         )
 
-        wheel_vel_noise = numpy.random.normal(size=2, scale=ODOM_NOISE_STDDEV)
-        wheel_force_noise = numpy.random.normal(size=2, scale=WHEEL_FORCE_MAX_STDDEV)
+        if self.perfect_odometry:
+            wheel_vel_noise = numpy.zeros(2)
+        else:
+            wheel_vel_noise = numpy.random.normal(size=2, scale=ODOM_NOISE_STDDEV)
+
+        if self.perfect_contact:
+            wheel_force_noise = numpy.zeros(2)
+        else:
+            wheel_force_noise = numpy.random.normal(size=2, scale=WHEEL_FORCE_MAX_STDDEV)
 
         mm = self.motor_model
 
@@ -1369,8 +1394,18 @@ class Robot(SimObject):
             self.odom_wheel_vel)
         
         self.odom_tick += 1
+
+        if self.perfect_odometry:
+
+            T_world_from_orig = Transform2D(self.orig_position, self.orig_angle)
+            T_world_from_cur = Transform2D(self.body.position, self.body.angle)
+
+            T_orig_from_cur = T_world_from_orig.inverse() * T_world_from_cur
+
+            self.odom_pose.position = T_orig_from_cur.position
+            self.odom_pose.angle = T_orig_from_cur.angle
         
-        if self.odom_tick % ODOM_FREQUENCY == 0:
+        elif self.odom_tick % ODOM_FREQUENCY == 0:
 
             odt = dt_sec * ODOM_FREQUENCY
             odom_fwd = odt * self.odom_linear_angular_vel[0]

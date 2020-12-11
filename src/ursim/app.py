@@ -83,7 +83,10 @@ LOG_PROFILING_NAMES = [
 
 class RoboSimApp(gfx.GlfwApp):
 
-    def __init__(self, controller, filter_setpoints=False):
+    def __init__(self, controller,
+                 filter_setpoints=False,
+                 perfect_odometry=None,
+                 perfect_contact=None):
 
         super().__init__()
 
@@ -138,6 +141,12 @@ class RoboSimApp(gfx.GlfwApp):
 
         self.controller = controller
         self.sim.robot.filter_setpoints = filter_setpoints
+
+        if perfect_odometry is not None:
+            self.sim.robot.perfect_odometry = perfect_odometry
+
+        if perfect_contact is not None:
+            self.sim.robot.perfect_contact = perfect_contact
 
         controller.setup_log(self.sim.datalog)
 
