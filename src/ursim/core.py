@@ -748,6 +748,9 @@ class TapeStrips(SimObject):
                     num_dashes -= 1
 
                 u = numpy.hstack(([numpy.float32(0)], numpy.cumsum(segment_lengths)))
+                if not u[-1]:
+                    continue
+
                 u /= u[-1]
 
                 cur_dash = [ points[0] ]
